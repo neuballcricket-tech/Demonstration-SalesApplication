@@ -1225,8 +1225,89 @@ export function apiCreateActivity(_data: {
   return Promise.resolve({} as ActivityEntry)
 }
 
+// ---------------------------------------------------------------------------
+// Booking Requests
+// ---------------------------------------------------------------------------
 
+export interface BookingRequestPayload {
+  inq_id: number
+  cli_id: number
+  lin_id: number
+  origin: string
+  destination: string
+  vessel: string
+  vessel_etd: string
+  voyage: string
+  cargo_ready_date: string
+  delivery_type: string
+  agreed_rate: number
+  delivery_term: string
+  commodity: number
+  hs_code: string
+  bl_type: string
+  notes: string
+  rate_remark?: string
+  contract_no?: string
+  ra_number?: string
+  specific_routing?: string
+  booking_type?: string
+  reefer_temp?: string
+  delivery_agent?: string
+}
 
+/** Create a booking request. Auto-sets workflow → booking_request. */
+export function apiCreateBookingRequest(
+  data: BookingRequestPayload
+): Promise<{ booking_id: number }> {
+  return post<{ booking_id: number }>('/booking-requests', data)
+}
+
+/** Partial update of booking request fields (no status side-effect). */
+export function apiPatchBookingRequest(
+  bookingId: number,
+  data: Partial<BookingRequestPayload>
+): Promise<Record<string, unknown>> {
+  return patch<Record<string, unknown>>(`/booking-requests/${bookingId}`, data)
+}
+
+/** Mark booking as reviewed (status → request_reviewed). */
+export function apiReviewBookingRequest(
+  bookingId: number,
+  data?: Partial<BookingRequestPayload>
+): Promise<Record<string, unknown>> {
+  return patch<Record<string, unknown>>(`/booking-requests/${bookingId}/review`, data)
+}
+
+/** Confirm booking with liner (status → request_booking_success, workflow → completed). */
+export function apiConfirmBookingRequest(
+  bookingId: number
+): Promise<Record<string, unknown>> {
+  return patch<Record<string, unknown>>(`/booking-requests/${bookingId}/confirm`)
+}
+
+// ---------------------------------------------------------------------------
+// Release Orders
+// ---------------------------------------------------------------------------
+
+/** Create a release order for a confirmed booking. Auto-sets workflow → booking_confirmed. */
+export function apiCreateReleaseOrder(
+  data: BackendReleaseOrderPayload
+): Promise<Record<string, unknown>> {
+  return post<Record<string, unknown>>('/booking-requests/release-orders', data)
+}
+
+/** Update release order fields. */
+export function apiPatchReleaseOrder(
+  roId: number,
+  data: Partial<BackendReleaseOrderPayload>
+): Promise<Record<string, unknown>> {
+  return patch<Record<string, unknown>>(`/booking-requests/release-orders/${roId}`, data)
+}
+
+/** Fetch pending release orders for the current user. */
+export function apiFetchPendingReleaseOrders(): Promise<Record<string, unknown>[]> {
+  return get<Record<string, unknown>[]>('/booking-requests/release-orders')
+}
 
 // ---------------------------------------------------------------------------
 // RFQ — bulk inquiry creation
@@ -1255,8 +1336,6 @@ export function apiCreateRfq(data: {
   return post<RfqCreateResult>('/inquiries/rfq', data)
 }
 
-
-
 export interface RfqPreviewRow {
   row: number
   origin: string
@@ -1266,7 +1345,6 @@ export interface RfqPreviewRow {
   country: string
   known_port: boolean
 }
-
 
 export interface RfqPreviewResult {
   destination: string | null
@@ -1278,4 +1356,3 @@ export interface RfqPreviewResult {
 export function apiPreviewRfq(file: File): Promise<RfqPreviewResult> {
   return postFile<RfqPreviewResult>('/inquiries/rfq/preview', file)
 }
-

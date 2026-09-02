@@ -40,6 +40,12 @@ interface WorkspaceProps {
     customer_name: string; quote_id: string; shipping_line: string;
     container_type: string; quantity: number; origin: string; destination: string;
     is_urgent: boolean; booked_by: number; notes: string; delivery_type?: 'port-to-port' | 'door-to-door';
+    inq_id?: number; cli_id?: number; lin_id?: number; commodity_id?: number;
+    vessel_etd?: string; agreed_rate?: number; delivery_term?: string;
+    hs_code?: string; bl_type?: string; cargo_ready_date?: string;
+    contract_no?: string; ra_number?: string; specific_routing?: string;
+    booking_type?: string; reefer_temp?: string; delivery_agent?: string;
+    vessel?: string; voyage?: string; rate_remark?: string;
   }) => string
   onSetBookingSiCutoff: (bookingId: string, date: string) => void
   onSetBookingBlCutoff: (bookingId: string, date: string) => void
@@ -331,6 +337,7 @@ export default function Workspace({
   const [bkCommodity, setBkCommodity] = useState('')
   const [bkCargoReadyDate, setBkCargoReadyDate] = useState('')
   const [bkVessel, setBkVessel] = useState('')                   // Vessel name
+  const [bkVesselEtd, setBkVesselEtd] = useState('')             // Vessel ETD (required by backend)
   const [bkVoyage, setBkVoyage] = useState('')                   // Voyage number
   const [bkPod, setBkPod] = useState('')                        // Port of Discharge
   const [bkContractNo, setBkContractNo] = useState('')
@@ -1262,6 +1269,7 @@ ABC Logistics (Pvt) Ltd`
         setBkCommodity('')
         setBkCargoReadyDate('')
         setBkVessel('')
+        setBkVesselEtd('')
         setBkVoyage('')
         setBkPod(brInq.destination ?? '')
         setBkContractNo('')
@@ -1300,6 +1308,7 @@ ABC Logistics (Pvt) Ltd`
         setBkCommodity(getNote('Commodity'))
         setBkCargoReadyDate(getNote('Cargo Ready'))
         setBkVessel(getNote('Vessel'))
+        setBkVesselEtd(rbBkg.vessel_etd ?? '')
         setBkVoyage(getNote('Voyage'))
         setBkPod(rbBkg.destination ?? '')
         setBkContractNo(getNote('Contract'))
@@ -2104,6 +2113,10 @@ ABC Logistics (Pvt) Ltd`
       case 'booking-request': {
         const { inquiry } = actionModal.sourceData
         const ctnSummary = bkContainers.map(c => `${c.qty}x${c.type}`).join(', ')
+        // Resolve liner ID from name for backend API
+        const resolvedLinId = linerList.find(l => l.name === bkShippingLine)?.lin_id
+        const resolvedCommodityId = inquiry.com_ids?.[0]
+
         const bookingId = onCreateBooking({
           customer_name: inquiry.customer_name,
           quote_id: inquiry.id,
@@ -2133,8 +2146,29 @@ ABC Logistics (Pvt) Ltd`
             bkRaNumber && `RA No: ${bkRaNumber}`,
           ].filter(Boolean).join(' | ') || `Booking for ${inquiry.customer_name}: ${inquiry.request}`,
           delivery_type: inquiry.delivery_type,
+          // Backend integration fields
+          inq_id: inquiry.inq_id,
+          cli_id: inquiry.cli_id,
+          lin_id: resolvedLinId,
+          commodity_id: resolvedCommodityId,
+          vessel_etd: bkVesselEtd || undefined,
+          agreed_rate: bkAgreedRate ? parseFloat(bkAgreedRate) : undefined,
+          delivery_term: bkDeliveryTerm || undefined,
+          hs_code: bkHsCode || undefined,
+          bl_type: bkBlType || undefined,
+          cargo_ready_date: bkCargoReadyDate || inquiry.cargo_ready_date || undefined,
+          contract_no: bkContractNo || undefined,
+          ra_number: bkRaNumber || undefined,
+          specific_routing: bkSpecificRouting || undefined,
+          booking_type: bkBookingType || undefined,
+          reefer_temp: bkReeferTemp || undefined,
+          delivery_agent: bkDeliveryAgent || undefined,
+          vessel: bkVessel || undefined,
+          voyage: bkVoyage || undefined,
+          rate_remark: bkRateRemark || undefined,
         })
-        onAdvanceWorkflow(inquiry.id, 'completed')
+        // Workflow auto-advances via POST /booking-requests; skip manual API call if backend IDs present
+        onAdvanceWorkflow(inquiry.id, 'completed', !!(inquiry.inq_id && resolvedLinId))
         const noteParts = [
           ctnSummary,
           bkShippingLine || 'Any carrier',
@@ -4592,14 +4626,22 @@ ABC Logistics (Pvt) Ltd`
                           value={bkCargoReadyDate} onChange={e => setBkCargoReadyDate(e.target.value)} />
                       </div>
                     </div>
-                    {/* Vessel + Voyage */}
+                    {/* Vessel + Vessel ETD */}
                     <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 90px 1fr', borderBottom: '1px solid var(--border)' }}>
                       <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Vessel</div>
                       <div style={{ padding: '4px 8px', borderRight: '1px solid var(--border)' }}>
                         <input className="lt-input" style={{ width: '100%', border: 'none', background: 'transparent', padding: '4px 0' }}
                           value={bkVessel} onChange={e => setBkVessel(e.target.value)} placeholder="e.g. MSC Asya" />
                       </div>
-                      <div style={{ padding: '8px 8px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Voyage</div>
+                      <div style={{ padding: '8px 8px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>ETD</div>
+                      <div style={{ padding: '4px 8px' }}>
+                        <input className="lt-input" type="date" style={{ width: '100%', border: 'none', background: 'transparent', padding: '4px 0' }}
+                          value={bkVesselEtd} onChange={e => setBkVesselEtd(e.target.value)} />
+                      </div>
+                    </div>
+                    {/* Voyage */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Voyage</div>
                       <div style={{ padding: '4px 8px' }}>
                         <input className="lt-input" style={{ width: '100%', border: 'none', background: 'transparent', padding: '4px 0' }}
                           value={bkVoyage} onChange={e => setBkVoyage(e.target.value)} placeholder="e.g. MA622R" />
@@ -4815,10 +4857,11 @@ ABC Logistics (Pvt) Ltd`
             const isActive = effectiveStep === step.key
             const isGroupAvailable = step.group ? (groupHasItems[step.group] ?? false) : false
             const isEmpty = count === 0 && !isGroupAvailable
+            const isGreyedOut = (activeRole === 'CS' || activeRole === 'Sales') && step.stepNumber >= 9
             return (
               <button
                 key={step.key}
-                onClick={() => setActiveStep(step.key)}
+                onClick={() => { if (!isGreyedOut) setActiveStep(step.key) }}
                 style={{
                   display: 'flex',
                   flexDirection: compact ? 'row' : 'column',
@@ -4828,11 +4871,13 @@ ABC Logistics (Pvt) Ltd`
                   minWidth: compact ? undefined : 80,
                   border: 'none',
                   borderRadius: compact ? 6 : 10,
-                  cursor: 'pointer',
-                  background: isActive ? roleColor + '12' : 'transparent',
+                  cursor: isGreyedOut ? 'not-allowed' : 'pointer',
+                  background: isActive && !isGreyedOut ? roleColor + '12' : 'transparent',
                   transition: 'background 0.15s',
                   flexShrink: 0,
                   position: 'relative',
+                  opacity: isGreyedOut ? 0.35 : 1,
+                  pointerEvents: isGreyedOut ? 'none' as const : undefined,
                 }}
               >
                 <div style={{
@@ -4844,8 +4889,8 @@ ABC Logistics (Pvt) Ltd`
                   justifyContent: 'center',
                   fontSize: compact ? 9 : 11,
                   fontWeight: 700,
-                  background: isActive ? roleColor : isEmpty ? 'rgba(0,0,0,0.06)' : roleColor + '18',
-                  color: isActive ? '#fff' : isEmpty ? 'var(--text-muted)' : roleColor,
+                  background: isGreyedOut ? 'rgba(0,0,0,0.06)' : isActive ? roleColor : isEmpty ? 'rgba(0,0,0,0.06)' : roleColor + '18',
+                  color: isGreyedOut ? '#aaa' : isActive ? '#fff' : isEmpty ? 'var(--text-muted)' : roleColor,
                   transition: 'all 0.15s',
                   flexShrink: 0,
                 }}>
@@ -4853,8 +4898,8 @@ ABC Logistics (Pvt) Ltd`
                 </div>
                 <span style={{
                   fontSize: compact ? 9 : 10,
-                  fontWeight: isActive ? 700 : 600,
-                  color: isActive ? roleColor : isEmpty ? 'var(--text-muted)' : 'var(--text-secondary)',
+                  fontWeight: isActive && !isGreyedOut ? 700 : 600,
+                  color: isGreyedOut ? '#aaa' : isActive ? roleColor : isEmpty ? 'var(--text-muted)' : 'var(--text-secondary)',
                   whiteSpace: 'nowrap',
                   transition: 'color 0.15s',
                 }}>
