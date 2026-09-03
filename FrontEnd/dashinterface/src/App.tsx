@@ -21,7 +21,7 @@ import Login from './components/pages/Login'
 import Profile from './components/pages/Profile'
 import {
   PAGE_LABELS, nowStamp,
-  EMPLOYEES, EMPLOYEE_ROLE_MAP, ROLE_ACTIONS, ROLE_PAGE_ACCESS, ROLE_LABELS,
+  EMPLOYEES, EMPLOYEE_ROLE_MAP, ROLE_ACTIONS, ROLE_LABELS,
   WORKFLOW_STAGES,
   BE_TO_FE_BOOKING_STATUS,
   type BackendBookingStatus,
@@ -325,7 +325,8 @@ export default function App() {
   const activeEmployee = EMPLOYEES.find(e => e.id === activeEmployeeId) ?? EMPLOYEES[0]
   const activeRole: UserRole = EMPLOYEE_ROLE_MAP[activeEmployeeId] ?? 'CS'
 
-  const canAccessPage = (page: PageId) => ROLE_PAGE_ACCESS[activeRole].includes(page)
+  // TEST BRANCH: all pages accessible regardless of role
+  const canAccessPage = (_page: PageId) => true
 
   const navigateTo = (page: PageId) => {
     if (canAccessPage(page)) {
@@ -1283,6 +1284,23 @@ export default function App() {
           activeRole={activeRole}
           onNavigateProfile={() => setCurrentPage('profile')}
         />
+
+        {/* TEST BRANCH: floating role switcher — remove before merging to dev/master */}
+        <div style={{
+          position: 'fixed', bottom: 16, right: 16, zIndex: 9999,
+          background: '#1e293b', border: '1px solid #334155', borderRadius: 10,
+          padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)', fontSize: 12,
+        }}>
+          <span style={{ color: '#94a3b8', marginRight: 4 }}>Role:</span>
+          {(['CS', 'Sales', 'Procurement', 'Finance', 'Admin'] as UserRole[]).map(r => (
+            <button key={r} onClick={() => setTestRole(r)} style={{
+              padding: '3px 9px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
+              background: activeRole === r ? '#3b82f6' : '#334155',
+              color: activeRole === r ? '#fff' : '#94a3b8',
+            }}>{r}</button>
+          ))}
+        </div>
 
         <div className="db-body">
           <Sidebar current={currentPage} onNav={navigateTo} activeRole={activeRole} />
