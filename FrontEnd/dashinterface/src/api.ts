@@ -10,7 +10,7 @@ import type {
   QuoteStatus, CustomerTier, PaymentTerms, SBU, QuoteLine, ActivityEntry, KycStatus, RateRecord,
   DeliveryType, UnifiedRate, PortRecord, ServiceScope, RateSourceType,
   LinerRecord, TradeLaneRecord, ContactPersonRecord, EmployeeRecord, ClientRecord,
-  ContainerLine,
+  ContainerLine, BackendReleaseOrderPayload, CompletedRateRequestsResponse,
 } from './types'
 
 const BASE = import.meta.env.VITE_API_BASE || '/api'
@@ -1055,6 +1055,15 @@ export function apiPatchRateRequestOption(requestId: number, optionId: number, d
 /** Delete a rate request option. If last option, backend rolls back workflow to escalated_to_procurement. */
 export function apiDeleteRateRequestOption(requestId: number, optionId: number): Promise<Record<string, unknown>> {
   return del<Record<string, unknown>>(`/rate-requests/${requestId}/options/${optionId}`)
+}
+
+/**
+ * Fetch completed rate requests ready for quotation prep.
+ * Returns requests with is_given=true at quotation_prep stage for the current user,
+ * with full rate details attached to each option.
+ */
+export function apiFetchCompletedRateRequests(): Promise<CompletedRateRequestsResponse> {
+  return get<CompletedRateRequestsResponse>('/rate-requests/completed-for-quoting')
 }
 
 // ---------------------------------------------------------------------------

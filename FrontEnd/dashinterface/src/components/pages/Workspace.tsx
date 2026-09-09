@@ -14,7 +14,8 @@ import {
   type ReleaseOrderFields,
 } from '../../types'
 import { useRole } from '../../RoleContext'
-import { apiGetLiners, apiCreateKycRequest, apiCreateQuotation, apiPatchQuotation, apiMarkQuotationSent, apiFetchQuotation, apiRecordQuotationResponse, apiUpdateKycStage, type KycPendingClient, type KycRequestRecord, type QuotationOptionRow } from '../../api'
+import { apiGetLiners, apiCreateKycRequest, apiCreateQuotation, apiPatchQuotation, apiMarkQuotationSent, apiFetchQuotation, apiRecordQuotationResponse, apiUpdateKycStage, apiFetchCompletedRateRequests, type KycPendingClient, type KycRequestRecord, type QuotationOptionRow } from '../../api'
+import type { CompletedRateRequest, CompletedRateOption } from '../../types'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -48,7 +49,8 @@ interface WorkspaceProps {
   onMarkSiSubmitted: (bookingId: string) => void
   vesselSchedules: import('../../types').VesselSchedule[]
   onAddVesselSchedule: (vs: Omit<import('../../types').VesselSchedule, 'id'>) => void
-  onMarkDraftBlSent: (bookingId: string) => void
+  onMarkDraftBlSent: (bookingId: string, jobReferenceNumber?: string) => void
+  onMarkLinerBlGenerated: (bookingId: string) => void
   onMarkPreAdviceSent: (bookingId: string) => void
   onSetBlStatus: (bookingId: string, status: 'pending' | 'approved' | 'changes-requested') => void
   onRecordMasterBl: (bookingId: string, data: { master_bl_number: string; shipper: string; consignee: string }) => void
@@ -99,6 +101,63 @@ const TYPE_BADGE_CLASS: Record<ItemType, string> = {
 }
 
 // ---------------------------------------------------------------------------
+// Build rate-option lines for the quotation text template.
+// Filters to only selected option IDs, marks the best option with a star.
+// Falls back to parsing activity log notes if no saved rate request exists.
+// ---------------------------------------------------------------------------
+
+function formatRateOptionLine(
+  opt: CompletedRateOption,
+  isBest: boolean,
+  liners: import('../../types').LinerRecord[],
+): string {
+  const r = opt.rate!
+  const linerName = r.lin_id ? (liners.find(l => l.lin_id === r.lin_id)?.name ?? `Liner #${r.lin_id}`) : ''
+  const typeLabel = opt.rate_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+  const parts: string[] = []
+  if (linerName) parts.push(linerName)
+  parts.push(`${r.rate ?? '—'} ${r.currency ?? 'USD'}`)
+  if (r.container_type) parts.push(r.container_type)
+  if (r.transit) parts.push(`${r.transit}d transit`)
+  const ft = r.free_time ?? r.free_days
+  if (ft) parts.push(`${ft}d free`)
+  if (r.valid_from && r.valid_to) parts.push(`valid ${r.valid_from} – ${r.valid_to}`)
+  if (r.vessel_name) parts.push(`vessel: ${r.vessel_name}`)
+  const prefix = isBest ? '  ★ ' : '  • '
+  return `${prefix}[${typeLabel}] ${parts.join(' · ')}${isBest ? '  ← Recommended' : ''}`
+}
+
+function buildRateSection(
+  rr: CompletedRateRequest | undefined,
+  selectedIds: number[],
+  bestId: number | null,
+  liners: import('../../types').LinerRecord[],
+  fallbackCtx: import('../../types').ActivityEntry | null,
+): string {
+  const lines: string[] = []
+
+  if (rr && rr.options.length > 0) {
+    const selected = rr.options.filter(o => o.rate && selectedIds.includes(o.option_id))
+    for (const opt of selected) {
+      lines.push(formatRateOptionLine(opt, opt.option_id === bestId, liners))
+    }
+  }
+
+  // Fallback: parse activity log notes
+  if (lines.length === 0 && fallbackCtx) {
+    const notes = fallbackCtx.notes ?? ''
+    const dbRateMatch = notes.match(/DB Rates:\s*([^|]+)/i)
+    const manualRateMatch = notes.match(/Manual Rates?:\s*([^|]+)/i)
+    const dbRates = dbRateMatch?.[1]?.trim() ?? ''
+    const manualRates = manualRateMatch?.[1]?.trim() ?? ''
+    if (dbRates) dbRates.split(';').map(s => s.trim()).filter(Boolean).forEach(s => lines.push(`  • ${s}`))
+    if (manualRates) manualRates.split('||').map(s => s.trim()).filter(Boolean).forEach(s => lines.push(`  • ${s}`))
+  }
+
+  return lines.length > 0 ? lines.join('\n') : '  • (Rate options to be confirmed — please edit)'
+}
+
+// ---------------------------------------------------------------------------
 // Step-based navigation — per-role workflow steps
 // ---------------------------------------------------------------------------
 
@@ -122,12 +181,10 @@ const CS_STEPS: StepDef[] = [
   { key: 'cs-cutoff',     label: 'Cut Offs',          actionKinds: ['record-cutoff'],   stepNumber: 9 },
   { key: 'cs-si',         label: 'Cut Off Reminders', actionKinds: ['request-si'],    stepNumber: 10, group: 'post-cutoff' },
   { key: 'cs-submit-si',  label: 'Submit SI',         actionKinds: ['submit-si'],     stepNumber: 10, group: 'post-cutoff' },
-  { key: 'cs-draft-bl',   label: 'Draft BL',          actionKinds: ['send-draft-bl'], stepNumber: 10, group: 'post-cutoff' },
-  { key: 'cs-pre-advice', label: 'Pre-Advice',       actionKinds: ['send-pre-advice'], stepNumber: 11 },
-  // Steps hidden from CS step bar (comment back in to re-enable)
-  // { key: 'cs-master-bl',  label: 'Master BL',   actionKinds: ['record-master-bl'],   stepNumber: 12 },
-  // { key: 'cs-house-bl',   label: 'House BL',    actionKinds: ['create-house-bl'],    stepNumber: 13 },
-  // { key: 'cs-bl-approval',label: 'BL Approval', actionKinds: ['bl-approval'],        stepNumber: 14 },
+  { key: 'cs-draft-bl',   label: 'Draft BL',          actionKinds: ['save-draft-bl'], stepNumber: 10, group: 'post-cutoff' },
+  { key: 'cs-generate-si', label: 'Generate SI',     actionKinds: ['generate-si'],    stepNumber: 11 },
+  { key: 'cs-create-bl',   label: 'Create BL',       actionKinds: ['create-bl'],      stepNumber: 12 },
+  { key: 'cs-pre-advice',  label: 'Pre-Advice',      actionKinds: ['send-pre-advice'], stepNumber: 13 },
 ]
 
 const FINANCE_STEPS: StepDef[] = [
@@ -172,10 +229,10 @@ const ADMIN_STEPS: StepDef[] = [
   { key: 'adm-si',          label: 'Cut Off Reminders',  actionKinds: ['request-si'],    stepNumber: 15, group: 'post-cutoff' },
   { key: 'adm-submit-si',   label: 'Submit SI',    actionKinds: ['submit-si'],         stepNumber: 15, group: 'post-cutoff' },
   { key: 'adm-draft-bl',    label: 'Draft BL',     actionKinds: ['send-draft-bl'],     stepNumber: 15, group: 'post-cutoff' },
-  { key: 'adm-pre-advice',  label: 'Pre-Advice',   actionKinds: ['send-pre-advice'],   stepNumber: 16 },
-  { key: 'adm-master-bl',   label: 'Master BL',    actionKinds: ['record-master-bl'],        stepNumber: 17 },
-  { key: 'adm-house-bl',    label: 'House BL',     actionKinds: ['create-house-bl'],         stepNumber: 18 },
-  { key: 'adm-bl-approval', label: 'BL Approval',  actionKinds: ['bl-approval'],             stepNumber: 19 },
+  { key: 'adm-generate-si', label: 'Generate SI',  actionKinds: ['generate-si'],           stepNumber: 16 },
+  { key: 'adm-create-bl',   label: 'Create BL',   actionKinds: ['create-bl'],              stepNumber: 17 },
+  { key: 'adm-pre-advice',  label: 'Pre-Advice',  actionKinds: ['send-pre-advice'],        stepNumber: 18 },
+  { key: 'adm-bl-approval', label: 'BL Approval', actionKinds: ['bl-approval'],            stepNumber: 19 },
 ]
 
 const ROLE_STEP_MAP: Record<string, StepDef[]> = {
@@ -195,7 +252,7 @@ export default function Workspace({
   onGoTo, onAdvanceWorkflow, onConfirmBooking, onMarkRaAssigned, onRevertBookingRequest, onAttachReleaseOrder, onReleaseBooking,
   onAcknowledgeProcurement, onCreateBooking,
   onSetBookingSiCutoff, onSetBookingBlCutoff, onSetBookingVgmCutoff, onSetBookingFilingCutoff,
-  onMarkSiRequested, onMarkSiSubmitted, vesselSchedules, onAddVesselSchedule, onMarkDraftBlSent, onMarkPreAdviceSent, onSetBlStatus,
+  onMarkSiRequested, onMarkSiSubmitted, vesselSchedules, onAddVesselSchedule, onMarkDraftBlSent, onMarkLinerBlGenerated, onMarkPreAdviceSent, onSetBlStatus,
   onRecordMasterBl, onCreateHouseBl,
   onSetQuoteStatus, onUpdateCustomerKyc,
   onLogActivity, onFlash, onStartRateCheck,
@@ -241,6 +298,10 @@ export default function Workspace({
   // Quotation prep state (Sales edits document)
   const [quotationContent, setQuotationContent] = useState('')
   const [quoteCopied, setQuoteCopied] = useState(false)
+  // Selected rate option IDs for quotation prep — user ticks which options to include
+  const [selectedRateOptionIds, setSelectedRateOptionIds] = useState<Set<number>>(new Set())
+  // The single "best option" recommended to the customer
+  const [bestRateOptionId, setBestRateOptionId] = useState<number | null>(null)
   const [paCopied, setPaCopied] = useState(false)
   // Send-to-customer state (CS sends via Email or WhatsApp)
   const [sendMethod, setSendMethod] = useState<'email' | 'whatsapp'>('email')
@@ -302,6 +363,16 @@ export default function Workspace({
   // Reference data
   const [linerList, setLinerList] = useState<LinerRecord[]>([])
   useEffect(() => { apiGetLiners().then(setLinerList).catch(() => {}) }, [])
+
+  // Completed rate requests for quotation prep (Step 4)
+  const [completedRateRequests, setCompletedRateRequests] = useState<CompletedRateRequest[]>([])
+  useEffect(() => {
+    if (activeRole === 'CS' || activeRole === 'Sales' || activeRole === 'Admin') {
+      apiFetchCompletedRateRequests()
+        .then(res => setCompletedRateRequests(res.requests))
+        .catch(() => {})
+    }
+  }, [activeRole])
   const [cutoffNotes, setCutoffNotes] = useState('')
   const [cutoffSiDate, setCutoffSiDate] = useState('')
   const [cutoffBlDate, setCutoffBlDate] = useState('')
@@ -319,7 +390,8 @@ export default function Workspace({
   const [draftBlContent, setDraftBlContent] = useState('')
   const [draftBlFileName, setDraftBlFileName] = useState('')
   const [draftBlMode, setDraftBlMode] = useState<'paste' | 'upload'>('paste')
-  // Draft BL — Phase 1 vessel / Phase 2 booking / Phase 3 send
+  const [jobRefNumber, setJobRefNumber] = useState('')
+  // Draft BL — Phase 1 vessel / Phase 2 booking / Phase 3 save
   const [draftBlPhase, setDraftBlPhase] = useState<1 | 2 | 3>(1)
   const [vesselScheduleType, setVesselScheduleType] = useState<'FCL' | 'CONSOL' | 'BOTH'>('FCL')
   const [vesselPol, setVesselPol] = useState('')
@@ -346,6 +418,22 @@ export default function Workspace({
   const [houseBlNumber, setHouseBlNumber] = useState('')
   const [houseBlShipper, setHouseBlShipper] = useState('')
   const [houseBlConsignee, setHouseBlConsignee] = useState('')
+  // Generate SI (Liner BL Instruction) state
+  const [siForm, setSiForm] = useState<Record<string, string>>({})
+  const siField = (key: string) => siForm[key] ?? ''
+  const setSiField = (key: string, value: string) => setSiForm(prev => ({ ...prev, [key]: value }))
+  // Create BL (combined MBL + HBL) state
+  const [blActiveTab, setBlActiveTab] = useState<'mbl' | 'hbl'>('mbl')
+  const [mblForm, setMblForm] = useState<Record<string, string>>({})
+  const mblField = (key: string) => mblForm[key] ?? ''
+  const setMblField = (key: string, value: string) => setMblForm(prev => ({ ...prev, [key]: value }))
+  const [hblForm, setHblForm] = useState<Record<string, string>>({})
+  const hblField = (key: string) => hblForm[key] ?? ''
+  const setHblField = (key: string, value: string) => setHblForm(prev => ({ ...prev, [key]: value }))
+  interface BlContainerRow { containerNo: string; size: string; type: string; shipmentType: string; sealNo: string; packages: string; packageType: string; grossWeight: string; cbm: string }
+  const [hblContainers, setHblContainers] = useState<BlContainerRow[]>([])
+  const [hblCollapsed, setHblCollapsed] = useState<Record<string, boolean>>({})
+  const toggleHblSection = (sectionId: string) => setHblCollapsed(prev => ({ ...prev, [sectionId]: !prev[sectionId] }))
   // Pre-Advice state
   const [paForm, setPaForm] = useState<Record<string, string>>({})
   const paField = (key: string) => paForm[key] ?? ''
@@ -512,6 +600,11 @@ export default function Workspace({
           default:                    title = `${stage.label} — ${inq.customer_name}`
         }
 
+        // Attach saved rate request data for quotation-prep work items
+        const rateRequest = inq.workflow_stage === 'quotation-prep' && inq.inq_id
+          ? completedRateRequests.find(rr => rr.inq_id === inq.inq_id)
+          : undefined
+
         pending.push({
           type: 'inquiry',
           refId: inq.id,
@@ -523,7 +616,7 @@ export default function Workspace({
           previousContext: findContext(inq.id),
           actionLabel,
           actionKind,
-          sourceData: { inquiry: inq, nextStage: resolvedNextStage.id, container: cont, containerIdx: ci, customer: cust },
+          sourceData: { inquiry: inq, nextStage: resolvedNextStage.id, container: cont, containerIdx: ci, customer: cust, rateRequest },
           kycIncomplete: inq.kyc_completed === false,
         })
       }
@@ -696,7 +789,7 @@ export default function Workspace({
       })
     }
 
-    // --- From Bookings (record Draft BL + send to customer) — parallel with reminders & SI ---
+    // --- From Bookings (record Draft BL + save) — parallel with reminders & SI ---
     for (const bkg of bookings) {
       if (bkg.delivery_type === 'door-to-door') continue // door-to-door skips Draft BL
       if (bkg.draft_bl_sent) continue
@@ -709,23 +802,21 @@ export default function Workspace({
         type: 'booking',
         refId: bkg.id,
         customerName: bkg.customer_name,
-        title: `Record Draft BL & send to ${bkg.customer_name}`,
+        title: `Record Draft BL for ${bkg.customer_name}`,
         subtitle: `${bkg.quantity}x ${bkg.container_type} · ${bkg.origin} → ${bkg.destination}${cutoffSuffix(bkg)}`,
         urgentFlag: false,
         createdAt: bkg.created_at,
         previousContext: findContext(bkg.id),
-        actionLabel: 'Send Draft BL',
-        actionKind: 'send-draft-bl',
+        actionLabel: 'Save Draft BL',
+        actionKind: 'save-draft-bl',
         sourceData: { booking: bkg },
       })
     }
 
-    // --- Master BL (door-to-door only) — parallel with reminders & SI ---
+    // --- Generate SI / Liner BL Instruction (after Draft BL saved) ---
     for (const bkg of bookings) {
-      if (bkg.delivery_type !== 'door-to-door') continue
-      if (bkg.master_bl_recorded) continue
-      const hasCutoffDates = bkg.si_cutoff_date || bkg.bl_cutoff_date || bkg.vgm_cutoff_date
-      if (!hasCutoffDates) continue
+      if (!bkg.draft_bl_sent) continue
+      if (bkg.liner_bl_instruction_generated) continue
       if (bkg.status !== 'Liner Confirmed' && bkg.status !== 'Released') continue
       if (role && role !== 'CS') continue
 
@@ -733,36 +824,37 @@ export default function Workspace({
         type: 'booking',
         refId: bkg.id,
         customerName: bkg.customer_name,
-        title: `Record Master BL for ${bkg.customer_name}`,
+        title: `Generate SI / Liner BL Instruction for ${bkg.customer_name}`,
         subtitle: `${bkg.quantity}x ${bkg.container_type} · ${bkg.origin} → ${bkg.destination}${cutoffSuffix(bkg)}`,
         urgentFlag: false,
         createdAt: bkg.created_at,
         previousContext: findContext(bkg.id),
-        actionLabel: 'Record Master BL',
-        actionKind: 'record-master-bl',
+        actionLabel: 'Generate SI',
+        actionKind: 'generate-si',
         sourceData: { booking: bkg },
       })
     }
 
-    // --- House BL (door-to-door only, after Master BL recorded) ---
+    // --- Create BL (after SI generated, until BOTH MBL recorded AND HBL created) ---
     for (const bkg of bookings) {
-      if (bkg.delivery_type !== 'door-to-door') continue
-      if (!bkg.master_bl_recorded) continue
-      if (bkg.house_bl_created) continue
+      if (!bkg.liner_bl_instruction_generated) continue
+      if (bkg.master_bl_recorded && bkg.house_bl_created) continue
       if (bkg.status !== 'Liner Confirmed' && bkg.status !== 'Released') continue
       if (role && role !== 'CS') continue
 
+      const mblStatus = bkg.master_bl_recorded ? 'done' : 'pending'
+      const hblStatus = bkg.house_bl_created ? 'done' : 'pending'
       pending.push({
         type: 'booking',
         refId: bkg.id,
         customerName: bkg.customer_name,
-        title: `Create & send House BL to ${bkg.customer_name}`,
-        subtitle: `${bkg.quantity}x ${bkg.container_type} · ${bkg.origin} → ${bkg.destination} · Master BL: ${bkg.master_bl_number || 'N/A'}${cutoffSuffix(bkg)}`,
+        title: `Create BL for ${bkg.customer_name} (MBL: ${mblStatus}, HBL: ${hblStatus})`,
+        subtitle: `${bkg.quantity}x ${bkg.container_type} · ${bkg.origin} → ${bkg.destination}${cutoffSuffix(bkg)}`,
         urgentFlag: false,
         createdAt: bkg.created_at,
         previousContext: findContext(bkg.id),
-        actionLabel: 'Create & Send House BL',
-        actionKind: 'create-house-bl',
+        actionLabel: 'Create BL',
+        actionKind: 'create-bl',
         sourceData: { booking: bkg },
       })
     }
@@ -906,7 +998,7 @@ export default function Workspace({
       .slice(0, 10)
 
     return { pendingItems: pending, recentlyPushed: pushed }
-  }, [inquiries, bookings, quotes, customers, activityLog, activeRole, kycPendingClients, kycRequests]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [inquiries, bookings, quotes, customers, activityLog, activeRole, kycPendingClients, kycRequests, completedRateRequests]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------------------
   // Step-based filtering (replaces filter chips)
@@ -1015,24 +1107,35 @@ export default function Workspace({
         return
       }
       case 'prepare-quotation': {
-        // Pre-fill quotation document from rate brief in previous activity log entry
-        const { inquiry: qInq, container: qCont } = item.sourceData
+        // Pre-fill quotation document from saved rate request data (fetched from backend)
+        const { inquiry: qInq, container: qCont, rateRequest: rr } = item.sourceData as {
+          inquiry: Inquiry; container: ContainerLine; rateRequest?: CompletedRateRequest
+        }
+
+        // Initialize all options as selected; pick the first as best by default
+        if (rr && rr.options.length > 0) {
+          const allIds = new Set(rr.options.filter(o => o.rate).map(o => o.option_id))
+          setSelectedRateOptionIds(allIds)
+          setBestRateOptionId(rr.options.find(o => o.rate)?.option_id ?? null)
+        } else {
+          setSelectedRateOptionIds(new Set())
+          setBestRateOptionId(null)
+        }
+
         const qCust = customers.find(c => c.name.toLowerCase() === qInq.customer_name.toLowerCase())
-        const ctx = item.previousContext
-        const notes = ctx?.notes ?? ''
-        // Extract DB rates and manual rates separately
-        const dbRateMatch = notes.match(/DB Rates:\s*([^|]+)/i)
-        const manualRateMatch = notes.match(/Manual Rates?:\s*([^|]+)/i)
-        const dbRates = dbRateMatch?.[1]?.trim() ?? ''
-        const manualRates = manualRateMatch?.[1]?.trim() ?? ''
-        // Build bullet-style rate option list
-        const rateLines: string[] = []
-        if (dbRates) dbRates.split(';').map((r: string) => r.trim()).filter(Boolean).forEach((r: string) => rateLines.push(`  • ${r}`))
-        if (manualRates) manualRates.split('||').map((r: string) => r.trim()).filter(Boolean).forEach((r: string) => rateLines.push(`  • ${r}`))
-        const rateSection = rateLines.length > 0 ? rateLines.join('\n') : '  • (Rate options to be confirmed — please edit)'
-        // Pull Procurement's message to Sales (stored before "Customer:" segment in notes)
-        const procMsgMatch = notes.match(/^(.+?) \| Customer:/i)
-        const procNote = procMsgMatch?.[1]?.trim() ?? ''
+
+        // Build rate section text from selected saved rate options
+        const allOptionIds = rr?.options.filter(o => o.rate).map(o => o.option_id) ?? []
+        const firstBest = allOptionIds[0] ?? null
+        const rateSection = buildRateSection(rr, allOptionIds, firstBest, linerList, item.previousContext)
+
+        // Pull Procurement's remark from the rate request, or fall back to activity log
+        const procNote = rr?.remark ?? (() => {
+          const ctx = item.previousContext
+          const match = ctx?.notes?.match(/^(.+?) \| Customer:/i)
+          return match?.[1]?.trim() ?? ''
+        })()
+
         // Container / route details
         const dest = qCont?.destination || qInq.destination
         const containerLabel = qCont ? `${qCont.quantity}× ${qCont.containerType}` : ''
@@ -1290,10 +1393,11 @@ ABC Logistics (Pvt) Ltd`
         setActionModal(item)
         break
       }
-      case 'send-draft-bl': {
+      case 'save-draft-bl': {
         const blBkgInit = item.sourceData.booking as Booking
         // Phase 1 vessel form (CS only; Admin skips to phase 2)
         setDraftBlPhase(activeRole === 'CS' ? 1 : 2)
+        setJobRefNumber(blBkgInit.job_reference_number || '')
         setVesselScheduleType('FCL')
         setFormVessel(blBkgInit.vessel_name || '')
         setFormVoyage(blBkgInit.voyage_number || '')
@@ -1404,6 +1508,138 @@ ABC Logistics (Pvt) Ltd`
         setCustomerContactPhone(blCust?.contact_phone ?? '')
         setSendMethod(blCust?.contact_email ? 'email' : 'whatsapp')
         setWaConfirmed(false)
+        setActionModal(item)
+        break
+      }
+      case 'generate-si': {
+        const siBkg = item.sourceData.booking as Booking
+        const siCust = customers.find(c => c.name.toLowerCase() === item.customerName.toLowerCase())
+        const siInq = inquiries.find(i => i.customer_name.toLowerCase() === item.customerName.toLowerCase())
+        const deliveryMap: Record<string, string> = { 'port-to-port': 'CY/CY', 'door-to-door': 'SD/SD', 'port-to-door': 'CY/SD' }
+        setSiForm({
+          to_liner: siBkg.shipping_line || '',
+          attn: 'B/L DEPARTMENT',
+          bl_type: 'ORIGINAL',
+          booking_ref: siBkg.id || '',
+          job_ref: siBkg.job_reference_number || '',
+          shipper_name: siBkg.customer_name || '',
+          shipper_address: siCust?.location || '',
+          consignee_name: siBkg.master_bl_consignee || siBkg.house_bl_consignee || '',
+          consignee_address: '',
+          notify_name: '',
+          notify_address: '',
+          vessel: siBkg.vessel_name || '',
+          voyage: siBkg.voyage_number || '',
+          delivery_type: deliveryMap[siBkg.delivery_type || ''] || 'CY/CY',
+          place_of_receipt: siBkg.origin || '',
+          pol: siBkg.origin || '',
+          pod: siBkg.destination || '',
+          sob_date: '',
+          container_no: '',
+          seal_no: '',
+          container_size: siBkg.container_type || '',
+          marks_and_numbers: siInq?.remark || '',
+          description_of_goods: siInq?.containers?.[0]?.commodityName || siInq?.commodity_type || '',
+          weight_kgs: siInq?.cargo_weight ? String(siInq.cargo_weight) : '',
+          volume_m3: '',
+          freight: 'PREPAID',
+          total_containers: `${siBkg.quantity || 1}x ${siBkg.container_type || ''}`,
+          shipped_on_board: 'YES',
+        })
+        setFormNote('')
+        setActionModal(item)
+        break
+      }
+      case 'create-bl': {
+        const blBkg = item.sourceData.booking as Booking
+        const blCust = customers.find(c => c.name.toLowerCase() === item.customerName.toLowerCase())
+        const blInq = inquiries.find(i => i.customer_name.toLowerCase() === item.customerName.toLowerCase())
+        const blVessel = vesselSchedules
+          .filter(vs => vs.vessel_name === blBkg.vessel_name && vs.voyage_number === blBkg.voyage_number)
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+        const deliveryMap2: Record<string, string> = { 'port-to-port': 'CY/CY', 'door-to-door': 'DOOR/DOOR', 'port-to-door': 'CY/CFS', 'door-to-port': 'CFS/CY' }
+        // Tab: start on MBL if not yet recorded, else HBL
+        setBlActiveTab(blBkg.master_bl_recorded ? 'hbl' : 'mbl')
+        // Pre-fill MBL form
+        setMblForm({
+          master_bl_number: blBkg.master_bl_number || '',
+          shipper: blBkg.master_bl_shipper || blBkg.customer_name || '',
+          consignee: blBkg.master_bl_consignee || '',
+          vessel: blBkg.vessel_name || '',
+          voyage: blBkg.voyage_number || '',
+          pol: blVessel?.pol || blBkg.origin || '',
+          pod: blVessel?.final_pod || blBkg.destination || '',
+          container_type: blBkg.container_type || '',
+          container_count: String(blBkg.quantity || 1),
+          freight_term: 'PREPAID',
+          shipping_line: blBkg.shipping_line || '',
+          delivery_type: deliveryMap2[blBkg.delivery_type || ''] || 'CY/CY',
+        })
+        // Pre-fill HBL form — all sections from bl_field_spec.json
+        const parsedSize = (blBkg.container_type || '').match(/(\d+)/)?.[1] || '20'
+        const parsedType = (blBkg.container_type || '').replace(/\d+'\s*/, '').replace(/'/g, '') || 'GP'
+        setHblForm({
+          // B/L Details
+          branch: 'COLOMBO', bookingNo: blBkg.id || '', shipmentCategory: 'LOCAL EXPORT',
+          blType: blBkg.bl_type || 'OWN', houseBlNo: blBkg.house_bl_number || '', customBlNo: '',
+          sttNo: '', hsCode: blInq?.containers?.[0]?.hs_code || blBkg.hs_code || '', deliveryNo: '',
+          // Parties
+          shipperName: blBkg.house_bl_shipper || blBkg.customer_name || '', shipperRef: '',
+          emailRef: blCust?.contact_email || '', shipperAddress: blCust?.location || '',
+          consignedTo: '', consigneeName: blBkg.house_bl_consignee || '',
+          consigneeAddress: '', notifyType: '', notifyName: '', notifyAddress: '',
+          alsoNotify: '', customerCategory: 'DIRECT', businessType: 'FREE HAND',
+          customerShipper: blBkg.customer_name || '', billingParty: blBkg.customer_name || '',
+          salesPerson: '', csExecutive: activeEmployee.name || '',
+          documentationBy: activeEmployee.name || '', introducedBy: '', nominatedAgent: '',
+          // Cargo Summary
+          cargoType: (blBkg.container_type || '').includes('RF') ? 'REEFER' : 'GENERAL',
+          commodity: blInq?.containers?.[0]?.commodityName || blInq?.commodity_type || '',
+          noOfContainersOnBl: String(blBkg.quantity || 1), totalPackages: '', packageType: '',
+          printDetails: 'PACKAGE DETAILS',
+          grossWeight: blInq?.cargo_weight ? String(blInq.cargo_weight) : '',
+          weightUom: 'KG', grossDecimals: '2', netWeight: '', netPrintWith: 'BOTH',
+          cbm: '', cbmDecimals: '2', wmRatio: '1000', marksNumbers: blInq?.remark || '',
+          // Goods Description
+          descriptionOfGoods: blInq?.containers?.[0]?.commodityName || blInq?.commodity_type || '',
+          linerBlDescription: '', descriptionPrefix: '',
+          printToBlText: "SHIPPER'S LOAD COUNT & SEAL", sapDescription: '',
+          // Routing & Delivery
+          deliveryType: deliveryMap2[blBkg.delivery_type || ''] || 'CY/CY',
+          incoterm: blInq?.incoterm || '', countryOfOrigin: 'SRI LANKA', transitTime: '',
+          placeOfReceipt: blBkg.origin || '',
+          portOfLoading: blVessel?.pol || blBkg.origin || '', polCode: '',
+          portOfDischarge: blVessel?.final_pod || blBkg.destination || '', podCode: '',
+          podEta: blVessel?.eta_fpod || '', podAta: '',
+          finalDestination: blVessel?.final_pod || blBkg.destination || '', fdCode: '',
+          fdEta: blVessel?.eta_fpod || '',
+          placeOfDelivery: blVessel?.final_pod || blBkg.destination || '', podelCode: '',
+          podelEta: blVessel?.eta_fpod || '',
+          // Issuance
+          placeOfBlIssued: 'COLOMBO,SRI LANKA',
+          dateOfBlIssued: new Date().toISOString().slice(0, 10),
+          shippedOnBoardDate: blVessel?.etd_pol || '', receivedForShipment: 'NO',
+          blTerm: 'NON-NEGO', noOfOriginalBls: 'ZERO (0)', permitNo: '',
+          surrendered: '0', holdCargo: '0', emailSurrenderLetter: '0',
+          remarks: blBkg.notes || '',
+          // Freight & Charges
+          freightTerm: 'PREPAID', freightTermText: '', freightAmount: '',
+          freightPayableAt: '', freightTermDetails: '',
+          originCharges: 'PREPAID', destinationCharges: 'COLLECT',
+          // Agents & Carrier
+          podAgent: '', contactPerson: '', podAgentAddress: '',
+          agentForCarrier: blBkg.shipping_line || '',
+          detentionDays: '', blFormat: 'CLS_FMC',
+        })
+        // Pre-fill container rows
+        const blContainerCount = blBkg.quantity || 1
+        setHblContainers(Array.from({ length: blContainerCount }, () => ({
+          containerNo: '', size: parsedSize, type: parsedType,
+          shipmentType: 'FCL/FCL', sealNo: '', packages: '',
+          packageType: '', grossWeight: '', cbm: '',
+        })))
+        setHblCollapsed({})
+        setFormNote('')
         setActionModal(item)
         break
       }
@@ -1678,17 +1914,35 @@ ABC Logistics (Pvt) Ltd`
         break
       }
       case 'prepare-quotation': {
-        const { inquiry } = actionModal.sourceData
+        const { inquiry, rateRequest: saveRr } = actionModal.sourceData as {
+          inquiry: Inquiry; rateRequest?: CompletedRateRequest
+        }
         // Create quotation record in backend (status = in_prep).
         // Do NOT mark as sent here — that happens in the send-to-customer step.
         if (inquiry.inq_id) {
           const today = new Date().toISOString().slice(0, 10)
           const deadline = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
+
+          // Build quotation options from the selected rate request options
+          const quotationOptions: import('../../api').QuotationOptionPayload[] = []
+          if (saveRr) {
+            for (const opt of saveRr.options) {
+              if (!opt.rate || !selectedRateOptionIds.has(opt.option_id)) continue
+              quotationOptions.push({
+                inq_id: inquiry.inq_id,
+                rate_id: opt.rate_id,
+                option_id: opt.option_id,
+                amt: opt.rate.rate ?? 0,
+                currency: opt.rate.currency ?? 'USD',
+              })
+            }
+          }
+
           apiCreateQuotation({
             inq_id: inquiry.inq_id,
             quote_date: today,
             sent_via: 'email',           // placeholder — updated to actual method in send step
-            options: [],
+            options: quotationOptions,
             acceptance_deadline: deadline,
           })
             .then(created => {
@@ -2036,23 +2290,87 @@ ABC Logistics (Pvt) Ltd`
         onFlash(`${booking.id} → SI submitted to ${booking.shipping_line || 'liner'} ${method}${vgmCertFileName ? ' (VGM attached)' : ''}`, nextStepAction)
         break
       }
-      case 'send-draft-bl': {
+      case 'save-draft-bl': {
         const { booking } = actionModal.sourceData
-        onMarkDraftBlSent(booking.id)
-        const sendVia = sendMethod === 'email'
-          ? `via Email to ${customerContactEmail}`
-          : `via WhatsApp to ${customerContactPhone || 'customer'}`
+        onMarkDraftBlSent(booking.id, jobRefNumber)
         onLogActivity({
           actor_role: activeRole,
           actor_id: activeEmployee.id,
-          action: `Draft BL sent to ${booking.customer_name} ${sendVia}. Awaiting customer approval.`,
+          action: `Draft BL saved for ${booking.customer_name}${jobRefNumber ? ` (Job Ref: ${jobRefNumber})` : ''}.`,
           ref_type: 'booking',
           ref_id: booking.id,
           customer_name: booking.customer_name,
           pushed_to: 'CS',
-          notes: `Draft BL sent ${sendVia}${draftBlContent ? ` | Document attached` : ''}${formNote ? ` | ${formNote}` : ''}`,
+          notes: `Draft BL saved${jobRefNumber ? ` | Job Ref: ${jobRefNumber}` : ''}${formNote ? ` | ${formNote}` : ''}`,
         })
-        onFlash(`${booking.id} → Draft BL sent to ${booking.customer_name} ${sendVia}`, nextStepAction)
+        onFlash(`${booking.id} → Draft BL saved for ${booking.customer_name}${jobRefNumber ? ` (Job Ref: ${jobRefNumber})` : ''}`, nextStepAction)
+        break
+      }
+      case 'generate-si': {
+        const { booking } = actionModal.sourceData
+        onMarkLinerBlGenerated(booking.id)
+        onLogActivity({
+          actor_role: activeRole,
+          actor_id: activeEmployee.id,
+          action: `Liner BL Instruction generated for ${booking.customer_name} (${siField('to_liner') || booking.shipping_line}).`,
+          ref_type: 'booking',
+          ref_id: booking.id,
+          customer_name: booking.customer_name,
+          pushed_to: 'CS',
+          notes: `SI generated | BL Type: ${siField('bl_type')} | Booking: ${siField('booking_ref')} | ${siField('pol')} → ${siField('pod')}${formNote ? ` | ${formNote}` : ''}`,
+        })
+        onFlash(`${booking.id} → Liner BL Instruction generated for ${booking.customer_name}`, nextStepAction)
+        break
+      }
+      case 'create-bl': {
+        const { booking } = actionModal!.sourceData
+        if (blActiveTab === 'mbl') {
+          onRecordMasterBl(booking.id, {
+            master_bl_number: mblField('master_bl_number'),
+            shipper: mblField('shipper'),
+            consignee: mblField('consignee'),
+          })
+          onLogActivity({
+            actor_role: activeRole,
+            actor_id: activeEmployee.id,
+            action: `Recorded Master BL ${mblField('master_bl_number')} for ${booking.id}.`,
+            ref_type: 'booking',
+            ref_id: booking.id,
+            customer_name: booking.customer_name,
+            pushed_to: 'CS',
+            notes: `Master BL: ${mblField('master_bl_number')} | Shipper: ${mblField('shipper')} | Consignee: ${mblField('consignee')}${formNote ? ` | ${formNote}` : ''}`,
+          })
+          if (booking.house_bl_created) {
+            onFlash(`${booking.id} → Master BL recorded. BL creation complete.`, nextStepAction)
+          } else {
+            onFlash(`${booking.id} → Master BL recorded. Now create House BL.`)
+            setBlActiveTab('hbl')
+            return // Don't close modal — continue to HBL
+          }
+        } else {
+          onCreateHouseBl(booking.id, {
+            house_bl_number: hblField('houseBlNo') || hblField('customBlNo') || '',
+            shipper: hblField('shipperName'),
+            consignee: hblField('consigneeName'),
+          })
+          onLogActivity({
+            actor_role: activeRole,
+            actor_id: activeEmployee.id,
+            action: `Created House BL ${hblField('houseBlNo') || hblField('customBlNo')} for ${booking.id}.`,
+            ref_type: 'booking',
+            ref_id: booking.id,
+            customer_name: booking.customer_name,
+            pushed_to: 'CS',
+            notes: `House BL: ${hblField('houseBlNo') || hblField('customBlNo')} | Shipper: ${hblField('shipperName')} | Consignee: ${hblField('consigneeName')}${formNote ? ` | ${formNote}` : ''}`,
+          })
+          if (booking.master_bl_recorded) {
+            onFlash(`${booking.id} → House BL created. BL creation complete.`, nextStepAction)
+          } else {
+            onFlash(`${booking.id} → House BL created. Now record Master BL.`)
+            setBlActiveTab('mbl')
+            return // Don't close modal — continue to MBL
+          }
+        }
         break
       }
       case 'send-pre-advice': {
@@ -2210,7 +2528,7 @@ ABC Logistics (Pvt) Ltd`
                   key={key}
                   onClick={() => {
                     setSelectedItemId(key)
-                    if (item.actionKind === 'booking-request' || item.actionKind === 'review-booking-request' || item.actionKind === 'confirm-liner-booking' || item.actionKind === 'attach-release-order' || item.actionKind === 'release-booking' || item.actionKind === 'send-draft-bl' || item.actionKind === 'record-cutoff' || item.actionKind === 'request-si' || item.actionKind === 'submit-si' || item.actionKind === 'send-pre-advice') {
+                    if (item.actionKind === 'booking-request' || item.actionKind === 'review-booking-request' || item.actionKind === 'confirm-liner-booking' || item.actionKind === 'attach-release-order' || item.actionKind === 'release-booking' || item.actionKind === 'save-draft-bl' || item.actionKind === 'send-draft-bl' || item.actionKind === 'generate-si' || item.actionKind === 'create-bl' || item.actionKind === 'record-cutoff' || item.actionKind === 'request-si' || item.actionKind === 'submit-si' || item.actionKind === 'send-pre-advice') {
                       handleAction(item)
                     }
                   }}
@@ -2542,7 +2860,7 @@ ABC Logistics (Pvt) Ltd`
                   </div>
                 </div>
               )
-            })() : selectedItem.actionKind === 'send-draft-bl' && actionModal ? (() => {
+            })() : (selectedItem.actionKind === 'save-draft-bl' || selectedItem.actionKind === 'send-draft-bl') && actionModal ? (() => {
               const blBkg = actionModal.sourceData.booking as Booking
               // bookings that have release order fields (for pre-fill selector)
               const roBookings = bookings.filter(b => b.release_order_fields)
@@ -2608,7 +2926,7 @@ ABC Logistics (Pvt) Ltd`
                   {/* Step header */}
                   <div style={{ padding: '8px 14px', background: '#0891b2', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>VESSEL SCHEDULE</span>
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>Step 1 of 3</span>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>Step 1 of 2</span>
                   </div>
 
                   {/* Release order pre-fill selector */}
@@ -2816,7 +3134,7 @@ ABC Logistics (Pvt) Ltd`
                     {/* Step header */}
                     <div style={{ padding: '8px 14px', background: '#0891b2', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>BOOKING</span>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>Step 2 of 3</span>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>Step 2 of 2</span>
                     </div>
                     {activeRole === 'CS' && <button style={{ alignSelf: 'flex-start', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#0891b2', padding: 0 }} onClick={() => setDraftBlPhase(1)}>← Back to Vessel Schedule</button>}
 
@@ -2950,146 +3268,10 @@ ABC Logistics (Pvt) Ltd`
                         }}>
                         Save Booking
                       </button>
-                      <button className="db-btn primary"
-                        style={{ background: '#0891b2', borderColor: '#0891b2' }}
-                        onClick={() => setDraftBlPhase(3)}>
-                        Next — Send Draft BL →
-                      </button>
                     </div>
                   </div>
                 )
               }
-              // Phase 3 — send Draft BL
-              return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {/* Step header */}
-                  <div style={{ padding: '8px 14px', background: '#0891b2', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>SEND DRAFT BL</span>
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>Step 3 of 3</span>
-                  </div>
-                  <button style={{ alignSelf: 'flex-start', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#0891b2', padding: 0 }} onClick={() => setDraftBlPhase(2)}>← Back to Booking</button>
-                  {/* Vessel summary strip */}
-                  {(formVessel || formVoyage) && (
-                    <div style={{ padding: '8px 12px', background: 'rgba(8,145,178,0.06)', border: '1px solid rgba(8,145,178,0.15)', borderRadius: 8, fontSize: 12, display: 'flex', gap: 16 }}>
-                      {formVessel && <span><span style={{ color: 'var(--text-muted)' }}>Vessel:</span> <strong>{formVessel}</strong></span>}
-                      {formVoyage && <span><span style={{ color: 'var(--text-muted)' }}>Voyage:</span> <strong>{formVoyage}</strong></span>}
-                      {vesselPol && <span><span style={{ color: 'var(--text-muted)' }}>POL:</span> {vesselPol}</span>}
-                      {vesselFinalPod && <span><span style={{ color: 'var(--text-muted)' }}>FPOD:</span> {vesselFinalPod}</span>}
-                    </div>
-                  )}
-                  {/* Booking summary */}
-                  <div style={{ padding: '10px 14px', background: 'rgba(15,143,168,0.06)', border: '1px solid rgba(15,143,168,0.15)', borderRadius: 8, fontSize: 12 }}>
-                    <strong>{blBkg.customer_name}</strong> — {blBkg.origin} → {blBkg.destination}
-                    <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
-                      {blBkg.quantity}x {blBkg.container_type} · {blBkg.shipping_line || 'No liner'}
-                    </div>
-                  </div>
-                  {/* Cutoff dates */}
-                  {(blBkg.si_cutoff_date || blBkg.bl_cutoff_date) && (
-                    <div style={{ display: 'flex', gap: 12, fontSize: 11 }}>
-                      {blBkg.si_cutoff_date && <div style={{ flex: 1, padding: '6px 10px', background: 'rgba(8,145,178,0.06)', border: '1px solid rgba(8,145,178,0.15)', borderRadius: 6 }}><span style={{ color: 'var(--text-muted)' }}>SI Cutoff:</span> <strong>{blBkg.si_cutoff_date}</strong></div>}
-                      {blBkg.bl_cutoff_date && <div style={{ flex: 1, padding: '6px 10px', background: 'rgba(217,119,6,0.06)', border: '1px solid rgba(217,119,6,0.15)', borderRadius: 6 }}><span style={{ color: 'var(--text-muted)' }}>BL Cutoff:</span> <strong>{blBkg.bl_cutoff_date}</strong></div>}
-                    </div>
-                  )}
-                  {/* Draft BL document */}
-                  <div>
-                    <label className="lt-label">Draft BL Document</label>
-                    <div style={{ display: 'flex', gap: 8, marginTop: 4, marginBottom: 8 }}>
-                      {(['paste', 'upload'] as const).map(m => (
-                        <button key={m} onClick={() => setDraftBlMode(m)}
-                          className={`db-btn ${draftBlMode === m ? 'primary' : ''}`}
-                          style={draftBlMode !== m ? { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' } : {}}>
-                          {m === 'paste' ? <><ClipboardPaste size={13} style={{ marginRight: 4 }} />Paste</> : <><Paperclip size={13} style={{ marginRight: 4 }} />Upload</>}
-                        </button>
-                      ))}
-                    </div>
-                    {draftBlMode === 'paste' && (
-                      <textarea className="lt-input" style={{ width: '100%', minHeight: 90, fontFamily: 'monospace', fontSize: 11, lineHeight: 1.5, resize: 'vertical' as const }}
-                        value={draftBlContent} onChange={e => setDraftBlContent(e.target.value)}
-                        placeholder="Paste Draft BL content here..." />
-                    )}
-                    {draftBlMode === 'upload' && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <label className="db-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer', background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
-                          <Paperclip size={13} />
-                          {draftBlFileName ? 'Replace file' : 'Choose file'}
-                          <input type="file" accept=".pdf,.doc,.docx,.xlsx,.png,.jpg" style={{ display: 'none' }}
-                            onChange={e => {
-                              const f = e.target.files?.[0]
-                              if (!f) return
-                              setDraftBlFileName(f.name)
-                              const r = new FileReader()
-                              r.onload = () => setDraftBlContent(r.result as string)
-                              r.readAsDataURL(f)
-                              e.target.value = ''
-                            }} />
-                        </label>
-                        {draftBlFileName && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                            <FileText size={13} style={{ color: '#16a34a' }} />
-                            <span style={{ fontWeight: 600 }}>{draftBlFileName}</span>
-                            <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--text-muted)' }} onClick={() => { setDraftBlFileName(''); setDraftBlContent('') }}><X size={12} /></button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {/* Send method */}
-                  <div>
-                    <label className="lt-label">Send Draft BL to Customer via</label>
-                    <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                      <button className={`db-btn ${sendMethod === 'email' ? 'primary' : ''}`}
-                        style={sendMethod !== 'email' ? { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' } : {}}
-                        onClick={() => setSendMethod('email')}><Mail size={13} style={{ marginRight: 4 }} /> Email</button>
-                      <button className={`db-btn ${sendMethod === 'whatsapp' ? 'primary' : ''}`}
-                        style={sendMethod === 'whatsapp' ? { background: '#25d366', borderColor: '#25d366' } : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-                        onClick={() => setSendMethod('whatsapp')}><MessageCircle size={13} style={{ marginRight: 4 }} /> WhatsApp</button>
-                    </div>
-                  </div>
-                  {sendMethod === 'email' && (
-                    <div>
-                      <label className="lt-label">Customer Email <span style={{ color: '#dc2626' }}>*</span></label>
-                      <input className="lt-input" style={{ width: '100%' }} type="email"
-                        value={customerContactEmail} onChange={e => setCustomerContactEmail(e.target.value)}
-                        placeholder="customer@example.com" />
-                    </div>
-                  )}
-                  {sendMethod === 'whatsapp' && (
-                    <>
-                      <div>
-                        <label className="lt-label">Customer WhatsApp Number</label>
-                        <input className="lt-input" style={{ width: '100%' }} value={customerContactPhone}
-                          onChange={e => setCustomerContactPhone(e.target.value)} placeholder="+94 7X XXX XXXX" />
-                      </div>
-                      <div style={{ padding: '10px 14px', background: 'rgba(37,211,102,0.06)', border: '1px solid rgba(37,211,102,0.2)', borderRadius: 8 }}>
-                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)' }}>
-                          <input type="checkbox" checked={waConfirmed} onChange={e => setWaConfirmed(e.target.checked)} style={{ marginTop: 2 }} />
-                          <span>I confirm that I have sent the Draft BL to the customer via WhatsApp.
-                            <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>No WhatsApp integration — manual confirmation.</span>
-                          </span>
-                        </label>
-                      </div>
-                    </>
-                  )}
-                  <div>
-                    <label className="lt-label">Notes (optional)</label>
-                    <input className="lt-input" style={{ width: '100%' }} value={formNote}
-                      onChange={e => setFormNote(e.target.value)} placeholder="Any notes for the customer..." />
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <button className="db-btn primary"
-                      disabled={sendMethod === 'email' ? !customerContactEmail.includes('@') : !waConfirmed}
-                      style={
-                        (sendMethod === 'email' && !customerContactEmail.includes('@')) || (sendMethod === 'whatsapp' && !waConfirmed)
-                          ? { opacity: 0.4, cursor: 'not-allowed' }
-                          : sendMethod === 'whatsapp' ? { background: '#25d366', borderColor: '#25d366' } : {}
-                      }
-                      onClick={handleModalSubmit}>
-                      {sendMethod === 'email' ? <><Mail size={12} style={{ marginRight: 6 }} /> Send Draft BL via Email</> : <><MessageCircle size={12} style={{ marginRight: 6 }} /> Confirm Draft BL Sent</>}
-                    </button>
-                  </div>
-                </div>
-              )
             })() : selectedItem.actionKind === 'send-pre-advice' && actionModal ? (() => {
               const paBkg = actionModal.sourceData.booking as Booking
               const blCutoff = paBkg.bl_cutoff_date || paBkg.si_cutoff_date
@@ -3835,6 +4017,470 @@ ABC Logistics (Pvt) Ltd`
                   </div>
                 </div>
               )
+            })() : selectedItem.actionKind === 'generate-si' && actionModal ? (() => {
+              const gsBkg = actionModal.sourceData.booking as Booking
+              const gsInput = (label: string, key: string, opts?: { placeholder?: string; readOnly?: boolean; span2?: boolean; type?: string }) => (
+                <div style={opts?.span2 ? { gridColumn: '1 / -1' } : {}}>
+                  <label className="lt-label">{label}</label>
+                  <input className="lt-input" style={{ width: '100%', ...(opts?.readOnly ? { background: 'rgba(0,0,0,0.03)' } : {}) }}
+                    type={opts?.type || 'text'}
+                    value={siField(key)} onChange={e => setSiField(key, e.target.value)}
+                    placeholder={opts?.placeholder || ''} readOnly={opts?.readOnly} />
+                </div>
+              )
+              const gsTextarea = (label: string, key: string, placeholder?: string) => (
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label className="lt-label">{label}</label>
+                  <textarea className="lt-input" rows={3} style={{ width: '100%', resize: 'vertical' as const, fontSize: 12 }}
+                    value={siField(key)} onChange={e => setSiField(key, e.target.value)}
+                    placeholder={placeholder || ''} />
+                </div>
+              )
+              const gsSectionHeader = (title: string) => (
+                <div style={{ padding: '6px 12px', background: 'rgba(8,145,178,0.08)', borderLeft: '3px solid #0891b2', borderRadius: '0 6px 6px 0', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#0891b2', marginTop: 4 }}>{title}</div>
+              )
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {/* Header */}
+                  <div style={{ padding: '8px 14px', background: '#0891b2', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>LINER BL INSTRUCTION</span>
+                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>{gsBkg.customer_name}</span>
+                  </div>
+
+                  {/* Booking summary */}
+                  <div style={{ padding: '10px 14px', background: 'rgba(15,143,168,0.06)', border: '1px solid rgba(15,143,168,0.15)', borderRadius: 8, fontSize: 12 }}>
+                    <strong>{gsBkg.customer_name}</strong> — {gsBkg.origin} → {gsBkg.destination}
+                    <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
+                      {gsBkg.quantity}x {gsBkg.container_type} · {gsBkg.shipping_line || 'No liner'}
+                      {gsBkg.job_reference_number && <span style={{ marginLeft: 8 }}>· Job Ref: <strong>{gsBkg.job_reference_number}</strong></span>}
+                    </div>
+                  </div>
+
+                  {/* ── HEADER INFO ── */}
+                  {gsSectionHeader('Addressed To')}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {gsInput('To (Shipping Line)', 'to_liner', { placeholder: 'e.g. HAPAG LLOYD' })}
+                    {gsInput('Attn', 'attn', { placeholder: 'e.g. B/L DEPARTMENT' })}
+                    <div>
+                      <label className="lt-label">BL Type</label>
+                      <select className="lt-input" style={{ width: '100%' }} value={siField('bl_type')} onChange={e => setSiField('bl_type', e.target.value)}>
+                        <option value="ORIGINAL">ORIGINAL</option>
+                        <option value="SEAWAY BILL">SEAWAY BILL</option>
+                        <option value="TELEX RELEASE">TELEX RELEASE</option>
+                        <option value="EXPRESS RELEASE">EXPRESS RELEASE</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* ── REFERENCE ── */}
+                  {gsSectionHeader('Reference')}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {gsInput('Booking Ref', 'booking_ref', { readOnly: true })}
+                    {gsInput('Job Ref', 'job_ref', { readOnly: true })}
+                  </div>
+
+                  {/* ── PARTIES ── */}
+                  {gsSectionHeader('Parties')}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
+                    {gsInput('Shipper Name', 'shipper_name', { placeholder: 'Shipper company name' })}
+                    {gsTextarea('Shipper Address', 'shipper_address', 'Full shipper address...')}
+                    {gsInput('Consignee Name', 'consignee_name', { placeholder: 'Consignee company name' })}
+                    {gsTextarea('Consignee Address', 'consignee_address', 'Full consignee address...')}
+                    {gsInput('Notify Party Name', 'notify_name', { placeholder: 'Notify party name' })}
+                    {gsTextarea('Notify Party Address', 'notify_address', 'Notify party address...')}
+                  </div>
+
+                  {/* ── VESSEL & ROUTE ── */}
+                  {gsSectionHeader('Vessel & Route')}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {gsInput('Vessel', 'vessel')}
+                    {gsInput('Voyage', 'voyage')}
+                    <div>
+                      <label className="lt-label">Delivery Type</label>
+                      <select className="lt-input" style={{ width: '100%' }} value={siField('delivery_type')} onChange={e => setSiField('delivery_type', e.target.value)}>
+                        <option value="CY/CY">CY/CY</option>
+                        <option value="CY/SD">CY/SD</option>
+                        <option value="SD/CY">SD/CY</option>
+                        <option value="SD/SD">SD/SD</option>
+                      </select>
+                    </div>
+                    {gsInput('Place of Receipt', 'place_of_receipt')}
+                    {gsInput('Port of Loading (POL)', 'pol')}
+                    {gsInput('Port of Discharge (POD)', 'pod')}
+                    {gsInput('SOB Date', 'sob_date', { type: 'date' })}
+                  </div>
+
+                  {/* ── CONTAINER DETAILS ── */}
+                  {gsSectionHeader('Container Details')}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {gsInput('Container No', 'container_no', { placeholder: 'e.g. HLBU1234567' })}
+                    {gsInput('Seal No', 'seal_no', { placeholder: 'e.g. SL123456' })}
+                    {gsInput('Container Size/Type', 'container_size', { readOnly: true })}
+                  </div>
+
+                  {/* ── CARGO DETAILS ── */}
+                  {gsSectionHeader('Cargo Details')}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {gsTextarea('Marks & Nos', 'marks_and_numbers', 'Marks and numbers...')}
+                    {gsTextarea('Description of Goods', 'description_of_goods', 'Commodity description...')}
+                    {gsInput('Weight (KGS)', 'weight_kgs', { placeholder: '0.00', type: 'number' })}
+                    {gsInput('Volume (M3)', 'volume_m3', { placeholder: '0.00', type: 'number' })}
+                  </div>
+
+                  {/* ── TERMS ── */}
+                  {gsSectionHeader('Terms')}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div>
+                      <label className="lt-label">Freight</label>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                        {(['PREPAID', 'COLLECT'] as const).map(f => (
+                          <button key={f}
+                            className={`db-btn ${siField('freight') === f ? 'primary' : ''}`}
+                            style={siField('freight') !== f ? { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' } : {}}
+                            onClick={() => setSiField('freight', f)}>
+                            {f}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {gsInput('Total Containers', 'total_containers', { readOnly: true })}
+                    <div>
+                      <label className="lt-label">Shipped on Board</label>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                        {(['YES', 'NO'] as const).map(v => (
+                          <button key={v}
+                            className={`db-btn ${siField('shipped_on_board') === v ? 'primary' : ''}`}
+                            style={siField('shipped_on_board') !== v ? { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' } : {}}
+                            onClick={() => setSiField('shipped_on_board', v)}>
+                            {v}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <label className="lt-label">Notes (optional)</label>
+                    <input className="lt-input" style={{ width: '100%' }} value={formNote}
+                      onChange={e => setFormNote(e.target.value)} placeholder="Internal notes..." />
+                  </div>
+                </div>
+              )
+            })() : selectedItem.actionKind === 'create-bl' && actionModal ? (() => {
+              const cbBkg = actionModal.sourceData.booking as Booking
+              // Helper: input field
+              const cbInput = (form: 'mbl' | 'hbl', label: string, key: string, opts?: { placeholder?: string; readOnly?: boolean; span2?: boolean; type?: string }) => (
+                <div style={opts?.span2 ? { gridColumn: '1 / -1' } : {}}>
+                  <label className="lt-label">{label}</label>
+                  <input className="lt-input" style={{ width: '100%', ...(opts?.readOnly ? { background: 'rgba(0,0,0,0.03)' } : {}) }}
+                    type={opts?.type || 'text'}
+                    value={form === 'mbl' ? mblField(key) : hblField(key)}
+                    onChange={e => form === 'mbl' ? setMblField(key, e.target.value) : setHblField(key, e.target.value)}
+                    placeholder={opts?.placeholder || ''} readOnly={opts?.readOnly} />
+                </div>
+              )
+              // Helper: textarea field
+              const cbTextarea = (form: 'mbl' | 'hbl', label: string, key: string, rows: number, placeholder?: string) => (
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label className="lt-label">{label}</label>
+                  <textarea className="lt-input" rows={rows} style={{ width: '100%', resize: 'vertical' as const, fontSize: 12 }}
+                    value={form === 'mbl' ? mblField(key) : hblField(key)}
+                    onChange={e => form === 'mbl' ? setMblField(key, e.target.value) : setHblField(key, e.target.value)}
+                    placeholder={placeholder || ''} />
+                </div>
+              )
+              // Helper: select field
+              const cbSelect = (form: 'mbl' | 'hbl', label: string, key: string, options: string[]) => (
+                <div>
+                  <label className="lt-label">{label}</label>
+                  <select className="lt-input" style={{ width: '100%' }}
+                    value={form === 'mbl' ? mblField(key) : hblField(key)}
+                    onChange={e => form === 'mbl' ? setMblField(key, e.target.value) : setHblField(key, e.target.value)}>
+                    {options.map(o => <option key={o} value={o}>{o || '—'}</option>)}
+                  </select>
+                </div>
+              )
+              // Helper: accordion section header
+              const cbSection = (sectionId: string, title: string, hint?: string) => (
+                <div onClick={() => toggleHblSection(sectionId)} style={{
+                  padding: '8px 12px', background: 'rgba(8,145,178,0.08)',
+                  borderLeft: '3px solid #0891b2', borderRadius: '0 6px 6px 0',
+                  fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const,
+                  letterSpacing: '0.05em', color: '#0891b2', marginTop: 4,
+                  cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}>
+                  <span>{title}{hint ? <span style={{ fontWeight: 400, textTransform: 'none' as const, marginLeft: 8, fontSize: 10, color: '#64748b' }}>{hint}</span> : null}</span>
+                  <span style={{ fontSize: 14, lineHeight: 1 }}>{hblCollapsed[sectionId] ? '+' : '−'}</span>
+                </div>
+              )
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {/* Tab bar: MBL | HBL */}
+                  <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--border)', borderRadius: '8px 8px 0 0', overflow: 'hidden' }}>
+                    {(['mbl', 'hbl'] as const).map(tab => {
+                      const isDone = tab === 'mbl' ? cbBkg.master_bl_recorded : cbBkg.house_bl_created
+                      return (
+                        <button key={tab} onClick={() => setBlActiveTab(tab)} style={{
+                          flex: 1, padding: '10px 16px', border: 'none', cursor: 'pointer',
+                          background: blActiveTab === tab ? 'rgba(8,145,178,0.08)' : 'transparent',
+                          borderBottom: blActiveTab === tab ? '2px solid #0891b2' : '2px solid transparent',
+                          fontWeight: blActiveTab === tab ? 700 : 500, fontSize: 13,
+                          color: blActiveTab === tab ? '#0891b2' : 'var(--text-secondary)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        }}>
+                          {tab === 'mbl' ? 'Master BL' : 'House BL'}
+                          {isDone && <span style={{ width: 14, height: 14, borderRadius: '50%', background: '#16a34a', color: '#fff', fontSize: 9, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>✓</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {/* Booking summary */}
+                  <div style={{ padding: '10px 14px', background: 'rgba(15,143,168,0.06)', border: '1px solid rgba(15,143,168,0.15)', borderRadius: 8, fontSize: 12 }}>
+                    <strong>{cbBkg.customer_name}</strong> — {cbBkg.origin} → {cbBkg.destination}
+                    <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
+                      {cbBkg.quantity}x {cbBkg.container_type} · {cbBkg.shipping_line || 'No liner'} · Job Ref: {cbBkg.job_reference_number || 'N/A'}
+                    </div>
+                  </div>
+
+                  {/* ===== MBL TAB ===== */}
+                  {blActiveTab === 'mbl' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      <div style={{ padding: '6px 12px', background: '#0d9488', borderRadius: 6 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>MASTER BILL OF LADING</span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        {cbInput('mbl', 'Master BL Number *', 'master_bl_number', { placeholder: 'e.g. MAEU123456789' })}
+                        {cbInput('mbl', 'Shipping Line', 'shipping_line', { readOnly: true })}
+                        {cbInput('mbl', 'Shipper', 'shipper', { placeholder: 'Shipper name' })}
+                        {cbInput('mbl', 'Consignee *', 'consignee', { placeholder: 'Consignee name' })}
+                        {cbInput('mbl', 'Vessel', 'vessel', { readOnly: true })}
+                        {cbInput('mbl', 'Voyage', 'voyage', { readOnly: true })}
+                        {cbInput('mbl', 'Port of Loading', 'pol', { readOnly: true })}
+                        {cbInput('mbl', 'Port of Discharge', 'pod', { readOnly: true })}
+                        {cbInput('mbl', 'Container Type', 'container_type', { readOnly: true })}
+                        {cbInput('mbl', 'Container Count', 'container_count', { readOnly: true })}
+                        {cbSelect('mbl', 'Freight Term', 'freight_term', ['PREPAID', 'COLLECT', 'PAYABLE AS ARRANGED'])}
+                        {cbInput('mbl', 'Delivery Type', 'delivery_type', { readOnly: true })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ===== HBL TAB ===== */}
+                  {blActiveTab === 'hbl' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ padding: '6px 12px', background: '#d97706', borderRadius: 6 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>HOUSE BILL OF LADING</span>
+                        {cbBkg.master_bl_number && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)', marginLeft: 10 }}>Master BL: {cbBkg.master_bl_number}</span>}
+                      </div>
+
+                      {/* Section 1: B/L Details */}
+                      {cbSection('bl', 'B/L Details', 'Identifiers')}
+                      {!hblCollapsed['bl'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '8px 0' }}>
+                          {cbSelect('hbl', 'Branch', 'branch', ['COLOMBO', 'GALLE', 'HAMBANTOTA'])}
+                          {cbInput('hbl', 'Booking No.', 'bookingNo', { readOnly: true })}
+                          {cbSelect('hbl', 'Shipment Category', 'shipmentCategory', ['LOCAL EXPORT', 'RE-EXPORT', 'TRANSHIPMENT', 'CROSS TRADE'])}
+                          {cbSelect('hbl', 'B/L Type', 'blType', ['OWN', 'CO-LOAD', 'MASTER ONLY'])}
+                          {cbInput('hbl', 'House B/L #', 'houseBlNo', { placeholder: 'System-generated' })}
+                          {cbInput('hbl', 'Custom B/L #', 'customBlNo')}
+                          {cbInput('hbl', 'STT #', 'sttNo', { placeholder: 'Transhipment only' })}
+                          {cbInput('hbl', 'HS Code', 'hsCode', { placeholder: 'e.g. 2009.89' })}
+                          {cbInput('hbl', 'Delivery No.', 'deliveryNo')}
+                        </div>
+                      )}
+
+                      {/* Section 2: Parties */}
+                      {cbSection('parties', 'Parties', 'Shipper, consignee, notify')}
+                      {!hblCollapsed['parties'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '8px 0' }}>
+                          {cbInput('hbl', 'Shipper Name *', 'shipperName')}
+                          {cbInput('hbl', 'Shipper Reference (PO#)', 'shipperRef')}
+                          {cbInput('hbl', 'Email Reference', 'emailRef')}
+                          {cbSelect('hbl', 'Consigned', 'consignedTo', ['', 'TO ORDER', 'TO ORDER OF SHIPPER', 'TO ORDER OF BANK', 'STRAIGHT / NAMED'])}
+                          {cbTextarea('hbl', 'Shipper Address *', 'shipperAddress', 3)}
+                          {cbInput('hbl', 'Consignee Name *', 'consigneeName')}
+                          {cbTextarea('hbl', 'Consignee Address *', 'consigneeAddress', 3)}
+                          {cbSelect('hbl', 'Notify Type', 'notifyType', ['', 'SAME AS CONSIGNEE', 'THIRD PARTY', 'AGENT'])}
+                          {cbInput('hbl', 'Notify Name', 'notifyName')}
+                          {cbTextarea('hbl', 'Notify Address', 'notifyAddress', 3)}
+                          {cbTextarea('hbl', 'Also Notify', 'alsoNotify', 3)}
+                          {cbSelect('hbl', 'Customer Category', 'customerCategory', ['DIRECT', 'AGENT', 'NOMINATION', 'CO-LOADER'])}
+                          {cbSelect('hbl', 'Business Type', 'businessType', ['AGENT NOMINATION', 'FREE HAND', 'CONTROLLED', 'TRIANGLE'])}
+                          {cbInput('hbl', 'Customer / Shipper', 'customerShipper')}
+                          {cbInput('hbl', 'Billing Party', 'billingParty')}
+                          {cbInput('hbl', 'Sales Person', 'salesPerson')}
+                          {cbInput('hbl', 'CS Executive', 'csExecutive')}
+                          {cbInput('hbl', 'Documentation By', 'documentationBy')}
+                          {cbInput('hbl', 'Introduced By', 'introducedBy')}
+                          {cbInput('hbl', 'Nominated Agent', 'nominatedAgent', { span2: true })}
+                        </div>
+                      )}
+
+                      {/* Section 3: Cargo Summary */}
+                      {cbSection('cargo', 'Cargo Summary', 'Printed totals')}
+                      {!hblCollapsed['cargo'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '8px 0' }}>
+                          {cbSelect('hbl', 'Cargo Type', 'cargoType', ['GENERAL', 'REEFER', 'HAZARDOUS', 'OUT OF GAUGE'])}
+                          {cbInput('hbl', 'Commodity', 'commodity')}
+                          {cbInput('hbl', 'No. of Containers on B/L', 'noOfContainersOnBl', { type: 'number' })}
+                          {cbInput('hbl', 'Total Packages', 'totalPackages', { type: 'number' })}
+                          {cbInput('hbl', 'Package Type', 'packageType', { placeholder: 'e.g. TRAYS, CARTONS' })}
+                          {cbSelect('hbl', 'Print Details', 'printDetails', ['PACKAGE DETAILS', 'CONTAINER DETAILS', 'BOTH', 'NONE'])}
+                          {cbInput('hbl', 'Gross Weight', 'grossWeight', { type: 'number' })}
+                          {cbSelect('hbl', 'Weight Unit', 'weightUom', ['KG', 'LBS', 'MT'])}
+                          {cbSelect('hbl', 'Gross Decimals', 'grossDecimals', ['0', '1', '2', '3'])}
+                          {cbInput('hbl', 'Net Weight', 'netWeight', { type: 'number' })}
+                          {cbSelect('hbl', 'Print Net With', 'netPrintWith', ['BOTH', 'GROSS ONLY', 'NET ONLY', 'NONE'])}
+                          {cbInput('hbl', 'CBM (Volume)', 'cbm', { type: 'number' })}
+                          {cbSelect('hbl', 'CBM Decimals', 'cbmDecimals', ['0', '1', '2', '3'])}
+                          {cbInput('hbl', 'W/M Ratio', 'wmRatio', { type: 'number' })}
+                          <div style={{ gridColumn: '1 / -1' }} />
+                          {cbTextarea('hbl', 'Marks & Numbers', 'marksNumbers', 4, 'CONTAINER AND SEAL DETAILS AS PER ATTACHED SHEET')}
+                        </div>
+                      )}
+
+                      {/* Section 4: Containers */}
+                      {cbSection('containers', 'Containers', `${hblContainers.length} row(s)`)}
+                      {!hblCollapsed['containers'] && (
+                        <div style={{ padding: '8px 0' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '110px 50px 50px 80px 90px 70px 70px 70px 60px 28px', gap: 4, fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, paddingLeft: 2 }}>
+                            <span>Container #</span><span>Size</span><span>Type</span><span>Shipment</span><span>Seal No</span><span>Packages</span><span>Pkg Type</span><span>Gross Wt</span><span>CBM</span><span />
+                          </div>
+                          {hblContainers.map((row, ri) => (
+                            <div key={ri} style={{ display: 'grid', gridTemplateColumns: '110px 50px 50px 80px 90px 70px 70px 70px 60px 28px', gap: 4, marginBottom: 3 }}>
+                              <input className="lt-input" style={{ width: '100%', fontSize: 11, padding: '3px 4px' }} value={row.containerNo}
+                                onChange={e => setHblContainers(prev => prev.map((r, i) => i === ri ? { ...r, containerNo: e.target.value } : r))} placeholder="ABCU1234567" />
+                              <select className="lt-input" style={{ width: '100%', fontSize: 11, padding: '3px 2px' }} value={row.size}
+                                onChange={e => setHblContainers(prev => prev.map((r, i) => i === ri ? { ...r, size: e.target.value } : r))}>
+                                <option value="20">20</option><option value="40">40</option><option value="45">45</option>
+                              </select>
+                              <select className="lt-input" style={{ width: '100%', fontSize: 11, padding: '3px 2px' }} value={row.type}
+                                onChange={e => setHblContainers(prev => prev.map((r, i) => i === ri ? { ...r, type: e.target.value } : r))}>
+                                <option value="GP">GP</option><option value="HC">HC</option><option value="RF">RF</option><option value="OT">OT</option><option value="FR">FR</option><option value="TK">TK</option>
+                              </select>
+                              <select className="lt-input" style={{ width: '100%', fontSize: 11, padding: '3px 2px' }} value={row.shipmentType}
+                                onChange={e => setHblContainers(prev => prev.map((r, i) => i === ri ? { ...r, shipmentType: e.target.value } : r))}>
+                                <option value="FCL/FCL">FCL/FCL</option><option value="FCL/LCL">FCL/LCL</option><option value="LCL/LCL">LCL/LCL</option><option value="LCL/FCL">LCL/FCL</option>
+                              </select>
+                              <input className="lt-input" style={{ width: '100%', fontSize: 11, padding: '3px 4px' }} value={row.sealNo}
+                                onChange={e => setHblContainers(prev => prev.map((r, i) => i === ri ? { ...r, sealNo: e.target.value } : r))} placeholder="Seal" />
+                              <input className="lt-input" style={{ width: '100%', fontSize: 11, padding: '3px 4px' }} type="number" value={row.packages}
+                                onChange={e => setHblContainers(prev => prev.map((r, i) => i === ri ? { ...r, packages: e.target.value } : r))} />
+                              <input className="lt-input" style={{ width: '100%', fontSize: 11, padding: '3px 4px' }} value={row.packageType}
+                                onChange={e => setHblContainers(prev => prev.map((r, i) => i === ri ? { ...r, packageType: e.target.value } : r))} placeholder="Type" />
+                              <input className="lt-input" style={{ width: '100%', fontSize: 11, padding: '3px 4px' }} type="number" value={row.grossWeight}
+                                onChange={e => setHblContainers(prev => prev.map((r, i) => i === ri ? { ...r, grossWeight: e.target.value } : r))} />
+                              <input className="lt-input" style={{ width: '100%', fontSize: 11, padding: '3px 4px' }} type="number" value={row.cbm}
+                                onChange={e => setHblContainers(prev => prev.map((r, i) => i === ri ? { ...r, cbm: e.target.value } : r))} />
+                              {hblContainers.length > 1 && (
+                                <button type="button" onClick={() => setHblContainers(prev => prev.filter((_, i) => i !== ri))}
+                                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14, padding: 0 }}>×</button>
+                              )}
+                            </div>
+                          ))}
+                          <button type="button" onClick={() => setHblContainers(prev => [...prev, { containerNo: '', size: '20', type: 'GP', shipmentType: 'FCL/FCL', sealNo: '', packages: '', packageType: '', grossWeight: '', cbm: '' }])}
+                            style={{ fontSize: 11, color: '#0891b2', background: 'none', border: '1px dashed #0891b2', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', marginTop: 4 }}>
+                            + Add Container
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Section 5: Goods Description */}
+                      {cbSection('goods', 'Goods Description', 'Printed on bill face')}
+                      {!hblCollapsed['goods'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8, padding: '8px 0' }}>
+                          {cbTextarea('hbl', 'Description of Goods *', 'descriptionOfGoods', 6, 'e.g. 06X20GP CONTAINERS FCL/FCL...')}
+                          {cbTextarea('hbl', 'Liner B/L Description', 'linerBlDescription', 4, 'What goes to the carrier for the master bill')}
+                          {cbInput('hbl', 'Description Prefix (bottom)', 'descriptionPrefix', { span2: true })}
+                          {cbInput('hbl', 'Clause Printed to B/L', 'printToBlText', { span2: true })}
+                          {cbTextarea('hbl', 'SAP Description', 'sapDescription', 3)}
+                        </div>
+                      )}
+
+                      {/* Section 6: Routing & Delivery */}
+                      {cbSection('routing', 'Routing & Delivery', 'Places printed on the bill')}
+                      {!hblCollapsed['routing'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '8px 0' }}>
+                          {cbSelect('hbl', 'Delivery Type *', 'deliveryType', ['CY/CY', 'CY/CFS', 'CFS/CY', 'CFS/CFS', 'DOOR/DOOR'])}
+                          {cbSelect('hbl', 'Incoterm', 'incoterm', ['', 'EXW', 'FCA', 'FAS', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP'])}
+                          {cbInput('hbl', 'Country of Origin *', 'countryOfOrigin')}
+                          {cbInput('hbl', 'Transit Time (days)', 'transitTime', { type: 'number' })}
+                          {cbInput('hbl', 'Place of Receipt *', 'placeOfReceipt')}
+                          <div />
+                          {cbInput('hbl', 'Port of Loading *', 'portOfLoading')}
+                          {cbInput('hbl', 'POL Code', 'polCode', { placeholder: 'UN/LOCODE e.g. LKCMB' })}
+                          <div />
+                          {cbInput('hbl', 'Port of Discharge *', 'portOfDischarge')}
+                          {cbInput('hbl', 'POD Code', 'podCode', { placeholder: 'UN/LOCODE' })}
+                          {cbInput('hbl', 'POD ETA', 'podEta', { type: 'date' })}
+                          {cbInput('hbl', 'POD ATA', 'podAta', { type: 'date' })}
+                          {cbInput('hbl', 'Final Destination *', 'finalDestination')}
+                          {cbInput('hbl', 'Code', 'fdCode', { placeholder: 'UN/LOCODE' })}
+                          {cbInput('hbl', 'Final Dest. ETA', 'fdEta', { type: 'date' })}
+                          {cbInput('hbl', 'Place of Delivery *', 'placeOfDelivery')}
+                          {cbInput('hbl', 'Code', 'podelCode', { placeholder: 'UN/LOCODE' })}
+                          {cbInput('hbl', 'Delivery ETA', 'podelEta', { type: 'date' })}
+                        </div>
+                      )}
+
+                      {/* Section 7: Issuance */}
+                      {cbSection('issue', 'Issuance', 'Dates and negotiability')}
+                      {!hblCollapsed['issue'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '8px 0' }}>
+                          {cbInput('hbl', 'Place of B/L Issued *', 'placeOfBlIssued')}
+                          {cbInput('hbl', 'Date of B/L Issued *', 'dateOfBlIssued', { type: 'date' })}
+                          {cbInput('hbl', 'Shipped on Board Date *', 'shippedOnBoardDate', { type: 'date' })}
+                          {cbSelect('hbl', 'Received for Shipment', 'receivedForShipment', ['NO', 'YES'])}
+                          {cbSelect('hbl', 'B/L Term *', 'blTerm', ['NON-NEGO', 'NEGOTIABLE', 'SEAWAY', 'EXPRESS'])}
+                          {cbSelect('hbl', 'No. of Original B/Ls', 'noOfOriginalBls', ['ZERO (0)', 'ONE (1)', 'TWO (2)', 'THREE (3)'])}
+                          {cbInput('hbl', 'Permit No.', 'permitNo')}
+                          <div />
+                          <div />
+                          {cbTextarea('hbl', 'Remarks', 'remarks', 3)}
+                        </div>
+                      )}
+
+                      {/* Section 8: Freight & Charges */}
+                      {cbSection('freight', 'Freight & Charges', 'Terms')}
+                      {!hblCollapsed['freight'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '8px 0' }}>
+                          {cbSelect('hbl', 'Freight Term *', 'freightTerm', ['PREPAID', 'COLLECT', 'PAYABLE AS ARRANGED'])}
+                          {cbInput('hbl', 'Freight Term Text', 'freightTermText')}
+                          {cbInput('hbl', 'Freight Amount', 'freightAmount', { type: 'number' })}
+                          {cbTextarea('hbl', 'Freight Payable At', 'freightPayableAt', 2)}
+                          {cbTextarea('hbl', 'Freight Term Details', 'freightTermDetails', 2)}
+                          <div />
+                          {cbSelect('hbl', 'Origin Charges *', 'originCharges', ['PREPAID', 'COLLECT'])}
+                          {cbSelect('hbl', 'Destination Charges *', 'destinationCharges', ['PREPAID', 'COLLECT'])}
+                        </div>
+                      )}
+
+                      {/* Section 9: Agents & Carrier */}
+                      {cbSection('agents', 'Destination Agent & Carrier')}
+                      {!hblCollapsed['agents'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '8px 0' }}>
+                          {cbInput('hbl', 'POD Agent *', 'podAgent')}
+                          {cbInput('hbl', 'Contact Person', 'contactPerson')}
+                          {cbTextarea('hbl', 'POD Agent Address', 'podAgentAddress', 3)}
+                          {cbInput('hbl', 'Agent for Carrier *', 'agentForCarrier')}
+                          {cbInput('hbl', 'Detention / Demurrage Clause', 'detentionDays', { span2: true, placeholder: 'e.g. 14 DAYS FREE DETENTION & DEMURRAGE AT DESTINATION' })}
+                          {cbSelect('hbl', 'B/L Format', 'blFormat', ['CLS_FMC', 'CLS_STD', 'CLS_NEUTRAL'])}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Notes */}
+                  <div>
+                    <label className="lt-label">Notes (optional)</label>
+                    <input className="lt-input" style={{ width: '100%' }} value={formNote}
+                      onChange={e => setFormNote(e.target.value)} placeholder="Internal notes..." />
+                  </div>
+                </div>
+              )
             })() : (selectedItem.actionKind === 'booking-request' || selectedItem.actionKind === 'review-booking-request') && actionModal ? (() => {
               const isCS = selectedItem.actionKind === 'booking-request'
               const isReefer = bkContainers.some(c => c.type.includes('RF'))
@@ -4221,7 +4867,7 @@ ABC Logistics (Pvt) Ltd`
       </div>
 
       {/* Action Modal */}
-      {actionModal && actionModal.actionKind !== 'booking-request' && actionModal.actionKind !== 'review-booking-request' && actionModal.actionKind !== 'confirm-liner-booking' && actionModal.actionKind !== 'attach-release-order' && actionModal.actionKind !== 'release-booking' && actionModal.actionKind !== 'send-draft-bl' && actionModal.actionKind !== 'record-cutoff' && actionModal.actionKind !== 'request-si' && actionModal.actionKind !== 'submit-si' && actionModal.actionKind !== 'send-pre-advice' && (
+      {actionModal && actionModal.actionKind !== 'booking-request' && actionModal.actionKind !== 'review-booking-request' && actionModal.actionKind !== 'confirm-liner-booking' && actionModal.actionKind !== 'attach-release-order' && actionModal.actionKind !== 'release-booking' && actionModal.actionKind !== 'send-draft-bl' && actionModal.actionKind !== 'save-draft-bl' && actionModal.actionKind !== 'generate-si' && actionModal.actionKind !== 'create-bl' && actionModal.actionKind !== 'record-cutoff' && actionModal.actionKind !== 'request-si' && actionModal.actionKind !== 'submit-si' && actionModal.actionKind !== 'send-pre-advice' && (
         <div className="lt-modal-backdrop" onClick={() => setActionModal(null)}>
           <div className="lt-modal" onClick={e => e.stopPropagation()} style={{ width: actionModal.actionKind === 'send-kyc' ? 660 : 520, padding: '28px 30px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
@@ -4479,6 +5125,7 @@ ABC Logistics (Pvt) Ltd`
             {/* Prepare Quotation (Sales) */}
             {actionModal.actionKind === 'prepare-quotation' && (() => {
               const ctx = actionModal.previousContext
+              const modalRr = actionModal.sourceData?.rateRequest as CompletedRateRequest | undefined
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
                   <div style={{ padding: '10px 14px', background: 'rgba(15,143,168,0.06)', border: '1px solid rgba(15,143,168,0.18)', borderRadius: 8, fontSize: 12, color: '#0f8fa8', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -4486,7 +5133,181 @@ ABC Logistics (Pvt) Ltd`
                     Review and edit the quotation below, then click <strong>Save Quotation</strong>. The quotation will appear in the Send Quote step for delivery.
                   </div>
 
-                  {ctx && (
+                  {/* Saved rate options from backend — selectable */}
+                  {modalRr && modalRr.options.length > 0 && (() => {
+                    const validOpts = modalRr.options.filter(o => o.rate)
+
+                    // Helper: rebuild quotation text after selection or best-option changes
+                    const rebuildQuotation = (nextSelected: Set<number>, nextBest: number | null) => {
+                      const { inquiry: qInq2, container: qCont2 } = actionModal.sourceData as { inquiry: Inquiry; container: ContainerLine }
+                      const qCust2 = customers.find(c => c.name.toLowerCase() === qInq2.customer_name.toLowerCase())
+                      const dest2 = qCont2?.destination || qInq2.destination
+                      const cLabel = qCont2 ? `${qCont2.quantity}x ${qCont2.containerType}` : ''
+                      const comLabel = qCont2?.commodityType ? ` · ${qCont2.commodityType}` : qInq2.commodity_type ? ` · ${qInq2.commodity_type}` : ''
+                      const procRemark = modalRr.remark ?? ''
+                      const td = new Date().toISOString().slice(0, 10)
+                      const rs = buildRateSection(modalRr, [...nextSelected], nextBest, linerList, actionModal.previousContext)
+                      setQuotationContent(
+`FREIGHT QUOTATION
+
+To: ${qInq2.customer_name}${qCust2?.tier ? ` (${qCust2.tier})` : ''}
+Date: ${td}
+Reference: ${qInq2.id}
+
+Dear ${qInq2.customer_name},
+
+Thank you for your freight enquiry. We are pleased to offer the following:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SHIPMENT DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Route:       ${qInq2.origin} → ${dest2}
+Cargo:       ${cLabel}${comLabel}
+Service:     ${qInq2.delivery_type === 'door-to-door' ? 'Door-to-Door' : 'Port-to-Port'}${qInq2.incoterm ? ` (${qInq2.incoterm})` : ''}${qInq2.cargo_ready_date ? `\nCargo Ready: ${qInq2.cargo_ready_date}` : ''}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RATE OPTIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${rs}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TERMS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Validity: 14 days from date of this quotation
+• Rates subject to space and equipment availability
+• Port surcharges, customs, and inland haulage quoted separately unless stated above
+${procRemark ? `\nNOTES: ${procRemark}` : ''}
+Please confirm your preferred option at your earliest convenience.
+
+Best regards,
+${activeEmployee.name}
+ABC Logistics (Pvt) Ltd`
+                      )
+                    }
+
+                    const toggleOption = (optId: number) => {
+                      setSelectedRateOptionIds(prev => {
+                        const next = new Set(prev)
+                        if (next.has(optId)) {
+                          next.delete(optId)
+                          // If we removed the best, clear best or pick next selected
+                          if (bestRateOptionId === optId) {
+                            const remaining = [...next]
+                            const nextBest = remaining.length > 0 ? remaining[0] : null
+                            setBestRateOptionId(nextBest)
+                            rebuildQuotation(next, nextBest)
+                            return next
+                          }
+                        } else {
+                          next.add(optId)
+                        }
+                        rebuildQuotation(next, bestRateOptionId)
+                        return next
+                      })
+                    }
+
+                    const pickBest = (optId: number) => {
+                      // Selecting as best also ensures it's included
+                      setSelectedRateOptionIds(prev => {
+                        const next = new Set(prev)
+                        next.add(optId)
+                        setBestRateOptionId(optId)
+                        rebuildQuotation(next, optId)
+                        return next
+                      })
+                    }
+
+                    return (
+                      <div className="ws-context-card" style={{ marginTop: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <FileText size={11} style={{ color: '#0f8fa8' }} />
+                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
+                              Rate Options ({validOpts.length})
+                            </span>
+                          </div>
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                            {selectedRateOptionIds.size} included · tick best option
+                          </span>
+                        </div>
+                        {validOpts.map((opt: CompletedRateOption) => {
+                          const r = opt.rate!
+                          const isSelected = selectedRateOptionIds.has(opt.option_id)
+                          const isBest = bestRateOptionId === opt.option_id
+                          const linerName = r.lin_id ? (linerList.find(l => l.lin_id === r.lin_id)?.name ?? `Liner #${r.lin_id}`) : null
+                          const typeLabel = opt.rate_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+                          const freeTime = r.free_time ?? r.free_days
+                          return (
+                            <div
+                              key={opt.option_id}
+                              style={{
+                                padding: '8px 10px',
+                                background: isBest ? 'rgba(15,143,168,0.08)' : isSelected ? 'rgba(15,143,168,0.03)' : 'var(--bg-card)',
+                                border: `1.5px solid ${isBest ? '#0f8fa8' : isSelected ? 'rgba(15,143,168,0.18)' : 'var(--border)'}`,
+                                borderRadius: 6, marginBottom: 6, fontSize: 11,
+                                opacity: isSelected ? 1 : 0.5,
+                                transition: 'all 0.15s',
+                              }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                {/* Include checkbox */}
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleOption(opt.option_id)}
+                                  style={{ accentColor: '#0f8fa8', cursor: 'pointer', margin: 0 }}
+                                />
+                                {/* Rate details */}
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>
+                                      {linerName ? `${linerName} — ` : ''}{r.rate ?? '—'} {r.currency ?? 'USD'}
+                                    </span>
+                                    <span style={{ fontSize: 10, padding: '2px 6px', background: 'rgba(15,143,168,0.1)', borderRadius: 4, color: '#0f8fa8' }}>
+                                      {typeLabel}
+                                    </span>
+                                  </div>
+                                  <div style={{ color: 'var(--text-muted)', marginTop: 3 }}>
+                                    {r.origin && r.destination ? `${r.origin} → ${r.destination}` : ''}
+                                    {r.container_type ? ` · ${r.container_type}` : ''}
+                                    {r.transit ? ` · ${r.transit}d transit` : ''}
+                                    {freeTime ? ` · ${freeTime}d free` : ''}
+                                    {r.valid_from && r.valid_to ? ` · valid ${r.valid_from} – ${r.valid_to}` : ''}
+                                  </div>
+                                </div>
+                                {/* Best option radio */}
+                                <button
+                                  type="button"
+                                  title={isBest ? 'Recommended option' : 'Mark as recommended'}
+                                  onClick={() => pickBest(opt.option_id)}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: 4,
+                                    fontSize: 10, padding: '3px 8px', borderRadius: 4, cursor: 'pointer',
+                                    border: `1px solid ${isBest ? '#0f8fa8' : 'var(--border)'}`,
+                                    background: isBest ? '#0f8fa8' : 'transparent',
+                                    color: isBest ? '#fff' : 'var(--text-muted)',
+                                    fontWeight: isBest ? 600 : 400,
+                                    transition: 'all 0.15s',
+                                  }}
+                                >
+                                  <Check size={10} />
+                                  Best
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        {modalRr.remark && (
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>
+                            Note: {modalRr.remark}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+
+                  {/* Fallback: activity log context (when no saved rate request) */}
+                  {!modalRr && ctx && (
                     <div className="ws-context-card" style={{ marginTop: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                         <User size={11} style={{ color: 'var(--text-muted)' }} />
@@ -5094,6 +5915,16 @@ ABC Logistics (Pvt) Ltd`
               </div>
             )}
 
+            {/* Job Reference Number — shown for save-draft-bl */}
+            {actionModal.actionKind === 'save-draft-bl' && (
+              <div style={{ marginTop: 16 }}>
+                <label className="lt-label">Job Reference Number <span style={{ color: '#dc2626' }}>*</span></label>
+                <input className="lt-input" style={{ width: '100%' }}
+                  value={jobRefNumber} onChange={e => setJobRefNumber(e.target.value)}
+                  placeholder="Enter job reference number..." />
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 24, paddingTop: 20, borderTop: '1px solid #eef2f6' }}>
               <button className="db-btn" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }} onClick={() => setActionModal(null)}>Cancel</button>
               <button
@@ -5112,6 +5943,10 @@ ABC Logistics (Pvt) Ltd`
                   (actionModal.actionKind === 'create-house-bl' && sendMethod === 'email' && (!customerContactEmail.trim() || !customerContactEmail.includes('@'))) ||
                   (actionModal.actionKind === 'create-house-bl' && sendMethod === 'whatsapp' && !waConfirmed) ||
                   (actionModal.actionKind === 'customer-response' && customerDecision === 'accepted' && quotationOptions.length > 0 && selectedOptionRateId == null) ||
+                  (actionModal.actionKind === 'save-draft-bl' && !jobRefNumber.trim()) ||
+                  (actionModal.actionKind === 'generate-si' && (!siField('shipper_name').trim() || !siField('consignee_name').trim())) ||
+                  (actionModal.actionKind === 'create-bl' && blActiveTab === 'mbl' && (!mblField('master_bl_number').trim() || !mblField('consignee').trim())) ||
+                  (actionModal.actionKind === 'create-bl' && blActiveTab === 'hbl' && (!hblField('shipperName').trim() || !hblField('consigneeName').trim())) ||
                   kycSending || quotationSending
                 }
                 style={
@@ -5137,6 +5972,14 @@ ABC Logistics (Pvt) Ltd`
                   actionModal.actionKind === 'create-house-bl' && sendMethod === 'whatsapp' && waConfirmed && houseBlNumber.trim() && houseBlConsignee.trim() ? { background: '#25d366', borderColor: '#25d366' } :
                   actionModal.actionKind === 'create-house-bl' && sendMethod === 'email' && customerContactEmail.includes('@') && houseBlNumber.trim() && houseBlConsignee.trim() ? { background: '#d97706', borderColor: '#d97706' } :
                   actionModal.actionKind === 'create-house-bl' ? { opacity: 0.4, cursor: 'not-allowed' } :
+                  (actionModal.actionKind === 'save-draft-bl' && !jobRefNumber.trim()) ? { opacity: 0.4, cursor: 'not-allowed' } :
+                  (actionModal.actionKind === 'save-draft-bl') ? { background: '#0891b2', borderColor: '#0891b2' } :
+                  (actionModal.actionKind === 'generate-si' && (!siField('shipper_name').trim() || !siField('consignee_name').trim())) ? { opacity: 0.4, cursor: 'not-allowed' } :
+                  (actionModal.actionKind === 'generate-si') ? { background: '#0891b2', borderColor: '#0891b2' } :
+                  (actionModal.actionKind === 'create-bl' && blActiveTab === 'mbl' && (!mblField('master_bl_number').trim() || !mblField('consignee').trim())) ? { opacity: 0.4, cursor: 'not-allowed' } :
+                  (actionModal.actionKind === 'create-bl' && blActiveTab === 'mbl') ? { background: '#0d9488', borderColor: '#0d9488' } :
+                  (actionModal.actionKind === 'create-bl' && blActiveTab === 'hbl' && (!hblField('shipperName').trim() || !hblField('consigneeName').trim())) ? { opacity: 0.4, cursor: 'not-allowed' } :
+                  (actionModal.actionKind === 'create-bl' && blActiveTab === 'hbl') ? { background: '#d97706', borderColor: '#d97706' } :
                   (actionModal.actionKind === 'send-kyc' && (!kycBrNumber.trim() || !kycCliType || !kycDeadline)) ? { opacity: 0.4, cursor: 'not-allowed' } :
                   (actionModal.actionKind === 'send-kyc') ? { background: '#0891b2', borderColor: '#0891b2' } :
                   (actionModal.actionKind === 'prepare-quotation' && !quotationContent.trim()) ? { opacity: 0.4, cursor: 'not-allowed' } :
@@ -5165,6 +6008,10 @@ ABC Logistics (Pvt) Ltd`
                  actionModal.actionKind === 'create-house-bl' && sendMethod === 'email' ? <><Mail size={12} /> Create &amp; Send House BL via Email</> :
                  actionModal.actionKind === 'create-house-bl' && sendMethod === 'whatsapp' ? <><MessageCircle size={12} /> Create &amp; Confirm House BL Sent</> :
                  actionModal.actionKind === 'approve-quote' && formDecision === 'reject' ? 'Reject' :
+                 actionModal.actionKind === 'save-draft-bl' ? <><FileText size={12} /> Save Draft BL</> :
+                 actionModal.actionKind === 'generate-si' ? <><FileText size={12} /> Generate SI Document</> :
+                 actionModal.actionKind === 'create-bl' && blActiveTab === 'mbl' ? <><FileText size={12} /> Record Master BL</> :
+                 actionModal.actionKind === 'create-bl' && blActiveTab === 'hbl' ? <><FileText size={12} /> Create House BL</> :
                  <>Confirm &amp; Push <ChevronRight size={12} /></>}
               </button>
             </div>

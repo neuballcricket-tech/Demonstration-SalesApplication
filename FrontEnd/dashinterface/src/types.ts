@@ -421,6 +421,60 @@ export interface RateRecord {
   source_system: string
 }
 
+// ==================== COMPLETED RATE REQUESTS (for quotation prep) ====================
+// Matches GET /rate-requests/completed-for-quoting response shape.
+// Each request is a rate_request row with is_given=true at quotation_prep stage,
+// and options contain the actual rate details fetched from the relevant rate table.
+
+export type RateTableType = 'tariff_rates' | 'fak_rates' | 'special_rate' | 'vessel_by_vessel_rate' | 'contracted_rates' | 'nac'
+
+/** Rate detail row — union of fields across all 6 rate tables. */
+export interface RateOptionDetail {
+  rate_id: number
+  lin_id?: number | null
+  origin?: string | null
+  destination?: string | null
+  container_type?: string | null
+  rate?: number | null
+  currency?: string | null
+  valid_from?: string | null
+  valid_to?: string | null
+  transit?: number | null
+  free_time?: number | null
+  free_days?: number | null       // special_rate / vessel_by_vessel_rate use free_days
+  max_weight?: number | null
+  note?: string | null
+  special_remark?: string | null
+  // contracted_rates specific
+  contract_ref_id?: string | null
+  // nac specific
+  nac_ref_id?: string | null
+  // vessel_by_vessel_rate specific
+  vessel_name?: string | null
+  voyage?: string | null
+  eta?: string | null
+  etd?: string | null
+}
+
+export interface CompletedRateOption {
+  option_id: number
+  rate_type: RateTableType
+  rate_id: number
+  rate: RateOptionDetail | null
+}
+
+export interface CompletedRateRequest {
+  request_id: number
+  inq_id: number
+  remark: string | null
+  created_at: string
+  options: CompletedRateOption[]
+}
+
+export interface CompletedRateRequestsResponse {
+  requests: CompletedRateRequest[]
+}
+
 // ==================== UNIFIED RATE (from all DB rate tables) ====================
 export type RateSourceType = 'Contracted' | 'FAK' | 'Spot' | 'Tariff Rate' | 'NAC' | 'Special'
 
@@ -721,6 +775,7 @@ export interface Booking {
   si_requested?: boolean
   si_submitted?: boolean
   draft_bl_sent?: boolean
+  job_reference_number?: string
   bl_status?: 'pending' | 'approved' | 'changes-requested'
   delivery_type?: DeliveryType
   master_bl_number?: string
@@ -731,6 +786,7 @@ export interface Booking {
   house_bl_shipper?: string
   house_bl_consignee?: string
   house_bl_created?: boolean
+  liner_bl_instruction_generated?: boolean  // true after CS generates SI / Liner BL instruction
   pre_advice_sent?: boolean         // true after CS sends pre-advice to door agent (door-to-door / port-to-door)
   release_order_attached?: boolean  // true after Procurement attaches release order and sends to CS
   release_order_fields?: ReleaseOrderFields

@@ -607,9 +607,15 @@ export default function App() {
     setVesselSchedules(prev => [...prev, { ...vs, id }])
   }
 
-  const markDraftBlSent = (bookingId: string) => {
+  const markDraftBlSent = (bookingId: string, jobReferenceNumber?: string) => {
     setBookings(prev => prev.map(b =>
-      b.id === bookingId ? { ...b, draft_bl_sent: true } : b
+      b.id === bookingId ? { ...b, draft_bl_sent: true, ...(jobReferenceNumber ? { job_reference_number: jobReferenceNumber } : {}) } : b
+    ))
+  }
+
+  const markLinerBlGenerated = (bookingId: string) => {
+    setBookings(prev => prev.map(b =>
+      b.id === bookingId ? { ...b, liner_bl_instruction_generated: true } : b
     ))
   }
 
@@ -911,6 +917,7 @@ export default function App() {
             vesselSchedules={vesselSchedules}
             onAddVesselSchedule={addVesselSchedule}
             onMarkDraftBlSent={markDraftBlSent}
+            onMarkLinerBlGenerated={markLinerBlGenerated}
             onMarkPreAdviceSent={markPreAdviceSent}
             onSetBlStatus={setBlStatus}
             onRecordMasterBl={recordMasterBl}
