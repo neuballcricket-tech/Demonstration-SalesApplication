@@ -4,6 +4,7 @@ export type PageId =
   | 'chat'
   | 'workspace'
   | 'new-inquiry'
+  | 'rfq-new'
   | 'record-rate'
   | 'rate-check'
   | 'inquiry-list'
@@ -21,6 +22,7 @@ export const PAGE_LABELS: Record<PageId, string> = {
   chat: 'Command Center',
   workspace: 'Workspace',
   'new-inquiry': 'New Inquiry',
+  'rfq-new': 'New RFQ',
   'record-rate': 'Record Rate',
   'rate-check': 'Rate Check',
   'inquiry-list': 'Inquiry List',
@@ -55,11 +57,11 @@ export const ROLE_COLORS: Record<UserRole, string> = {
 }
 
 export const ROLE_PAGE_ACCESS: Record<UserRole, PageId[]> = {
-  CS:          ['dashboard', 'chat', 'workspace', 'new-inquiry', 'inquiry-list', 'rate-list', 'booking-list', 'followups', 'customers', 'kyc', 'profile'],
-  Sales:       ['dashboard', 'chat', 'workspace', 'new-inquiry', 'inquiry-list', 'rate-list', 'followups', 'customers', 'profile'],
+  CS:          ['dashboard', 'chat', 'workspace', 'new-inquiry', 'rfq-new', 'inquiry-list', 'rate-list', 'booking-list', 'followups', 'customers', 'kyc', 'profile'],
+  Sales:       ['dashboard', 'chat', 'workspace', 'new-inquiry', 'rfq-new', 'inquiry-list', 'rate-list', 'followups', 'customers', 'profile'],
   Finance:     ['dashboard', 'chat', 'workspace', 'customers', 'kyc', 'profile'],
   Procurement: ['dashboard', 'chat', 'workspace', 'inquiry-list', 'record-rate', 'rate-check', 'rate-list', 'booking-list', 'followups', 'profile'],
-  Admin:       ['dashboard', 'chat', 'workspace', 'new-inquiry', 'record-rate', 'rate-check', 'inquiry-list', 'rate-list', 'booking-list', 'shipments', 'followups', 'customers', 'kyc', 'profile'],
+  Admin:       ['dashboard', 'chat', 'workspace', 'new-inquiry', 'rfq-new', 'record-rate', 'rate-check', 'inquiry-list', 'rate-list', 'booking-list', 'shipments', 'followups', 'customers', 'kyc', 'profile'],
 }
 
 export const ROLE_QUICK_COMMANDS: Record<UserRole, string[]> = {
@@ -316,6 +318,7 @@ export interface Inquiry {
   inq_id?: number          // backend integer PK (inquiry table)
   cli_id?: number          // backend client ID
   cpid?: number            // backend contact-person ID
+  rfq_ref?: number         // backend RFQ reference
   com_ids?: number[]       // backend commodity row IDs
   cont_ids?: number[]      // backend container row IDs
   quotation_id?: number    // backend quotation PK — set when quotation is created in prepare-quotation
