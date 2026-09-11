@@ -939,6 +939,36 @@ export function apiCreateTariffRate(payload: Record<string, unknown>): Promise<R
   return post<Record<string, unknown>>('/rates/tariff-rates', payload)
 }
 
+export interface BulkTariffPreviewRow {
+  origin: string
+  destination: string
+  liner: string
+  container_type: string
+  rate: number
+  currency: string
+  valid_from: string
+  valid_to: string
+  free_time: string
+  max_weight: string
+  note: string
+}
+export interface BulkTariffPreviewResult {
+  rows: BulkTariffPreviewRow[]
+  skipped: string[]
+  unknown_count: number
+}
+export function apiPreviewBulkTariffRates(file: File): Promise<BulkTariffPreviewResult> {
+  return postFile<BulkTariffPreviewResult>('/rates/tariff-rates/preview', file)
+}
+export function apiBulkCreateTariffRates(data: {
+  lin_id: number
+  month: number
+  year: number
+  rows: BulkTariffPreviewRow[]
+}): Promise<{ created: number }> {
+  return post<{ created: number }>('/rates/tariff-rates/bulk', data)
+}
+
 export function apiCreateContractedRate(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
   return post<Record<string, unknown>>('/rates/contracted-rates', payload)
 }

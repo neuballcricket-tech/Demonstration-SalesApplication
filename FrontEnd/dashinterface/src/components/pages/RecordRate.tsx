@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
-import { ArrowLeft, Check, DollarSign, FileText, Plus, X } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { ArrowLeft, Check, DollarSign, FileText, FileSpreadsheet, Plus, Upload, X } from 'lucide-react'
 import {
   RATE_SOURCE_COLORS, portOptions,
   type PortRecord, type LinerRecord, type TradeLaneRecord, type EmployeeRecord, type ClientRecord,
   type RateSourceType,
 } from '../../types'
-import { apiGetPorts, apiGetLiners, apiGetTradeLanes, apiGetEmployeesDb, apiGetClientsDb, apiCreateTariffRate, apiCreateContractedRate, apiCreateNacRate } from '../../api'
+import { apiGetPorts, apiGetLiners, apiGetTradeLanes, apiGetEmployeesDb, apiGetClientsDb, apiCreateTariffRate, apiCreateContractedRate, apiCreateNacRate, apiPreviewBulkTariffRates, apiBulkCreateTariffRates, type BulkTariffPreviewRow } from '../../api'
 import TagInput from '../shared/TagInput'
 
 interface TariffContainerRate {
@@ -67,6 +67,18 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
   // Contracted — applicable customers
   const [rrApplicableCustomers, setRrApplicableCustomers] = useState<string[]>([])
 
+  // Bulk upload state
+  const [entryMode, setEntryMode] = useState<'manual' | 'bulk'>('manual')
+  const [bulkRows, setBulkRows] = useState<BulkTariffPreviewRow[]>([])
+  const [bulkUploading, setBulkUploading] = useState(false)
+  const [bulkSaving, setBulkSaving] = useState(false)
+  const [bulkNote, setBulkNote] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const now = new Date()
+  const [bulkLinerId, setBulkLinerId] = useState<number | ''>('')
+  const [bulkMonth, setBulkMonth] = useState(now.getMonth() + 1) // 1-12
+  const [bulkYear, setBulkYear] = useState(now.getFullYear())
+
   // Reference data
   const [portList, setPortList] = useState<PortRecord[]>([])
   const [linerList, setLinerList] = useState<LinerRecord[]>([])
@@ -96,6 +108,8 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
     setRrTariffContainers([emptyTariffContainer()])
     setRrContractedContainers([emptyContractedContainer()])
     setRrNacContainers([emptyContractedContainer()])
+    setEntryMode('manual'); setBulkRows([]); setBulkNote('')
+    setBulkLinerId(''); setBulkMonth(now.getMonth() + 1); setBulkYear(now.getFullYear())
   }
 
   // Name resolution helpers for review
@@ -120,6 +134,50 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
     setRrNacContainers(prev => prev.map((c, i) => i === idx ? { ...c, ...patch } : c))
   const addNacContainer = () => setRrNacContainers(prev => [...prev, emptyContractedContainer()])
   const removeNacContainer = (idx: number) => setRrNacContainers(prev => prev.filter((_, i) => i !== idx))
+
+  // Bulk upload handlers
+  const handleBulkFile = async (file: File) => {
+    setBulkUploading(true)
+    setBulkNote('')
+    try {
+      const res = await apiPreviewBulkTariffRates(file)
+      if (res.rows.length === 0) {
+        onFlash('No tariff rates found in that file')
+        return
+      }
+      setBulkRows(res.rows)
+      const bits = [`${res.rows.length} rate(s) loaded`]
+      if (res.unknown_count) bits.push(`${res.unknown_count} unrecognised value(s)`)
+      if (res.skipped.length) bits.push(`${res.skipped.length} row(s) skipped`)
+      setBulkNote(bits.join(' · '))
+      onFlash(bits.join(' · '))
+    } catch (e) {
+      onFlash(`Could not read the file: ${(e as Error).message}`)
+    } finally {
+      setBulkUploading(false)
+    }
+  }
+
+  const handleBulkSave = async () => {
+    if (bulkRows.length === 0 || bulkLinerId === '') return
+    setBulkSaving(true)
+    try {
+      const res = await apiBulkCreateTariffRates({
+        lin_id: bulkLinerId,
+        month: bulkMonth,
+        year: bulkYear,
+        rows: bulkRows,
+      })
+      onFlash(`${res.created} tariff rate(s) saved successfully`)
+      resetForm()
+    } catch (e) {
+      onFlash(`Bulk save failed: ${(e as Error).message}`)
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
+  const removeBulkRow = (idx: number) => setBulkRows(prev => prev.filter((_, i) => i !== idx))
 
   const handleSave = () => {
     const summarise = (arr: (TariffContainerRate | ContractedContainerRate)[]) =>
@@ -260,9 +318,157 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
           </div>
         </div>
 
-
-        {/* ---- Tariff Rate fields ---- */}
+        {/* Entry mode toggle — only for Tariff Rate */}
         {rrType === 'Tariff Rate' && (
+          <div style={{ marginBottom: 14 }}>
+            <label className="lt-label">Entry Mode</label>
+            <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+              {([['manual', 'Manual Entry'], ['bulk', 'Excel Upload']] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  className="db-btn"
+                  style={{
+                    fontSize: 11, padding: '5px 10px', borderRadius: 6,
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    background: entryMode === key ? '#0d9488' : 'var(--bg-card)',
+                    color: entryMode === key ? '#fff' : 'var(--text-secondary)',
+                    border: entryMode === key ? '1px solid #0d9488' : '1px solid var(--border)',
+                  }}
+                  onClick={() => setEntryMode(key)}
+                >
+                  {key === 'bulk' && <FileSpreadsheet size={12} />}
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ---- Bulk Upload UI ---- */}
+        {rrType === 'Tariff Rate' && entryMode === 'bulk' && (
+          <div style={{ marginBottom: 10 }}>
+            {/* Liner, Month, Year selectors */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
+              <div>
+                <label className="lt-label">Liner <span style={{ color: '#dc2626' }}>*</span></label>
+                <select className="lt-select" style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+                        value={bulkLinerId} onChange={e => setBulkLinerId(e.target.value === '' ? '' : Number(e.target.value))}>
+                  <option value="">— Select liner —</option>
+                  {linerList.filter(l => ['ONE', 'PIL', 'LAEC', 'Standardized'].includes(l.name)).map(l => <option key={l.lin_id} value={l.lin_id}>{l.name}{l.is_on_inttra ? ' (INTTRA)' : ''}{l.has_portal ? ' (Portal)' : ''}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="lt-label">Month <span style={{ color: '#dc2626' }}>*</span></label>
+                <select className="lt-select" style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+                        value={bulkMonth} onChange={e => setBulkMonth(Number(e.target.value))}>
+                  {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, i) => (
+                    <option key={i + 1} value={i + 1}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="lt-label">Year <span style={{ color: '#dc2626' }}>*</span></label>
+                <select className="lt-select" style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+                        value={bulkYear} onChange={e => setBulkYear(Number(e.target.value))}>
+                  {Array.from({ length: 5 }, (_, i) => now.getFullYear() - 1 + i).map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Upload area */}
+            <div style={{
+              border: '2px dashed var(--border)', borderRadius: 10,
+              padding: '20px 16px', marginBottom: 16, display: 'flex',
+              alignItems: 'center', gap: 14, flexWrap: 'wrap',
+              opacity: bulkLinerId === '' ? 0.5 : 1,
+              pointerEvents: bulkLinerId === '' ? 'none' : 'auto',
+            }}>
+              <FileSpreadsheet size={20} style={{ color: '#0d9488' }} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>Upload tariff rate spreadsheet</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  Columns: Origin, Destination, Container Type, Rate, Currency, Free Time, Max Weight, Note
+                </div>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                disabled={bulkUploading || bulkLinerId === ''}
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleBulkFile(f); e.target.value = '' }}
+                style={{ fontSize: 12, marginLeft: 'auto' }}
+              />
+              {bulkUploading && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Reading...</span>}
+              {bulkNote && <span style={{ fontSize: 12, color: '#0d9488' }}>{bulkNote}</span>}
+            </div>
+            {bulkLinerId === '' && <div style={{ fontSize: 11, color: '#d97706', marginTop: -10, marginBottom: 12 }}>Select a liner first to enable file upload</div>}
+
+            {/* Preview table */}
+            {bulkRows.length > 0 && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                  <strong style={{ fontSize: 14 }}>Preview ({bulkRows.length} rates)</strong>
+                  <button className="db-btn" style={{ fontSize: 11, marginLeft: 'auto' }}
+                          onClick={() => { setBulkRows([]); setBulkNote(''); if (fileInputRef.current) fileInputRef.current.value = '' }}>
+                    Clear
+                  </button>
+                </div>
+                <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+                        {['#', 'Origin', 'Destination', 'Liner', 'Container', 'Rate', 'Curr', 'Valid From', 'Valid To', 'Free Time', 'Weight', 'Note', ''].map((h, i) => (
+                          <th key={i} style={{ padding: '8px 6px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {bulkRows.map((r, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td style={{ padding: '6px', color: 'var(--text-muted)' }}>{i + 1}</td>
+                          <td style={{ padding: '6px' }}>{r.origin}</td>
+                          <td style={{ padding: '6px' }}>{r.destination}</td>
+                          <td style={{ padding: '6px' }}>{r.liner}</td>
+                          <td style={{ padding: '6px' }}>{r.container_type}</td>
+                          <td style={{ padding: '6px', fontWeight: 600 }}>{r.rate}</td>
+                          <td style={{ padding: '6px' }}>{r.currency}</td>
+                          <td style={{ padding: '6px' }}>{r.valid_from}</td>
+                          <td style={{ padding: '6px' }}>{r.valid_to}</td>
+                          <td style={{ padding: '6px' }}>{r.free_time || '—'}</td>
+                          <td style={{ padding: '6px' }}>{r.max_weight || '—'}</td>
+                          <td style={{ padding: '6px', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.note || '—'}</td>
+                          <td style={{ padding: '6px' }}>
+                            <button className="lt-icon-btn" title="Remove" style={{ padding: 2 }} onClick={() => removeBulkRow(i)}>
+                              <X size={12} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Save button */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+                  <button className="db-btn" style={{ fontSize: 12 }} onClick={onGoBack}>Cancel</button>
+                  <button
+                    className="db-btn primary"
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}
+                    disabled={bulkSaving || bulkRows.length === 0 || bulkLinerId === ''}
+                    onClick={handleBulkSave}
+                  >
+                    <Upload size={14} /> {bulkSaving ? 'Saving...' : `Save ${bulkRows.length} Tariff Rate(s)`}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ---- Tariff Rate fields (manual) ---- */}
+        {rrType === 'Tariff Rate' && entryMode === 'manual' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             {/* — Carrier & Service — */}
             <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['Tariff Rate'])} />Carrier & Service</div>
@@ -600,7 +806,8 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
         )}
 
 
-        {/* Edit Actions */}
+        {/* Edit Actions (manual mode only) */}
+        {!(rrType === 'Tariff Rate' && entryMode === 'bulk') && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 16 }}>
           <button className="db-btn" style={{ fontSize: 12 }} onClick={onGoBack}>Back to Workspace</button>
           <button
@@ -616,6 +823,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             <FileText size={12} /> Review & Save
           </button>
         </div>
+        )}
         </>}
 
         {/* ======== REVIEW MODE ======== */}

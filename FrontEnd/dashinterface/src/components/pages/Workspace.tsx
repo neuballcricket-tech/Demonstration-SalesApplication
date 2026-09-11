@@ -181,12 +181,11 @@ const CS_STEPS: StepDef[] = [
   { key: 'cs-booking',    label: 'Booking',     actionKinds: ['booking-request'],    stepNumber: 7 },
   { key: 'cs-release',    label: 'Release Order', actionKinds: ['release-booking'],  stepNumber: 8 },
   { key: 'cs-cutoff',     label: 'Cut Offs',          actionKinds: ['record-cutoff'],   stepNumber: 9 },
-  { key: 'cs-si',         label: 'Cut Off Reminders', actionKinds: ['request-si'],    stepNumber: 10, group: 'post-cutoff' },
-  { key: 'cs-submit-si',  label: 'Submit SI',         actionKinds: ['submit-si'],     stepNumber: 10, group: 'post-cutoff' },
-  { key: 'cs-draft-bl',   label: 'Draft BL',          actionKinds: ['save-draft-bl'], stepNumber: 10, group: 'post-cutoff' },
-  { key: 'cs-generate-si', label: 'Generate SI',     actionKinds: ['generate-si'],    stepNumber: 11 },
-  { key: 'cs-create-bl',   label: 'Create BL',       actionKinds: ['create-bl'],      stepNumber: 12 },
-  { key: 'cs-pre-advice',  label: 'Pre-Advice',      actionKinds: ['send-pre-advice'], stepNumber: 13 },
+  { key: 'cs-si',          label: 'Cut Off Reminders', actionKinds: ['request-si'],       stepNumber: 10, group: 'post-cutoff' },
+  { key: 'cs-record-si',   label: 'Record SI',         actionKinds: ['submit-si'],        stepNumber: 10, group: 'post-cutoff' },
+  { key: 'cs-pre-advice',  label: 'Pre-Advice',        actionKinds: ['send-pre-advice'],  stepNumber: 10, group: 'post-cutoff' },
+  { key: 'cs-generate-si', label: 'Generate SI',       actionKinds: ['generate-si'],      stepNumber: 10, group: 'post-cutoff' },
+  { key: 'cs-create-bl',   label: 'Create BL',         actionKinds: ['create-bl'],        stepNumber: 11 },
 ]
 
 const FINANCE_STEPS: StepDef[] = [
@@ -228,13 +227,12 @@ const ADMIN_STEPS: StepDef[] = [
   { key: 'adm-urgent',      label: 'Urgent',       actionKinds: ['acknowledge-procurement'], stepNumber: 13 },
   { key: 'adm-release',     label: 'Release',      actionKinds: ['release-booking'],         stepNumber: 14 },
   { key: 'adm-cutoff',      label: 'Cutoff',       actionKinds: ['record-cutoff'],           stepNumber: 14 },
-  { key: 'adm-si',          label: 'Cut Off Reminders',  actionKinds: ['request-si'],    stepNumber: 15, group: 'post-cutoff' },
-  { key: 'adm-submit-si',   label: 'Submit SI',    actionKinds: ['submit-si'],         stepNumber: 15, group: 'post-cutoff' },
-  { key: 'adm-draft-bl',    label: 'Draft BL',     actionKinds: ['send-draft-bl'],     stepNumber: 15, group: 'post-cutoff' },
-  { key: 'adm-generate-si', label: 'Generate SI',  actionKinds: ['generate-si'],           stepNumber: 16 },
-  { key: 'adm-create-bl',   label: 'Create BL',   actionKinds: ['create-bl'],              stepNumber: 17 },
-  { key: 'adm-pre-advice',  label: 'Pre-Advice',  actionKinds: ['send-pre-advice'],        stepNumber: 18 },
-  { key: 'adm-bl-approval', label: 'BL Approval', actionKinds: ['bl-approval'],            stepNumber: 19 },
+  { key: 'adm-si',          label: 'Cut Off Reminders',  actionKinds: ['request-si'],       stepNumber: 15, group: 'post-cutoff' },
+  { key: 'adm-record-si',   label: 'Record SI',          actionKinds: ['submit-si'],        stepNumber: 15, group: 'post-cutoff' },
+  { key: 'adm-pre-advice',  label: 'Pre-Advice',         actionKinds: ['send-pre-advice'],  stepNumber: 15, group: 'post-cutoff' },
+  { key: 'adm-generate-si', label: 'Generate SI',        actionKinds: ['generate-si'],      stepNumber: 15, group: 'post-cutoff' },
+  { key: 'adm-create-bl',   label: 'Create BL',          actionKinds: ['create-bl'],        stepNumber: 16 },
+  { key: 'adm-bl-approval', label: 'BL Approval',        actionKinds: ['bl-approval'],      stepNumber: 17 },
 ]
 
 const ROLE_STEP_MAP: Record<string, StepDef[]> = {
@@ -244,6 +242,9 @@ const ROLE_STEP_MAP: Record<string, StepDef[]> = {
   Sales: SALES_STEPS,
   Admin: ADMIN_STEPS,
 }
+
+// NVOCC shipping lines — SI generation + email drafting is available for these
+const NVOCC_LINES = new Set(['ECU Worldwide', 'Consolidators International', 'Sea Consortium'])
 
 // ---------------------------------------------------------------------------
 // Component
@@ -424,6 +425,9 @@ export default function Workspace({
   const [siForm, setSiForm] = useState<Record<string, string>>({})
   const siField = (key: string) => siForm[key] ?? ''
   const setSiField = (key: string, value: string) => setSiForm(prev => ({ ...prev, [key]: value }))
+  const [siIsNvocc, setSiIsNvocc] = useState(true)
+  const [siEmailShow, setSiEmailShow] = useState(false)
+  const [siEmailDraft, setSiEmailDraft] = useState('')
   // Create BL (combined MBL + HBL) state
   const [blActiveTab, setBlActiveTab] = useState<'mbl' | 'hbl'>('mbl')
   const [mblForm, setMblForm] = useState<Record<string, string>>({})
@@ -434,6 +438,8 @@ export default function Workspace({
   const setHblField = (key: string, value: string) => setHblForm(prev => ({ ...prev, [key]: value }))
   interface BlContainerRow { containerNo: string; size: string; type: string; shipmentType: string; sealNo: string; packages: string; packageType: string; grossWeight: string; cbm: string }
   const [hblContainers, setHblContainers] = useState<BlContainerRow[]>([])
+  interface MblContainerRow { containerNo: string; containerType: string; sealNo: string; poNumber: string; hsCode: string; description: string; grossWeight: string; cbm: string }
+  const [mblContainers, setMblContainers] = useState<MblContainerRow[]>([{ containerNo: '', containerType: "40' HIGH CUBE", sealNo: '', poNumber: '', hsCode: '', description: '', grossWeight: '', cbm: '' }])
   const [hblCollapsed, setHblCollapsed] = useState<Record<string, boolean>>({})
   const toggleHblSection = (sectionId: string) => setHblCollapsed(prev => ({ ...prev, [sectionId]: !prev[sectionId] }))
   // Pre-Advice state
@@ -769,7 +775,7 @@ export default function Workspace({
       return parts.length ? ` · ${parts.join(' · ')}` : ''
     }
 
-    // --- From Bookings (submit SI to liner) — parallel with reminders & Draft BL ---
+    // --- From Bookings (record SI) — parallel with reminders, Pre-Advice & Generate SI ---
     for (const bkg of bookings) {
       if (bkg.si_submitted) continue
       const hasCutoffDates = bkg.si_cutoff_date || bkg.bl_cutoff_date || bkg.vgm_cutoff_date
@@ -781,45 +787,22 @@ export default function Workspace({
         type: 'booking',
         refId: bkg.id,
         customerName: bkg.customer_name,
-        title: `Submit SI to liner for ${bkg.customer_name}`,
+        title: `Record SI for ${bkg.customer_name}`,
         subtitle: `${bkg.quantity}x ${bkg.container_type} · ${bkg.origin} → ${bkg.destination}${cutoffSuffix(bkg)}`,
         urgentFlag: false,
         createdAt: bkg.created_at,
         previousContext: findContext(bkg.id),
-        actionLabel: 'Submit SI',
+        actionLabel: 'Record SI',
         actionKind: 'submit-si',
         sourceData: { booking: bkg },
       })
     }
 
-    // --- From Bookings (record Draft BL + save) — parallel with reminders & SI ---
+    // --- Generate SI / Liner BL Instruction — parallel with reminders, Record SI & Pre-Advice ---
     for (const bkg of bookings) {
-      if (bkg.delivery_type === 'door-to-door') continue // door-to-door skips Draft BL
-      if (bkg.draft_bl_sent) continue
+      if (bkg.liner_bl_instruction_generated) continue
       const hasCutoffDates = bkg.si_cutoff_date || bkg.bl_cutoff_date || bkg.vgm_cutoff_date
       if (!hasCutoffDates) continue
-      if (bkg.status !== 'Liner Confirmed' && bkg.status !== 'Released') continue
-      if (role && role !== 'CS') continue
-
-      pending.push({
-        type: 'booking',
-        refId: bkg.id,
-        customerName: bkg.customer_name,
-        title: `Record Draft BL for ${bkg.customer_name}`,
-        subtitle: `${bkg.quantity}x ${bkg.container_type} · ${bkg.origin} → ${bkg.destination}${cutoffSuffix(bkg)}`,
-        urgentFlag: false,
-        createdAt: bkg.created_at,
-        previousContext: findContext(bkg.id),
-        actionLabel: 'Save Draft BL',
-        actionKind: 'save-draft-bl',
-        sourceData: { booking: bkg },
-      })
-    }
-
-    // --- Generate SI / Liner BL Instruction (after Draft BL saved) ---
-    for (const bkg of bookings) {
-      if (!bkg.draft_bl_sent) continue
-      if (bkg.liner_bl_instruction_generated) continue
       if (bkg.status !== 'Liner Confirmed' && bkg.status !== 'Released') continue
       if (role && role !== 'CS') continue
 
@@ -862,11 +845,12 @@ export default function Workspace({
       })
     }
 
-    // --- Pre-Advice (door-to-door / port-to-door only, after BOTH Draft BL sent AND SI submitted) ---
+    // --- Pre-Advice (door-to-door / port-to-door only) — parallel with reminders, Record SI & Generate SI ---
     for (const bkg of bookings) {
       if (bkg.delivery_type !== 'door-to-door' && bkg.delivery_type !== 'port-to-door') continue
-      if (!bkg.draft_bl_sent || !bkg.si_submitted) continue
       if (bkg.pre_advice_sent) continue
+      const hasCutoffDates = bkg.si_cutoff_date || bkg.bl_cutoff_date || bkg.vgm_cutoff_date
+      if (!hasCutoffDates) continue
       if (bkg.status !== 'Liner Confirmed' && bkg.status !== 'Released') continue
       if (role && role !== 'CS') continue
 
@@ -891,19 +875,19 @@ export default function Workspace({
       })
     }
 
-    // --- BL Approval (port-to-port: after Draft BL sent; door-to-door: after House BL sent) ---
+    // --- BL Approval (port-to-port: after Liner BL Instruction generated; door-to-door: after House BL sent) ---
     for (const bkg of bookings) {
       const isDtd = bkg.delivery_type === 'door-to-door'
       if (isDtd) {
         if (!bkg.house_bl_created) continue
       } else {
-        if (!bkg.draft_bl_sent) continue
+        if (!bkg.liner_bl_instruction_generated) continue
       }
       if (bkg.bl_status && bkg.bl_status !== 'pending') continue
       if (bkg.status !== 'Liner Confirmed' && bkg.status !== 'Released') continue
       if (role && role !== 'CS') continue
 
-      const blLabel = isDtd ? 'House BL' : 'Draft BL'
+      const blLabel = isDtd ? 'House BL' : 'Master BL'
       pending.push({
         type: 'booking',
         refId: bkg.id,
@@ -1533,6 +1517,9 @@ ABC Logistics (Pvt) Ltd`
         const siCust = customers.find(c => c.name.toLowerCase() === item.customerName.toLowerCase())
         const siInq = inquiries.find(i => i.customer_name.toLowerCase() === item.customerName.toLowerCase())
         const deliveryMap: Record<string, string> = { 'port-to-port': 'CY/CY', 'door-to-door': 'SD/SD', 'port-to-door': 'CY/SD' }
+        setSiIsNvocc(NVOCC_LINES.has(siBkg.shipping_line))
+        setSiEmailShow(false)
+        setSiEmailDraft('')
         setSiForm({
           to_liner: siBkg.shipping_line || '',
           attn: 'B/L DEPARTMENT',
@@ -1577,21 +1564,78 @@ ABC Logistics (Pvt) Ltd`
         const deliveryMap2: Record<string, string> = { 'port-to-port': 'CY/CY', 'door-to-door': 'DOOR/DOOR', 'port-to-door': 'CY/CFS', 'door-to-port': 'CFS/CY' }
         // Tab: start on MBL if not yet recorded, else HBL
         setBlActiveTab(blBkg.master_bl_recorded ? 'hbl' : 'mbl')
-        // Pre-fill MBL form
+        // Pre-fill MBL form — all 13 sections from MBL field spec
         setMblForm({
-          master_bl_number: blBkg.master_bl_number || '',
-          shipper: blBkg.master_bl_shipper || blBkg.customer_name || '',
-          consignee: blBkg.master_bl_consignee || '',
-          vessel: blBkg.vessel_name || '',
-          voyage: blBkg.voyage_number || '',
-          pol: blVessel?.pol || blBkg.origin || '',
-          pod: blVessel?.final_pod || blBkg.destination || '',
-          container_type: blBkg.container_type || '',
-          container_count: String(blBkg.quantity || 1),
-          freight_term: 'PREPAID',
-          shipping_line: blBkg.shipping_line || '',
-          delivery_type: deliveryMap2[blBkg.delivery_type || ''] || 'CY/CY',
+          // 1. Document Header
+          waybillNo: blBkg.master_bl_number || '',
+          waybillSeq: '1',
+          riderPages: '0',
+          transportType: blBkg.delivery_type === 'port-to-port' ? 'PORT-TO-PORT' : 'COMBINED TRANSPORT',
+          lloydsImo: '',
+          // 2. Carrier
+          carrierName: (blBkg.shipping_line || '').toUpperCase(),
+          carrierAddress: '',
+          carrierWebsite: '',
+          // 3. Shipper (freight forwarder on MBL)
+          shipperName: 'CL SYNERGY LIMITED',
+          shipperAddress: 'NO.30, 6TH FLOOR,\nR.A.DE MEL MAWATHA,\nCOLOMBO 03, SRI LANKA.',
+          shipperContactName: '',
+          shipperContactPhone: '',
+          shipperContactEmail: '',
+          // 4. Consignee (destination agent on MBL)
+          consigneeName: blBkg.master_bl_consignee || '',
+          consigneeAddress: '',
+          // 5. Notify Parties
+          notifyClause: '',
+          notifyName: '',
+          notifyAddress: '',
+          notifyContactName: '',
+          notifyContactPhone: '',
+          notifyContactEmail: '',
+          // 6. POD Agent
+          podAgentName: '',
+          podAgentDept: '',
+          podAgentAddress: '',
+          podAgentPhone: '',
+          podAgentFax: '',
+          podAgentEmail: '',
+          // 7. Containers — handled by mblContainers state
+          // 8. Vessel & Voyage
+          vesselVoyage: `${blBkg.vessel_name || ''} - ${blBkg.voyage_number || ''}`.replace(/^ - $/, ''),
+          portOfLoading: blVessel?.pol || blBkg.origin || '',
+          portOfDischarge: blVessel?.final_pod || blBkg.destination || '',
+          placeOfReceipt: '',
+          placeOfDelivery: '',
+          loadType: 'FCL/FCL',
+          // 9. References
+          bookingRef: blBkg.id || '',
+          shipperRef: '',
+          carrierReceipt: '',
+          // 10. Cargo Summary
+          totalItems: String(blBkg.quantity || 1),
+          totalGrossWeight: '',
+          weightUnit: 'KGS',
+          totalNetWeight: '',
+          cargoDescription: '',
+          // 11. Freight & Charges
+          freightCharges: 'AS PER AGREEMENT',
+          freightClause: '',
+          declaredValue: '',
+          // 12. Issuance & Signature
+          placeOfIssue: 'Colombo',
+          dateOfIssue: new Date().toISOString().slice(0, 10),
+          shippedOnBoardDate: '',
+          signedOnBehalfOf: (blBkg.shipping_line || '').toUpperCase(),
+          signingAgent: '',
+          agentCode: '',
+          agentCapacity: '',
+          // 13. Special Clauses
+          thermalClause: '',
+          palletsClause: '',
+          riderNote: '',
         })
+        // Reset MBL containers
+        setMblContainers([{ containerNo: '', containerType: "40' HIGH CUBE", sealNo: '', poNumber: '', hsCode: '', description: '', grossWeight: '', cbm: '' }])
         // Pre-fill HBL form — all sections from bl_field_spec.json
         const parsedSize = (blBkg.container_type || '').match(/(\d+)/)?.[1] || '20'
         const parsedType = (blBkg.container_type || '').replace(/\d+'\s*/, '').replace(/'/g, '') || 'GP'
@@ -2297,14 +2341,14 @@ ABC Logistics (Pvt) Ltd`
         onLogActivity({
           actor_role: activeRole,
           actor_id: activeEmployee.id,
-          action: `SI submitted to ${booking.shipping_line || 'liner'} for ${booking.customer_name} ${method}.${vgmCertFileName ? ` VGM document attached: ${vgmCertFileName}` : ''}`,
+          action: `SI recorded for ${booking.customer_name} — submitted to ${booking.shipping_line || 'liner'} ${method}.${vgmCertFileName ? ` VGM document attached: ${vgmCertFileName}` : ''}`,
           ref_type: 'booking',
           ref_id: booking.id,
           customer_name: booking.customer_name,
           pushed_to: 'CS',
-          notes: `SI submitted ${method}${siContent ? ` | SI document attached` : ''}${vgmCertFileName ? ` | VGM: ${vgmCertFileName}` : ''}${formNote ? ` | ${formNote}` : ''}`,
+          notes: `SI recorded ${method}${siContent ? ` | SI document attached` : ''}${vgmCertFileName ? ` | VGM: ${vgmCertFileName}` : ''}${formNote ? ` | ${formNote}` : ''}`,
         })
-        onFlash(`${booking.id} → SI submitted to ${booking.shipping_line || 'liner'} ${method}${vgmCertFileName ? ' (VGM attached)' : ''}`, nextStepAction)
+        onFlash(`${booking.id} → SI recorded for ${booking.customer_name} (${booking.shipping_line || 'liner'})${vgmCertFileName ? ' (VGM attached)' : ''}`, nextStepAction)
         break
       }
       case 'save-draft-bl': {
@@ -2326,36 +2370,52 @@ ABC Logistics (Pvt) Ltd`
       case 'generate-si': {
         const { booking } = actionModal.sourceData
         onMarkLinerBlGenerated(booking.id)
-        onLogActivity({
-          actor_role: activeRole,
-          actor_id: activeEmployee.id,
-          action: `Liner BL Instruction generated for ${booking.customer_name} (${siField('to_liner') || booking.shipping_line}).`,
-          ref_type: 'booking',
-          ref_id: booking.id,
-          customer_name: booking.customer_name,
-          pushed_to: 'CS',
-          notes: `SI generated | BL Type: ${siField('bl_type')} | Booking: ${siField('booking_ref')} | ${siField('pol')} → ${siField('pod')}${formNote ? ` | ${formNote}` : ''}`,
-        })
-        onFlash(`${booking.id} → Liner BL Instruction generated for ${booking.customer_name}`, nextStepAction)
+        if (siIsNvocc) {
+          onLogActivity({
+            actor_role: activeRole,
+            actor_id: activeEmployee.id,
+            action: `Liner BL Instruction generated (NVOCC) for ${booking.customer_name} (${siField('to_liner') || booking.shipping_line}).`,
+            ref_type: 'booking',
+            ref_id: booking.id,
+            customer_name: booking.customer_name,
+            pushed_to: 'CS',
+            notes: `SI generated (NVOCC) | BL Type: ${siField('bl_type')} | Booking: ${siField('booking_ref')} | ${siField('pol')} → ${siField('pod')}${siEmailDraft ? ' | Email drafted' : ''}${formNote ? ` | ${formNote}` : ''}`,
+          })
+          onFlash(`${booking.id} → Liner BL Instruction generated for ${booking.customer_name}${siEmailDraft ? ' (email drafted)' : ''}`, nextStepAction)
+        } else {
+          onLogActivity({
+            actor_role: activeRole,
+            actor_id: activeEmployee.id,
+            action: `SI submission to liner confirmed for ${booking.customer_name} (${booking.shipping_line || 'liner'}).`,
+            ref_type: 'booking',
+            ref_id: booking.id,
+            customer_name: booking.customer_name,
+            pushed_to: 'CS',
+            notes: `SI confirmed submitted to liner${formNote ? ` | ${formNote}` : ''}`,
+          })
+          onFlash(`${booking.id} → SI confirmed submitted to ${booking.shipping_line || 'liner'} for ${booking.customer_name}`, nextStepAction)
+        }
         break
       }
       case 'create-bl': {
         const { booking } = actionModal!.sourceData
         if (blActiveTab === 'mbl') {
+          // MBL submit is now handled by the in-tab action buttons.
+          // If the generic footer button is somehow clicked for MBL, replicate the same logic:
           onRecordMasterBl(booking.id, {
-            master_bl_number: mblField('master_bl_number'),
-            shipper: mblField('shipper'),
-            consignee: mblField('consignee'),
+            master_bl_number: mblField('waybillNo'),
+            shipper: mblField('shipperName'),
+            consignee: mblField('consigneeName'),
           })
           onLogActivity({
             actor_role: activeRole,
             actor_id: activeEmployee.id,
-            action: `Recorded Master BL ${mblField('master_bl_number')} for ${booking.id}.`,
+            action: `Recorded Master BL ${mblField('waybillNo')} for ${booking.id}.`,
             ref_type: 'booking',
             ref_id: booking.id,
             customer_name: booking.customer_name,
             pushed_to: 'CS',
-            notes: `Master BL: ${mblField('master_bl_number')} | Shipper: ${mblField('shipper')} | Consignee: ${mblField('consignee')}${formNote ? ` | ${formNote}` : ''}`,
+            notes: `Master BL: ${mblField('waybillNo')} | Shipper: ${mblField('shipperName')} | Consignee: ${mblField('consigneeName')}${formNote ? ` | ${formNote}` : ''}`,
           })
           if (booking.house_bl_created) {
             onFlash(`${booking.id} → Master BL recorded. BL creation complete.`, nextStepAction)
@@ -2412,7 +2472,7 @@ ABC Logistics (Pvt) Ltd`
       case 'bl-approval': {
         const { booking } = actionModal.sourceData
         const approved = blDecision === 'approved'
-        const baBlType = booking.delivery_type === 'door-to-door' ? 'House BL' : 'Draft BL'
+        const baBlType = booking.delivery_type === 'door-to-door' ? 'House BL' : 'Master BL'
         onSetBlStatus(booking.id, blDecision)
         onLogActivity({
           actor_role: activeRole,
@@ -2891,418 +2951,6 @@ ABC Logistics (Pvt) Ltd`
                   </div>
                 </div>
               )
-            })() : (selectedItem.actionKind === 'save-draft-bl' || selectedItem.actionKind === 'send-draft-bl') && actionModal ? (() => {
-              const blBkg = actionModal.sourceData.booking as Booking
-              // bookings that have release order fields (for pre-fill selector)
-              const roBookings = bookings.filter(b => b.release_order_fields)
-              const applyReleaseOrder = (roId: string) => {
-                setSelectedReleaseOrderId(roId)
-                const ro = bookings.find(b => b.id === roId)
-                if (!ro) return
-                setFormVessel(ro.vessel_name || '')
-                setFormVoyage(ro.voyage_number || '')
-                setVesselPol(ro.origin || '')
-                setVesselFinalPod(ro.destination || '')
-                if (ro.release_order_fields) {
-                  setVesselEtdPol(ro.release_order_fields.etd || '')
-                  setVesselEtaFpod(ro.release_order_fields.eta || '')
-                }
-              }
-              // Recent vessel schedules matching typed name (within 2 weeks)
-              const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
-              const vesselMatches = formVessel.trim().length >= 2
-                ? vesselSchedules
-                    .filter(vs => vs.created_at >= twoWeeksAgo && vs.vessel_name.toLowerCase().includes(formVessel.trim().toLowerCase()))
-                    // deduplicate by vessel+voyage (keep latest)
-                    .reduce<typeof vesselSchedules>((acc, vs) => {
-                      const key = `${vs.vessel_name.toLowerCase()}|${vs.voyage_number.toLowerCase()}`
-                      const existing = acc.findIndex(v => `${v.vessel_name.toLowerCase()}|${v.voyage_number.toLowerCase()}` === key)
-                      if (existing >= 0) {
-                        if (vs.created_at > acc[existing].created_at) acc[existing] = vs
-                      } else acc.push(vs)
-                      return acc
-                    }, [])
-                    .sort((a, b) => b.created_at.localeCompare(a.created_at))
-                    .slice(0, 5)
-                : []
-              const applyVesselSchedule = (vs: typeof vesselSchedules[number]) => {
-                setFormVessel(vs.vessel_name)
-                setFormVoyage(vs.voyage_number)
-                setVesselScheduleType(vs.schedule_type)
-                setVesselPol(vs.pol)
-                setVesselEtaPol(vs.eta_pol)
-                setVesselEtdPol(vs.etd_pol)
-                setVesselRoutingType(vs.routing_type)
-                setVesselFinalPod(vs.final_pod)
-                setVesselEtaFpod(vs.eta_fpod)
-                setVesselRemarks(vs.remarks)
-                setVesselAgent(vs.agent)
-                setShowVesselSuggestions(false)
-              }
-              const tabBtn = (label: string, val: typeof vesselScheduleType) => (
-                <button key={val}
-                  onClick={() => setVesselScheduleType(val)}
-                  style={{
-                    flex: 1, padding: '7px 0', fontSize: 12, fontWeight: 700,
-                    border: '1px solid var(--border)', cursor: 'pointer',
-                    borderRadius: 0,
-                    background: vesselScheduleType === val ? '#0891b2' : 'var(--bg-card)',
-                    color: vesselScheduleType === val ? '#fff' : 'var(--text-secondary)',
-                  }}>
-                  {label}
-                </button>
-              )
-              if (draftBlPhase === 1) return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {/* Step header */}
-                  <div style={{ padding: '8px 14px', background: '#0891b2', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>VESSEL SCHEDULE</span>
-                    <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>Step 1 of 2</span>
-                  </div>
-
-                  {/* Release order pre-fill selector */}
-                  {roBookings.length > 0 && (
-                    <div>
-                      <label className="lt-label">Pre-fill from Release Order (optional)</label>
-                      <select className="lt-input" style={{ width: '100%' }}
-                        value={selectedReleaseOrderId}
-                        onChange={e => applyReleaseOrder(e.target.value)}>
-                        <option value="">— Select a release order —</option>
-                        {roBookings.map(b => (
-                          <option key={b.id} value={b.id}>
-                            {b.customer_name} · {b.vessel_name} / {b.voyage_number} ({b.origin} → {b.destination})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  {/* Schedule type tabs */}
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Vessel Schedule Type</div>
-                    <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }}>
-                      {tabBtn('FCL', 'FCL')}
-                      {tabBtn('CONSOL', 'CONSOL')}
-                      {tabBtn('BOTH', 'BOTH')}
-                    </div>
-                  </div>
-
-                  {/* Two-column grid */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <div style={{ position: 'relative' }}>
-                      <label className="lt-label">Vessel</label>
-                      <input className="lt-input" style={{ width: '100%' }} value={formVessel}
-                        onChange={e => { setFormVessel(e.target.value); setShowVesselSuggestions(true) }}
-                        onFocus={() => setShowVesselSuggestions(true)}
-                        onBlur={() => setTimeout(() => setShowVesselSuggestions(false), 200)}
-                        placeholder="e.g. MSC America" autoComplete="off" />
-                      {showVesselSuggestions && vesselMatches.length > 0 && (
-                        <div style={{
-                          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20,
-                          background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8,
-                          boxShadow: '0 4px 16px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto', marginTop: 2,
-                        }}>
-                          <div style={{ padding: '6px 10px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)' }}>
-                            Recent vessels (last 2 weeks)
-                          </div>
-                          {vesselMatches.map(vs => (
-                            <button key={vs.id}
-                              onMouseDown={e => { e.preventDefault(); applyVesselSchedule(vs) }}
-                              style={{
-                                display: 'block', width: '100%', padding: '8px 10px', border: 'none',
-                                background: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 12,
-                                borderBottom: '1px solid var(--border)',
-                              }}
-                              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(8,145,178,0.06)')}
-                              onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-                            >
-                              <div style={{ fontWeight: 600, color: 'var(--text)' }}>{vs.vessel_name} / {vs.voyage_number}</div>
-                              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                                {vs.pol}{vs.final_pod ? ` → ${vs.final_pod}` : ''}{vs.etd_pol ? ` · ETD ${vs.etd_pol}` : ''} · {vs.schedule_type}
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <label className="lt-label">Voyage</label>
-                      <input className="lt-input" style={{ width: '100%' }} value={formVoyage}
-                        onChange={e => setFormVoyage(e.target.value)} placeholder="e.g. QB614W" />
-                    </div>
-                    <div>
-                      <label className="lt-label">Port of Loading</label>
-                      <input className="lt-input" style={{ width: '100%' }} value={vesselPol}
-                        onChange={e => setVesselPol(e.target.value)} placeholder="e.g. Colombo" />
-                    </div>
-                    <div>
-                      <label className="lt-label">ETD POL</label>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <input type="date" className="lt-input" style={{ flex: 1 }} value={vesselEtdPol}
-                          onChange={e => setVesselEtdPol(e.target.value)} />
-                        {vesselEtdPol && <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0 4px' }} onClick={() => setVesselEtdPol('')}><X size={13} /></button>}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="lt-label">ETA POL</label>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <input type="date" className="lt-input" style={{ flex: 1 }} value={vesselEtaPol}
-                          onChange={e => setVesselEtaPol(e.target.value)} />
-                        {vesselEtaPol && <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0 4px' }} onClick={() => setVesselEtaPol('')}><X size={13} /></button>}
-                      </div>
-                    </div>
-                    <div>
-                      <label className="lt-label">Routing Type</label>
-                      <select className="lt-input" style={{ width: '100%' }} value={vesselRoutingType}
-                        onChange={e => setVesselRoutingType(e.target.value as 'DIRECT' | 'TRANSSHIPMENT')}>
-                        <option value="DIRECT">Direct</option>
-                        <option value="TRANSSHIPMENT">Transshipment</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="lt-label">Final Port of Discharge</label>
-                      <input className="lt-input" style={{ width: '100%' }} value={vesselFinalPod}
-                        onChange={e => setVesselFinalPod(e.target.value)} placeholder="e.g. Felixstowe" />
-                    </div>
-                    <div>
-                      <label className="lt-label">ETA FPOD</label>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <input type="date" className="lt-input" style={{ flex: 1 }} value={vesselEtaFpod}
-                          onChange={e => setVesselEtaFpod(e.target.value)} />
-                        {vesselEtaFpod && <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0 4px' }} onClick={() => setVesselEtaFpod('')}><X size={13} /></button>}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Full-width fields */}
-                  <div>
-                    <label className="lt-label">Remarks</label>
-                    <textarea className="lt-input" rows={2} style={{ width: '100%', resize: 'vertical' as const, fontSize: 13 }}
-                      value={vesselRemarks} onChange={e => setVesselRemarks(e.target.value)}
-                      placeholder="Any remarks about the vessel schedule..." />
-                  </div>
-                  <div>
-                    <label className="lt-label">Agent</label>
-                    <textarea className="lt-input" rows={2} style={{ width: '100%', resize: 'vertical' as const, fontSize: 13 }}
-                      value={vesselAgent} onChange={e => setVesselAgent(e.target.value)}
-                      placeholder="Agent details..." />
-                  </div>
-
-                  {/* Next button */}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <button className="db-btn primary"
-                      disabled={!formVessel.trim() || !formVoyage.trim()}
-                      style={!formVessel.trim() || !formVoyage.trim() ? { opacity: 0.4, cursor: 'not-allowed' } : { background: '#0891b2', borderColor: '#0891b2' }}
-                      onClick={() => {
-                        onAddVesselSchedule({
-                          vessel_name: formVessel.trim(),
-                          voyage_number: formVoyage.trim(),
-                          schedule_type: vesselScheduleType,
-                          pol: vesselPol.trim(),
-                          eta_pol: vesselEtaPol,
-                          etd_pol: vesselEtdPol,
-                          routing_type: vesselRoutingType,
-                          final_pod: vesselFinalPod.trim(),
-                          eta_fpod: vesselEtaFpod,
-                          remarks: vesselRemarks.trim(),
-                          agent: vesselAgent.trim(),
-                          created_at: new Date().toISOString(),
-                          created_by: activeEmployee.id,
-                        })
-                        // Push vessel schedule fields into the booking form
-                        const transitDays = (() => {
-                          if (!vesselEtdPol || !vesselEtaFpod) return ''
-                          const diff = Math.round((new Date(vesselEtaFpod).getTime() - new Date(vesselEtdPol).getTime()) / 86_400_000)
-                          return diff > 0 ? String(diff) : ''
-                        })()
-                        setBkgForm(prev => ({
-                          ...prev,
-                          receiving_terminal: vesselPol.trim() || prev.receiving_terminal,
-                          sob_date: vesselEtdPol || prev.sob_date,
-                          eta_final_destination: vesselEtaFpod || prev.eta_final_destination,
-                          eta_place_of_delivery: vesselEtaFpod || prev.eta_place_of_delivery,
-                          transit_days: transitDays || prev.transit_days,
-                        }))
-                        setDraftBlPhase(2)
-                      }}>
-                      Next — Add Booking →
-                    </button>
-                  </div>
-                </div>
-              )
-              // Phase 2 — Booking Form (Gensoft fields)
-              if (draftBlPhase === 2) {
-                const sectionHeader = (title: string) => (
-                  <div style={{ padding: '6px 12px', background: 'rgba(8,145,178,0.08)', borderLeft: '3px solid #0891b2', borderRadius: '0 6px 6px 0', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#0891b2', marginTop: 4 }}>{title}</div>
-                )
-                const formInput = (label: string, key: string, opts?: { type?: string; placeholder?: string; span2?: boolean; readOnly?: boolean }) => (
-                  <div style={opts?.span2 ? { gridColumn: '1 / -1' } : {}}>
-                    <label className="lt-label">{label}</label>
-                    <input className="lt-input" style={{ width: '100%', ...(opts?.readOnly ? { background: 'rgba(0,0,0,0.03)' } : {}) }}
-                      type={opts?.type || 'text'}
-                      value={bkgField(key)} onChange={e => setBkgField(key, e.target.value)}
-                      placeholder={opts?.placeholder || ''} readOnly={opts?.readOnly} />
-                  </div>
-                )
-                const formSelect = (label: string, key: string, options: string[]) => (
-                  <div>
-                    <label className="lt-label">{label}</label>
-                    <select className="lt-input" style={{ width: '100%' }} value={bkgField(key)} onChange={e => setBkgField(key, e.target.value)}>
-                      {options.map(o => <option key={o} value={o}>{o}</option>)}
-                    </select>
-                  </div>
-                )
-                const formTextarea = (label: string, key: string, placeholder?: string) => (
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label className="lt-label">{label}</label>
-                    <textarea className="lt-input" rows={2} style={{ width: '100%', resize: 'vertical' as const, fontSize: 12 }}
-                      value={bkgField(key)} onChange={e => setBkgField(key, e.target.value)}
-                      placeholder={placeholder || ''} />
-                  </div>
-                )
-                return (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                    {/* Step header */}
-                    <div style={{ padding: '8px 14px', background: '#0891b2', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>BOOKING</span>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>Step 2 of 2</span>
-                    </div>
-                    {activeRole === 'CS' && <button style={{ alignSelf: 'flex-start', background: 'none', border: 'none', cursor: 'pointer', fontSize: 11, color: '#0891b2', padding: 0 }} onClick={() => setDraftBlPhase(1)}>← Back to Vessel Schedule</button>}
-
-                    {/* Vessel summary strip */}
-                    {(formVessel || formVoyage) && (
-                      <div style={{ padding: '8px 12px', background: 'rgba(8,145,178,0.06)', border: '1px solid rgba(8,145,178,0.15)', borderRadius: 8, fontSize: 12, display: 'flex', flexWrap: 'wrap', gap: '4px 16px' }}>
-                        {formVessel && <span><span style={{ color: 'var(--text-muted)' }}>Vessel:</span> <strong>{formVessel}</strong></span>}
-                        {formVoyage && <span><span style={{ color: 'var(--text-muted)' }}>Voyage:</span> <strong>{formVoyage}</strong></span>}
-                        {vesselPol && <span><span style={{ color: 'var(--text-muted)' }}>POL:</span> {vesselPol}</span>}
-                        {vesselFinalPod && <span><span style={{ color: 'var(--text-muted)' }}>FPOD:</span> {vesselFinalPod}</span>}
-                        {vesselEtdPol && <span><span style={{ color: 'var(--text-muted)' }}>ETD:</span> {vesselEtdPol}</span>}
-                        {vesselEtaFpod && <span><span style={{ color: 'var(--text-muted)' }}>ETA:</span> {vesselEtaFpod}</span>}
-                      </div>
-                    )}
-
-                    {/* ── VESSEL DETAILS ── */}
-                    {sectionHeader('Vessel Details')}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      <div><label className="lt-label">Vessel</label><input className="lt-input" style={{ width: '100%', background: 'rgba(0,0,0,0.03)' }} value={formVessel} readOnly /></div>
-                      <div><label className="lt-label">Voyage</label><input className="lt-input" style={{ width: '100%', background: 'rgba(0,0,0,0.03)' }} value={formVoyage} readOnly /></div>
-                      <div><label className="lt-label">Port of Loading</label><input className="lt-input" style={{ width: '100%', background: 'rgba(0,0,0,0.03)' }} value={vesselPol} readOnly /></div>
-                      <div><label className="lt-label">Port of Discharge</label><input className="lt-input" style={{ width: '100%', background: 'rgba(0,0,0,0.03)' }} value={vesselFinalPod} readOnly /></div>
-                      <div><label className="lt-label">ETD POL</label><input className="lt-input" style={{ width: '100%', background: 'rgba(0,0,0,0.03)' }} value={vesselEtdPol} readOnly /></div>
-                      <div><label className="lt-label">ETA FPOD</label><input className="lt-input" style={{ width: '100%', background: 'rgba(0,0,0,0.03)' }} value={vesselEtaFpod} readOnly /></div>
-                      {formInput('SOB Date', 'sob_date', { type: 'date' })}
-                      <div><label className="lt-label">Routing Type</label><input className="lt-input" style={{ width: '100%', background: 'rgba(0,0,0,0.03)' }} value={vesselRoutingType} readOnly /></div>
-                    </div>
-
-                    {/* ── BUSINESS DETAILS ── */}
-                    {sectionHeader('Business Details')}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      {formInput('Inquiry Ref No', 'inquiry_ref')}
-                      {formInput('Quotation Ref No', 'quotation_ref')}
-                      {formSelect('Customer Category', 'customer_category', ['DIRECT', 'CONSOL', 'NVOCC'])}
-                      {formSelect('Business Type', 'business_type', ['SALES NOMINATION', 'CO-LOAD', 'BUYING AGENT', 'DIRECT'])}
-                      {formSelect('Revenue Type', 'revenue_type', ['FREIGHT FORWARDING', 'LINER AGENCY', 'NVOCC', 'CUSTOMS BROKERAGE'])}
-                      {formInput('Customer', 'customer')}
-                      {formInput('Billing Party', 'billing_party')}
-                      {formInput('Sales Person', 'sales_person')}
-                      {formInput('CS Executive', 'cs_executive')}
-                      {formInput('Documentation By', 'documentation_by')}
-                      {formInput('FCL Cutoff Date', 'fcl_cutoff_date', { type: 'date' })}
-                      {formInput('LCL Cutoff Date', 'lcl_cutoff_date', { type: 'date' })}
-                    </div>
-
-                    {/* ── SHIPPING DETAILS ── */}
-                    {sectionHeader('Shipping Details')}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      {formInput('Shipper Name (Booking Party)', 'shipper_name', { span2: true })}
-                      {formTextarea('Shipper Address', 'shipper_address')}
-                      {formInput('Actual Shipper', 'actual_shipper', { span2: true })}
-                      {formInput('Contact Person', 'contact_person')}
-                      {formInput('Telephone', 'telephone')}
-                      {formInput('Email Address', 'email_address', { type: 'email', span2: true })}
-                      {formInput('Consignee', 'consignee', { span2: true })}
-                      {formTextarea('Consignee Address', 'consignee_address')}
-                      {formInput('Notify', 'notify', { span2: true })}
-                      {formTextarea('Notify Address', 'notify_address')}
-                    </div>
-
-                    {/* ── CARGO & CONTAINER ── */}
-                    {sectionHeader('Cargo & Container')}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      {formInput('Commodity', 'commodity', { span2: true })}
-                      {formInput('Receiving Terminal', 'receiving_terminal')}
-                      {formInput('Final Destination', 'final_destination')}
-                      {formInput('Transit Days', 'transit_days', { type: 'number' })}
-                      {formInput('ETA Final Destination', 'eta_final_destination', { type: 'date' })}
-                      {formInput('Place of Delivery', 'place_of_delivery')}
-                      {formInput('ETA Place of Delivery', 'eta_place_of_delivery', { type: 'date' })}
-                      {formInput('Carrier', 'carrier')}
-                      {formInput('Booking Carrier Ref', 'booking_carrier_ref')}
-                      {formInput('INTRA Booking No', 'intra_booking_no')}
-                      {formInput('PO No', 'po_no')}
-                      {formInput('Email Ref', 'email_ref')}
-                      {formSelect('Cargo Type', 'cargo_type', ['GENERAL', 'HAZARDOUS', 'REEFER', 'OVERWEIGHT', 'OUT OF GAUGE'])}
-                      {formSelect('Freight Term', 'freight_term', ['PREPAID', 'COLLECT'])}
-                      {formSelect('MB/L Term', 'mbl_term', ['PREPAID', 'COLLECT'])}
-                      {formInput('No of Packages', 'no_of_packages', { type: 'number' })}
-                      {formInput('Package Type', 'package_type', { placeholder: 'e.g. Pallets, Cartons' })}
-                      {formInput('Gross Weight (KG)', 'gross_weight', { type: 'number' })}
-                      {formInput('Volume (CBM)', 'volume_cbm', { type: 'number' })}
-                      {formInput('Weight/Measurement Ratio', 'weight_measurement_ratio')}
-                    </div>
-
-                    {/* Container info strip */}
-                    <div style={{ padding: '8px 12px', background: 'rgba(217,119,6,0.06)', border: '1px solid rgba(217,119,6,0.15)', borderRadius: 8, fontSize: 12 }}>
-                      <strong>Container:</strong> {bkgField('container_count')}x {bkgField('container_size')}
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      {formSelect('Delivery Type', 'delivery_type_bkg', ['CY/CY', 'CY/DOOR', 'DOOR/CY', 'DOOR/DOOR'])}
-                      {formInput('Incoterm', 'incoterm', { placeholder: 'e.g. FOB, CIF, EXW, DDP' })}
-                      {formInput('Pickup Type', 'pickup_type')}
-                      {formInput('Inland Haulage Type', 'inland_haulage_type')}
-                    </div>
-
-                    {/* ── B/L DETAILS ── */}
-                    {sectionHeader('B/L Details')}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                      {formSelect('B/L Issue Type', 'bl_issue_type', ['OWN', 'LINER'])}
-                      {formInput('HB/L Issue Term', 'hbl_issue_term')}
-                      {formInput('MB/L Issue Term', 'mbl_issue_term')}
-                      {formInput('B/L Format', 'bl_format')}
-                      {formInput('B/L Number', 'bl_number')}
-                      {formInput('Shipping Bill No', 'shipping_bill_no')}
-                      {formInput('B/L Cutoff Date', 'bl_cutoff_date', { type: 'date' })}
-                      {formInput('B/L Cutoff Time', 'bl_cutoff_time', { type: 'time' })}
-                      {formInput('VGM Cutoff Date', 'vgm_cutoff_date', { type: 'date' })}
-                      {formInput('VGM Cutoff Time', 'vgm_cutoff_time', { type: 'time' })}
-                      {formSelect('Destination Charges', 'destination_charges', ['COLLECT', 'PREPAID'])}
-                      {formInput('Permit No', 'permit_no')}
-                    </div>
-
-                    {/* ── REMARKS ── */}
-                    {sectionHeader('Remarks')}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
-                      {formTextarea('Marks and Numbers', 'marks_and_numbers', 'Marks, numbers, container numbers...')}
-                      {formTextarea('Description of Goods', 'description_of_goods', 'Goods description for B/L...')}
-                      {formTextarea('B/L Instructions', 'bl_instructions', 'Special B/L instructions...')}
-                      {formTextarea('Remarks (Customer)', 'remarks_customer', 'Customer-facing remarks...')}
-                      {formTextarea('Remarks (Internal)', 'remarks_internal', 'Internal notes...')}
-                    </div>
-
-                    {/* Action buttons */}
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
-                      <button className="db-btn"
-                        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-                        onClick={() => {
-                          onFlash(`Booking saved for ${blBkg.customer_name}`)
-                        }}>
-                        Save Booking
-                      </button>
-                    </div>
-                  </div>
-                )
-              }
             })() : selectedItem.actionKind === 'send-pre-advice' && actionModal ? (() => {
               const paBkg = actionModal.sourceData.booking as Booking
               const blCutoff = paBkg.bl_cutoff_date || paBkg.si_cutoff_date
@@ -3906,7 +3554,7 @@ ABC Logistics (Pvt) Ltd`
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                   {/* Header */}
                   <div style={{ padding: '8px 14px', background: '#0891b2', borderRadius: '8px 8px 0 0', marginBottom: 1 }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>SUBMIT SHIPPING INSTRUCTIONS</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>RECORD SHIPPING INSTRUCTIONS</span>
                   </div>
                   <div style={{ border: '1px solid var(--border)', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
                     {/* Booking summary */}
@@ -4043,7 +3691,7 @@ ABC Logistics (Pvt) Ltd`
                       disabled={!siContent.trim() || inttraSiLoading}
                       style={siContent.trim() ? { background: '#0891b2', borderColor: '#0891b2' } : { opacity: 0.4, cursor: 'not-allowed' }}
                       onClick={handleModalSubmit}>
-                      <Globe size={12} /> Submit SI & Confirm{vgmCertFileName ? ' (VGM attached)' : ''}
+                      <Globe size={12} /> Record SI{vgmCertFileName ? ' (VGM attached)' : ''}
                     </button>
                   </div>
                 </div>
@@ -4070,11 +3718,63 @@ ABC Logistics (Pvt) Ltd`
               const gsSectionHeader = (title: string) => (
                 <div style={{ padding: '6px 12px', background: 'rgba(8,145,178,0.08)', borderLeft: '3px solid #0891b2', borderRadius: '0 6px 6px 0', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#0891b2', marginTop: 4 }}>{title}</div>
               )
+              // Generate pre-filled email draft for NVOCC
+              const generateEmailDraft = () => {
+                const liner = siField('to_liner') || gsBkg.shipping_line || 'Liner'
+                const lines = [
+                  `Subject: Shipping Instructions / Liner BL Instruction — ${siField('booking_ref')} — ${siField('pol')} → ${siField('pod')}`,
+                  '',
+                  `Dear ${liner},`,
+                  '',
+                  `Attn: ${siField('attn') || 'B/L Department'}`,
+                  '',
+                  `Please find below our Shipping Instructions for the above-referenced booking.`,
+                  '',
+                  '── BOOKING DETAILS ──────────────────────────',
+                  `Booking Ref:       ${siField('booking_ref')}`,
+                  siField('job_ref') ? `Job Ref:           ${siField('job_ref')}` : '',
+                  `BL Type:           ${siField('bl_type')}`,
+                  `Vessel / Voyage:   ${siField('vessel')} / ${siField('voyage')}`,
+                  `Delivery Type:     ${siField('delivery_type')}`,
+                  '',
+                  '── PARTIES ──────────────────────────────────',
+                  `Shipper:           ${siField('shipper_name')}`,
+                  siField('shipper_address') ? `                   ${siField('shipper_address').replace(/\n/g, '\n                   ')}` : '',
+                  `Consignee:         ${siField('consignee_name')}`,
+                  siField('consignee_address') ? `                   ${siField('consignee_address').replace(/\n/g, '\n                   ')}` : '',
+                  siField('notify_name') ? `Notify Party:      ${siField('notify_name')}` : '',
+                  '',
+                  '── ROUTING ──────────────────────────────────',
+                  `Place of Receipt:  ${siField('place_of_receipt')}`,
+                  `Port of Loading:   ${siField('pol')}`,
+                  `Port of Discharge: ${siField('pod')}`,
+                  siField('sob_date') ? `SOB Date:          ${siField('sob_date')}` : '',
+                  '',
+                  '── CONTAINER & CARGO ────────────────────────',
+                  `Container:         ${siField('container_no') || 'TBA'} (${siField('container_size')})`,
+                  siField('seal_no') ? `Seal No:           ${siField('seal_no')}` : '',
+                  `Description:       ${siField('description_of_goods')}`,
+                  `Weight:            ${siField('weight_kgs') || '—'} KGS`,
+                  siField('volume_m3') ? `Volume:            ${siField('volume_m3')} M3` : '',
+                  `Freight:           ${siField('freight')}`,
+                  `Total:             ${siField('total_containers')}`,
+                  '',
+                  'Please process the above instructions and issue the B/L accordingly.',
+                  '',
+                  'Thank you.',
+                  '',
+                  'Best regards,',
+                  `${activeEmployee.name || 'CS Team'}`,
+                  'Synergy Shipping & Logistics',
+                ].filter(l => l !== '').join('\n')
+                setSiEmailDraft(lines)
+                setSiEmailShow(true)
+              }
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   {/* Header */}
                   <div style={{ padding: '8px 14px', background: '#0891b2', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>LINER BL INSTRUCTION</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>GENERATE SI</span>
                     <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>{gsBkg.customer_name}</span>
                   </div>
 
@@ -4087,115 +3787,182 @@ ABC Logistics (Pvt) Ltd`
                     </div>
                   </div>
 
-                  {/* ── HEADER INFO ── */}
-                  {gsSectionHeader('Addressed To')}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    {gsInput('To (Shipping Line)', 'to_liner', { placeholder: 'e.g. HAPAG LLOYD' })}
-                    {gsInput('Attn', 'attn', { placeholder: 'e.g. B/L DEPARTMENT' })}
-                    <div>
-                      <label className="lt-label">BL Type</label>
-                      <select className="lt-input" style={{ width: '100%' }} value={siField('bl_type')} onChange={e => setSiField('bl_type', e.target.value)}>
-                        <option value="ORIGINAL">ORIGINAL</option>
-                        <option value="SEAWAY BILL">SEAWAY BILL</option>
-                        <option value="TELEX RELEASE">TELEX RELEASE</option>
-                        <option value="EXPRESS RELEASE">EXPRESS RELEASE</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* ── REFERENCE ── */}
-                  {gsSectionHeader('Reference')}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    {gsInput('Booking Ref', 'booking_ref', { readOnly: true })}
-                    {gsInput('Job Ref', 'job_ref', { readOnly: true })}
-                  </div>
-
-                  {/* ── PARTIES ── */}
-                  {gsSectionHeader('Parties')}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
-                    {gsInput('Shipper Name', 'shipper_name', { placeholder: 'Shipper company name' })}
-                    {gsTextarea('Shipper Address', 'shipper_address', 'Full shipper address...')}
-                    {gsInput('Consignee Name', 'consignee_name', { placeholder: 'Consignee company name' })}
-                    {gsTextarea('Consignee Address', 'consignee_address', 'Full consignee address...')}
-                    {gsInput('Notify Party Name', 'notify_name', { placeholder: 'Notify party name' })}
-                    {gsTextarea('Notify Party Address', 'notify_address', 'Notify party address...')}
-                  </div>
-
-                  {/* ── VESSEL & ROUTE ── */}
-                  {gsSectionHeader('Vessel & Route')}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    {gsInput('Vessel', 'vessel')}
-                    {gsInput('Voyage', 'voyage')}
-                    <div>
-                      <label className="lt-label">Delivery Type</label>
-                      <select className="lt-input" style={{ width: '100%' }} value={siField('delivery_type')} onChange={e => setSiField('delivery_type', e.target.value)}>
-                        <option value="CY/CY">CY/CY</option>
-                        <option value="CY/SD">CY/SD</option>
-                        <option value="SD/CY">SD/CY</option>
-                        <option value="SD/SD">SD/SD</option>
-                      </select>
-                    </div>
-                    {gsInput('Place of Receipt', 'place_of_receipt')}
-                    {gsInput('Port of Loading (POL)', 'pol')}
-                    {gsInput('Port of Discharge (POD)', 'pod')}
-                    {gsInput('SOB Date', 'sob_date', { type: 'date' })}
-                  </div>
-
-                  {/* ── CONTAINER DETAILS ── */}
-                  {gsSectionHeader('Container Details')}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    {gsInput('Container No', 'container_no', { placeholder: 'e.g. HLBU1234567' })}
-                    {gsInput('Seal No', 'seal_no', { placeholder: 'e.g. SL123456' })}
-                    {gsInput('Container Size/Type', 'container_size', { readOnly: true })}
-                  </div>
-
-                  {/* ── CARGO DETAILS ── */}
-                  {gsSectionHeader('Cargo Details')}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    {gsTextarea('Marks & Nos', 'marks_and_numbers', 'Marks and numbers...')}
-                    {gsTextarea('Description of Goods', 'description_of_goods', 'Commodity description...')}
-                    {gsInput('Weight (KGS)', 'weight_kgs', { placeholder: '0.00', type: 'number' })}
-                    {gsInput('Volume (M3)', 'volume_m3', { placeholder: '0.00', type: 'number' })}
-                  </div>
-
-                  {/* ── TERMS ── */}
-                  {gsSectionHeader('Terms')}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <div>
-                      <label className="lt-label">Freight</label>
-                      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                        {(['PREPAID', 'COLLECT'] as const).map(f => (
-                          <button key={f}
-                            className={`db-btn ${siField('freight') === f ? 'primary' : ''}`}
-                            style={siField('freight') !== f ? { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' } : {}}
-                            onClick={() => setSiField('freight', f)}>
-                            {f}
-                          </button>
-                        ))}
+                  {/* ══════ NON-NVOCC: Simple confirmation ══════ */}
+                  {!siIsNvocc && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      <div style={{ padding: '16px 18px', background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: 8 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#15803d', marginBottom: 8 }}>Confirm SI Submitted to Liner</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                          For non-NVOCC shipments, the Shipping Instructions are submitted directly to the liner by the shipper or through the liner's portal.
+                          Please confirm that the SI has been submitted for this booking.
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <div>
+                          <label className="lt-label">Shipping Line</label>
+                          <input className="lt-input" style={{ width: '100%', background: 'rgba(0,0,0,0.03)' }} value={gsBkg.shipping_line || ''} readOnly />
+                        </div>
+                        <div>
+                          <label className="lt-label">Booking Ref</label>
+                          <input className="lt-input" style={{ width: '100%', background: 'rgba(0,0,0,0.03)' }} value={gsBkg.id} readOnly />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="lt-label">Notes (optional)</label>
+                        <input className="lt-input" style={{ width: '100%' }} value={formNote}
+                          onChange={e => setFormNote(e.target.value)} placeholder="e.g. SI submitted via INTTRA portal on..." />
                       </div>
                     </div>
-                    {gsInput('Total Containers', 'total_containers', { readOnly: true })}
-                    <div>
-                      <label className="lt-label">Shipped on Board</label>
-                      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                        {(['YES', 'NO'] as const).map(v => (
-                          <button key={v}
-                            className={`db-btn ${siField('shipped_on_board') === v ? 'primary' : ''}`}
-                            style={siField('shipped_on_board') !== v ? { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' } : {}}
-                            onClick={() => setSiField('shipped_on_board', v)}>
-                            {v}
+                  )}
+
+                  {/* ══════ NVOCC: Full SI Generation Form ══════ */}
+                  {siIsNvocc && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      {/* ── HEADER INFO ── */}
+                      {gsSectionHeader('Addressed To')}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        {gsInput('To (Shipping Line)', 'to_liner', { placeholder: 'e.g. HAPAG LLOYD' })}
+                        {gsInput('Attn', 'attn', { placeholder: 'e.g. B/L DEPARTMENT' })}
+                        <div>
+                          <label className="lt-label">BL Type</label>
+                          <select className="lt-input" style={{ width: '100%' }} value={siField('bl_type')} onChange={e => setSiField('bl_type', e.target.value)}>
+                            <option value="ORIGINAL">ORIGINAL</option>
+                            <option value="SEAWAY BILL">SEAWAY BILL</option>
+                            <option value="TELEX RELEASE">TELEX RELEASE</option>
+                            <option value="EXPRESS RELEASE">EXPRESS RELEASE</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* ── REFERENCE ── */}
+                      {gsSectionHeader('Reference')}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        {gsInput('Booking Ref', 'booking_ref', { readOnly: true })}
+                        {gsInput('Job Ref', 'job_ref', { readOnly: true })}
+                      </div>
+
+                      {/* ── PARTIES ── */}
+                      {gsSectionHeader('Parties')}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
+                        {gsInput('Shipper Name', 'shipper_name', { placeholder: 'Shipper company name' })}
+                        {gsTextarea('Shipper Address', 'shipper_address', 'Full shipper address...')}
+                        {gsInput('Consignee Name', 'consignee_name', { placeholder: 'Consignee company name' })}
+                        {gsTextarea('Consignee Address', 'consignee_address', 'Full consignee address...')}
+                        {gsInput('Notify Party Name', 'notify_name', { placeholder: 'Notify party name' })}
+                        {gsTextarea('Notify Party Address', 'notify_address', 'Notify party address...')}
+                      </div>
+
+                      {/* ── VESSEL & ROUTE ── */}
+                      {gsSectionHeader('Vessel & Route')}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        {gsInput('Vessel', 'vessel')}
+                        {gsInput('Voyage', 'voyage')}
+                        <div>
+                          <label className="lt-label">Delivery Type</label>
+                          <select className="lt-input" style={{ width: '100%' }} value={siField('delivery_type')} onChange={e => setSiField('delivery_type', e.target.value)}>
+                            <option value="CY/CY">CY/CY</option>
+                            <option value="CY/SD">CY/SD</option>
+                            <option value="SD/CY">SD/CY</option>
+                            <option value="SD/SD">SD/SD</option>
+                          </select>
+                        </div>
+                        {gsInput('Place of Receipt', 'place_of_receipt')}
+                        {gsInput('Port of Loading (POL)', 'pol')}
+                        {gsInput('Port of Discharge (POD)', 'pod')}
+                        {gsInput('SOB Date', 'sob_date', { type: 'date' })}
+                      </div>
+
+                      {/* ── CONTAINER DETAILS ── */}
+                      {gsSectionHeader('Container Details')}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        {gsInput('Container No', 'container_no', { placeholder: 'e.g. HLBU1234567' })}
+                        {gsInput('Seal No', 'seal_no', { placeholder: 'e.g. SL123456' })}
+                        {gsInput('Container Size/Type', 'container_size', { readOnly: true })}
+                      </div>
+
+                      {/* ── CARGO DETAILS ── */}
+                      {gsSectionHeader('Cargo Details')}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        {gsTextarea('Marks & Nos', 'marks_and_numbers', 'Marks and numbers...')}
+                        {gsTextarea('Description of Goods', 'description_of_goods', 'Commodity description...')}
+                        {gsInput('Weight (KGS)', 'weight_kgs', { placeholder: '0.00', type: 'number' })}
+                        {gsInput('Volume (M3)', 'volume_m3', { placeholder: '0.00', type: 'number' })}
+                      </div>
+
+                      {/* ── TERMS ── */}
+                      {gsSectionHeader('Terms')}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                        <div>
+                          <label className="lt-label">Freight</label>
+                          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                            {(['PREPAID', 'COLLECT'] as const).map(f => (
+                              <button key={f}
+                                className={`db-btn ${siField('freight') === f ? 'primary' : ''}`}
+                                style={siField('freight') !== f ? { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' } : {}}
+                                onClick={() => setSiField('freight', f)}>
+                                {f}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        {gsInput('Total Containers', 'total_containers', { readOnly: true })}
+                        <div>
+                          <label className="lt-label">Shipped on Board</label>
+                          <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                            {(['YES', 'NO'] as const).map(v => (
+                              <button key={v}
+                                className={`db-btn ${siField('shipped_on_board') === v ? 'primary' : ''}`}
+                                style={siField('shipped_on_board') !== v ? { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' } : {}}
+                                onClick={() => setSiField('shipped_on_board', v)}>
+                                {v}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Notes */}
+                      <div>
+                        <label className="lt-label">Notes (optional)</label>
+                        <input className="lt-input" style={{ width: '100%' }} value={formNote}
+                          onChange={e => setFormNote(e.target.value)} placeholder="Internal notes..." />
+                      </div>
+
+                      {/* ── DRAFT EMAIL TO LINER ── */}
+                      <div style={{ borderTop: '2px solid var(--border)', paddingTop: 14, marginTop: 4 }}>
+                        {!siEmailShow ? (
+                          <button
+                            className="db-btn"
+                            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: '#0891b2', fontWeight: 600, fontSize: 12, width: '100%', padding: '10px 0' }}
+                            onClick={generateEmailDraft}>
+                            <Mail size={13} style={{ marginRight: 6, verticalAlign: -2 }} />
+                            Draft Email to Liner
                           </button>
-                        ))}
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <span style={{ fontSize: 11, fontWeight: 700, color: '#0891b2', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email Draft to Liner</span>
+                              <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11 }}
+                                onClick={() => setSiEmailShow(false)}>Collapse</button>
+                            </div>
+                            <textarea
+                              className="lt-input mono"
+                              rows={16}
+                              style={{ width: '100%', resize: 'vertical', fontSize: 11, lineHeight: 1.6, fontFamily: 'ui-monospace, "Cascadia Code", monospace' }}
+                              value={siEmailDraft}
+                              onChange={e => setSiEmailDraft(e.target.value)}
+                            />
+                            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                              <button className="db-btn" style={{ fontSize: 11, background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+                                onClick={() => { navigator.clipboard.writeText(siEmailDraft) }}>
+                                <ClipboardPaste size={11} style={{ marginRight: 4 }} /> Copy to Clipboard
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
-
-                  {/* Notes */}
-                  <div>
-                    <label className="lt-label">Notes (optional)</label>
-                    <input className="lt-input" style={{ width: '100%' }} value={formNote}
-                      onChange={e => setFormNote(e.target.value)} placeholder="Internal notes..." />
-                  </div>
+                  )}
                 </div>
               )
             })() : selectedItem.actionKind === 'create-bl' && actionModal ? (() => {
@@ -4278,23 +4045,265 @@ ABC Logistics (Pvt) Ltd`
 
                   {/* ===== MBL TAB ===== */}
                   {blActiveTab === 'mbl' && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <div style={{ padding: '6px 12px', background: '#0d9488', borderRadius: 6 }}>
                         <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>MASTER BILL OF LADING</span>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                        {cbInput('mbl', 'Master BL Number *', 'master_bl_number', { placeholder: 'e.g. MAEU123456789' })}
-                        {cbInput('mbl', 'Shipping Line', 'shipping_line', { readOnly: true })}
-                        {cbInput('mbl', 'Shipper', 'shipper', { placeholder: 'Shipper name' })}
-                        {cbInput('mbl', 'Consignee *', 'consignee', { placeholder: 'Consignee name' })}
-                        {cbInput('mbl', 'Vessel', 'vessel', { readOnly: true })}
-                        {cbInput('mbl', 'Voyage', 'voyage', { readOnly: true })}
-                        {cbInput('mbl', 'Port of Loading', 'pol', { readOnly: true })}
-                        {cbInput('mbl', 'Port of Discharge', 'pod', { readOnly: true })}
-                        {cbInput('mbl', 'Container Type', 'container_type', { readOnly: true })}
-                        {cbInput('mbl', 'Container Count', 'container_count', { readOnly: true })}
-                        {cbSelect('mbl', 'Freight Term', 'freight_term', ['PREPAID', 'COLLECT', 'PAYABLE AS ARRANGED'])}
-                        {cbInput('mbl', 'Delivery Type', 'delivery_type', { readOnly: true })}
+
+                      {/* Section 1: Document Header */}
+                      {cbSection('mbl-docheader', 'Document Header', 'B/L identifiers')}
+                      {!hblCollapsed['mbl-docheader'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '8px 0' }}>
+                          {cbInput('mbl', 'Waybill No *', 'waybillNo', { placeholder: 'e.g. MAEU123456789' })}
+                          {cbInput('mbl', 'Waybill Seq *', 'waybillSeq', { type: 'number' })}
+                          {cbInput('mbl', 'Rider Pages *', 'riderPages', { type: 'number' })}
+                          {cbSelect('mbl', 'Transport Type *', 'transportType', ['PORT-TO-PORT', 'COMBINED TRANSPORT'])}
+                          {cbInput('mbl', "Lloyd's IMO", 'lloydsImo', { placeholder: 'IMO number' })}
+                        </div>
+                      )}
+
+                      {/* Section 2: Carrier */}
+                      {cbSection('mbl-carrier', 'Carrier', 'Shipping line details')}
+                      {!hblCollapsed['mbl-carrier'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '8px 0' }}>
+                          {cbInput('mbl', 'Carrier Name *', 'carrierName', { placeholder: 'e.g. MAERSK LINE' })}
+                          {cbInput('mbl', 'Carrier Website', 'carrierWebsite', { placeholder: 'https://...' })}
+                          {cbTextarea('mbl', 'Carrier Address *', 'carrierAddress', 3, 'Full registered address')}
+                        </div>
+                      )}
+
+                      {/* Section 3: Shipper (freight forwarder on MBL) */}
+                      {cbSection('mbl-shipper', 'Shipper', 'Freight forwarder (not the customer)')}
+                      {!hblCollapsed['mbl-shipper'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '8px 0' }}>
+                          {cbInput('mbl', 'Shipper Name *', 'shipperName', { placeholder: 'Freight forwarder name' })}
+                          {cbInput('mbl', 'Contact Name', 'shipperContactName')}
+                          {cbInput('mbl', 'Contact Phone', 'shipperContactPhone')}
+                          {cbInput('mbl', 'Contact Email', 'shipperContactEmail', { type: 'email' })}
+                          {cbTextarea('mbl', 'Shipper Address *', 'shipperAddress', 3, 'Full address')}
+                        </div>
+                      )}
+
+                      {/* Section 4: Consignee (destination agent on MBL) */}
+                      {cbSection('mbl-consignee', 'Consignee', 'Destination agent')}
+                      {!hblCollapsed['mbl-consignee'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '8px 0' }}>
+                          {cbInput('mbl', 'Consignee Name *', 'consigneeName', { placeholder: 'Destination agent name' })}
+                          {cbTextarea('mbl', 'Consignee Address *', 'consigneeAddress', 3, 'Full address')}
+                        </div>
+                      )}
+
+                      {/* Section 5: Notify Parties */}
+                      {cbSection('mbl-notify', 'Notify Parties', 'Notification details')}
+                      {!hblCollapsed['mbl-notify'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '8px 0' }}>
+                          {cbSelect('mbl', 'Notify Clause *', 'notifyClause', ['', 'SAME AS CONSIGNEE', 'SAME AS SHIPPER', 'AS PER ATTACHED', 'OTHER'])}
+                          {cbInput('mbl', 'Notify Name *', 'notifyName')}
+                          {cbInput('mbl', 'Contact Name', 'notifyContactName')}
+                          {cbInput('mbl', 'Contact Phone', 'notifyContactPhone')}
+                          {cbInput('mbl', 'Contact Email', 'notifyContactEmail', { type: 'email' })}
+                          {cbTextarea('mbl', 'Notify Address *', 'notifyAddress', 3, 'Full address')}
+                        </div>
+                      )}
+
+                      {/* Section 6: POD Agent */}
+                      {cbSection('mbl-podagent', 'POD Agent', 'Port of discharge agent')}
+                      {!hblCollapsed['mbl-podagent'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '8px 0' }}>
+                          {cbInput('mbl', 'Agent Name *', 'podAgentName')}
+                          {cbInput('mbl', 'Department', 'podAgentDept')}
+                          {cbInput('mbl', 'Phone', 'podAgentPhone')}
+                          {cbInput('mbl', 'Fax', 'podAgentFax')}
+                          {cbInput('mbl', 'Email', 'podAgentEmail', { type: 'email' })}
+                          {cbTextarea('mbl', 'Agent Address *', 'podAgentAddress', 3, 'Full address')}
+                        </div>
+                      )}
+
+                      {/* Section 7: Containers / Rider */}
+                      {cbSection('mbl-containers', 'Containers / Rider', `${mblContainers.length} row(s)`)}
+                      {!hblCollapsed['mbl-containers'] && (
+                        <div style={{ padding: '8px 0' }}>
+                          <div style={{ display: 'grid', gridTemplateColumns: '110px 100px 90px 80px 80px 1fr 70px 60px 28px', gap: 4, fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, paddingLeft: 2 }}>
+                            <span>Container #</span><span>Type/Size</span><span>Seal No</span><span>PO #</span><span>HS Code</span><span>Description</span><span>Gross Wt</span><span>CBM</span><span />
+                          </div>
+                          {mblContainers.map((row, ri) => (
+                            <div key={ri} style={{ display: 'grid', gridTemplateColumns: '110px 100px 90px 80px 80px 1fr 70px 60px 28px', gap: 4, marginBottom: 3 }}>
+                              <input className="lt-input" style={{ width: '100%', fontSize: 11, padding: '3px 4px' }} value={row.containerNo}
+                                onChange={e => setMblContainers(prev => prev.map((r, i) => i === ri ? { ...r, containerNo: e.target.value } : r))} placeholder="ABCU1234567" />
+                              <select className="lt-input" style={{ width: '100%', fontSize: 11, padding: '3px 2px' }} value={row.containerType}
+                                onChange={e => setMblContainers(prev => prev.map((r, i) => i === ri ? { ...r, containerType: e.target.value } : r))}>
+                                <option value="20' STANDARD">20' STD</option>
+                                <option value="40' STANDARD">40' STD</option>
+                                <option value="40' HIGH CUBE">40' HC</option>
+                                <option value="45' HIGH CUBE">45' HC</option>
+                                <option value="20' REEFER">20' RF</option>
+                                <option value="40' REEFER HC">40' RF HC</option>
+                                <option value="20' OPEN TOP">20' OT</option>
+                                <option value="40' OPEN TOP">40' OT</option>
+                                <option value="20' FLAT RACK">20' FR</option>
+                                <option value="40' FLAT RACK">40' FR</option>
+                                <option value="20' TANK">20' TK</option>
+                              </select>
+                              <input className="lt-input" style={{ width: '100%', fontSize: 11, padding: '3px 4px' }} value={row.sealNo}
+                                onChange={e => setMblContainers(prev => prev.map((r, i) => i === ri ? { ...r, sealNo: e.target.value } : r))} placeholder="Seal" />
+                              <input className="lt-input" style={{ width: '100%', fontSize: 11, padding: '3px 4px' }} value={row.poNumber}
+                                onChange={e => setMblContainers(prev => prev.map((r, i) => i === ri ? { ...r, poNumber: e.target.value } : r))} placeholder="PO#" />
+                              <input className="lt-input" style={{ width: '100%', fontSize: 11, padding: '3px 4px' }} value={row.hsCode}
+                                onChange={e => setMblContainers(prev => prev.map((r, i) => i === ri ? { ...r, hsCode: e.target.value } : r))} placeholder="HS Code" />
+                              <input className="lt-input" style={{ width: '100%', fontSize: 11, padding: '3px 4px' }} value={row.description}
+                                onChange={e => setMblContainers(prev => prev.map((r, i) => i === ri ? { ...r, description: e.target.value } : r))} placeholder="Description of goods" />
+                              <input className="lt-input" style={{ width: '100%', fontSize: 11, padding: '3px 4px' }} type="number" value={row.grossWeight}
+                                onChange={e => setMblContainers(prev => prev.map((r, i) => i === ri ? { ...r, grossWeight: e.target.value } : r))} placeholder="KGS" />
+                              <input className="lt-input" style={{ width: '100%', fontSize: 11, padding: '3px 4px' }} type="number" value={row.cbm}
+                                onChange={e => setMblContainers(prev => prev.map((r, i) => i === ri ? { ...r, cbm: e.target.value } : r))} />
+                              {mblContainers.length > 1 && (
+                                <button type="button" onClick={() => setMblContainers(prev => prev.filter((_, i) => i !== ri))}
+                                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14, padding: 0 }}>×</button>
+                              )}
+                            </div>
+                          ))}
+                          <button type="button" onClick={() => setMblContainers(prev => [...prev, { containerNo: '', containerType: "40' HIGH CUBE", sealNo: '', poNumber: '', hsCode: '', description: '', grossWeight: '', cbm: '' }])}
+                            style={{ fontSize: 11, color: '#0891b2', background: 'none', border: '1px dashed #0891b2', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', marginTop: 4 }}>
+                            + Add Container
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Section 8: Vessel & Voyage */}
+                      {cbSection('mbl-vessel', 'Vessel & Voyage', 'Route details')}
+                      {!hblCollapsed['mbl-vessel'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '8px 0' }}>
+                          {cbInput('mbl', 'Vessel / Voyage *', 'vesselVoyage', { placeholder: 'e.g. EVER GIVEN - 1234N' })}
+                          {cbSelect('mbl', 'Load Type *', 'loadType', ['FCL/FCL', 'FCL/LCL', 'LCL/LCL', 'LCL/FCL'])}
+                          {cbInput('mbl', 'Port of Loading *', 'portOfLoading')}
+                          {cbInput('mbl', 'Port of Discharge *', 'portOfDischarge')}
+                          {cbInput('mbl', 'Place of Receipt', 'placeOfReceipt')}
+                          {cbInput('mbl', 'Place of Delivery', 'placeOfDelivery')}
+                        </div>
+                      )}
+
+                      {/* Section 9: References */}
+                      {cbSection('mbl-references', 'References', 'Booking & tracking refs')}
+                      {!hblCollapsed['mbl-references'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '8px 0' }}>
+                          {cbInput('mbl', 'Booking Ref *', 'bookingRef', { readOnly: true })}
+                          {cbInput('mbl', 'Shipper Ref', 'shipperRef')}
+                          {cbInput('mbl', 'Carrier Receipt *', 'carrierReceipt', { placeholder: 'Carrier receipt number' })}
+                        </div>
+                      )}
+
+                      {/* Section 10: Cargo Summary */}
+                      {cbSection('mbl-cargo', 'Cargo Summary', 'Totals & description')}
+                      {!hblCollapsed['mbl-cargo'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '8px 0' }}>
+                          {cbInput('mbl', 'Total Items *', 'totalItems', { type: 'number' })}
+                          {cbInput('mbl', 'Total Gross Weight *', 'totalGrossWeight', { type: 'number' })}
+                          {cbSelect('mbl', 'Weight Unit *', 'weightUnit', ['KGS', 'LBS', 'MT'])}
+                          {cbInput('mbl', 'Total Net Weight', 'totalNetWeight', { type: 'number' })}
+                          {cbSelect('mbl', 'Cargo Description *', 'cargoDescription', ['', 'SAID TO CONTAIN', 'SHIPPER LOAD & COUNT', 'CARRIER LOAD & COUNT', 'GENERAL CARGO', 'DANGEROUS GOODS', 'REEFER CARGO', 'OTHER'])}
+                        </div>
+                      )}
+
+                      {/* Section 11: Freight & Charges */}
+                      {cbSection('mbl-freight', 'Freight & Charges', 'Payment terms')}
+                      {!hblCollapsed['mbl-freight'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '8px 0' }}>
+                          {cbSelect('mbl', 'Freight Charges *', 'freightCharges', ['AS PER AGREEMENT', 'PREPAID', 'COLLECT', 'PAYABLE AT DESTINATION'])}
+                          {cbInput('mbl', 'Freight Clause', 'freightClause', { placeholder: 'Additional clause text' })}
+                          {cbInput('mbl', 'Declared Value', 'declaredValue', { placeholder: 'e.g. USD 50,000' })}
+                        </div>
+                      )}
+
+                      {/* Section 12: Issuance & Signature */}
+                      {cbSection('mbl-issuance', 'Issuance & Signature', 'Where & when issued')}
+                      {!hblCollapsed['mbl-issuance'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '8px 0' }}>
+                          {cbInput('mbl', 'Place of Issue *', 'placeOfIssue')}
+                          {cbInput('mbl', 'Date of Issue *', 'dateOfIssue', { type: 'date' })}
+                          {cbInput('mbl', 'Shipped on Board Date *', 'shippedOnBoardDate', { type: 'date' })}
+                          {cbInput('mbl', 'Signed on Behalf of *', 'signedOnBehalfOf')}
+                          {cbInput('mbl', 'Signing Agent *', 'signingAgent')}
+                          {cbInput('mbl', 'Agent Code *', 'agentCode', { placeholder: 'e.g. SCAC code' })}
+                          {cbInput('mbl', 'Agent Capacity *', 'agentCapacity', { placeholder: 'e.g. As Agents for the Carrier' })}
+                        </div>
+                      )}
+
+                      {/* Section 13: Special Clauses */}
+                      {cbSection('mbl-clauses', 'Special Clauses', 'Optional rider clauses')}
+                      {!hblCollapsed['mbl-clauses'] && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8, padding: '8px 0' }}>
+                          {cbTextarea('mbl', 'Thermal Clause', 'thermalClause', 3, 'Thermal / temperature clause if applicable')}
+                          {cbTextarea('mbl', 'Pallets Clause', 'palletsClause', 3, 'Pallets / packaging clause if applicable')}
+                          {cbInput('mbl', 'Rider Note', 'riderNote', { span2: true, placeholder: 'Additional rider note' })}
+                        </div>
+                      )}
+
+                      {/* MBL Action Buttons */}
+                      <div style={{ display: 'flex', gap: 10, marginTop: 10, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+                        <button type="button"
+                          disabled={!mblField('waybillNo').trim() || !mblField('consigneeName').trim()}
+                          style={{
+                            flex: 1, padding: '10px 16px', border: '1px solid #0d9488', borderRadius: 8,
+                            background: '#0d9488', color: '#fff', fontWeight: 600, fontSize: 13,
+                            cursor: (!mblField('waybillNo').trim() || !mblField('consigneeName').trim()) ? 'not-allowed' : 'pointer',
+                            opacity: (!mblField('waybillNo').trim() || !mblField('consigneeName').trim()) ? 0.4 : 1,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          }}
+                          onClick={() => {
+                            const bkg = actionModal!.sourceData.booking
+                            onRecordMasterBl(bkg.id, {
+                              master_bl_number: mblField('waybillNo'),
+                              shipper: mblField('shipperName'),
+                              consignee: mblField('consigneeName'),
+                            })
+                            onLogActivity({
+                              actor_role: activeRole,
+                              actor_id: activeEmployee.id,
+                              action: `Recorded Master BL ${mblField('waybillNo')} for ${bkg.id}.`,
+                              ref_type: 'booking',
+                              ref_id: bkg.id,
+                              customer_name: bkg.customer_name,
+                              pushed_to: 'CS',
+                              notes: `Master BL: ${mblField('waybillNo')} | Shipper: ${mblField('shipperName')} | Consignee: ${mblField('consigneeName')}`,
+                            })
+                            onFlash(`${bkg.id} — Master BL ${mblField('waybillNo')} recorded & saved.`)
+                            setActionModal(null)
+                          }}
+                        >
+                          <FileText size={12} /> Save MBL & Exit
+                        </button>
+                        <button type="button"
+                          disabled={!mblField('waybillNo').trim() || !mblField('consigneeName').trim()}
+                          style={{
+                            flex: 1, padding: '10px 16px', border: '1px solid #d97706', borderRadius: 8,
+                            background: '#d97706', color: '#fff', fontWeight: 600, fontSize: 13,
+                            cursor: (!mblField('waybillNo').trim() || !mblField('consigneeName').trim()) ? 'not-allowed' : 'pointer',
+                            opacity: (!mblField('waybillNo').trim() || !mblField('consigneeName').trim()) ? 0.4 : 1,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          }}
+                          onClick={() => {
+                            const bkg = actionModal!.sourceData.booking
+                            onRecordMasterBl(bkg.id, {
+                              master_bl_number: mblField('waybillNo'),
+                              shipper: mblField('shipperName'),
+                              consignee: mblField('consigneeName'),
+                            })
+                            onLogActivity({
+                              actor_role: activeRole,
+                              actor_id: activeEmployee.id,
+                              action: `Recorded Master BL ${mblField('waybillNo')} for ${bkg.id}.`,
+                              ref_type: 'booking',
+                              ref_id: bkg.id,
+                              customer_name: bkg.customer_name,
+                              pushed_to: 'CS',
+                              notes: `Master BL: ${mblField('waybillNo')} | Shipper: ${mblField('shipperName')} | Consignee: ${mblField('consigneeName')}`,
+                            })
+                            onFlash(`${bkg.id} — Master BL recorded. Now create House BL.`)
+                            setBlActiveTab('hbl')
+                          }}
+                        >
+                          <Ship size={12} /> Save MBL & Create HBL →
+                        </button>
                       </div>
                     </div>
                   )}
@@ -5641,7 +5650,7 @@ ABC Logistics (Pvt) Ltd`
             {actionModal.actionKind === 'bl-approval' && (() => {
               const { booking: baBkg } = actionModal.sourceData
               const isDtd = baBkg.delivery_type === 'door-to-door'
-              const blType = isDtd ? 'House BL' : 'Draft BL'
+              const blType = isDtd ? 'House BL' : 'Master BL'
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
                   {/* Booking summary */}
@@ -5946,8 +5955,8 @@ ABC Logistics (Pvt) Ltd`
               </div>
             )}
 
-            {/* Job Reference Number — shown for save-draft-bl */}
-            {actionModal.actionKind === 'save-draft-bl' && (
+            {/* Job Reference Number — removed with Draft BL step */}
+            {false && (
               <div style={{ marginTop: 16 }}>
                 <label className="lt-label">Job Reference Number <span style={{ color: '#dc2626' }}>*</span></label>
                 <input className="lt-input" style={{ width: '100%' }}
@@ -5974,9 +5983,8 @@ ABC Logistics (Pvt) Ltd`
                   (actionModal.actionKind === 'create-house-bl' && sendMethod === 'email' && (!customerContactEmail.trim() || !customerContactEmail.includes('@'))) ||
                   (actionModal.actionKind === 'create-house-bl' && sendMethod === 'whatsapp' && !waConfirmed) ||
                   (actionModal.actionKind === 'customer-response' && customerDecision === 'accepted' && quotationOptions.length > 0 && selectedOptionRateId == null) ||
-                  (actionModal.actionKind === 'save-draft-bl' && !jobRefNumber.trim()) ||
-                  (actionModal.actionKind === 'generate-si' && (!siField('shipper_name').trim() || !siField('consignee_name').trim())) ||
-                  (actionModal.actionKind === 'create-bl' && blActiveTab === 'mbl' && (!mblField('master_bl_number').trim() || !mblField('consignee').trim())) ||
+                  (actionModal.actionKind === 'generate-si' && siIsNvocc && (!siField('shipper_name').trim() || !siField('consignee_name').trim())) ||
+                  (actionModal.actionKind === 'create-bl' && blActiveTab === 'mbl' && (!mblField('waybillNo').trim() || !mblField('consigneeName').trim())) ||
                   (actionModal.actionKind === 'create-bl' && blActiveTab === 'hbl' && (!hblField('shipperName').trim() || !hblField('consigneeName').trim())) ||
                   kycSending || quotationSending
                 }
@@ -6003,11 +6011,9 @@ ABC Logistics (Pvt) Ltd`
                   actionModal.actionKind === 'create-house-bl' && sendMethod === 'whatsapp' && waConfirmed && houseBlNumber.trim() && houseBlConsignee.trim() ? { background: '#25d366', borderColor: '#25d366' } :
                   actionModal.actionKind === 'create-house-bl' && sendMethod === 'email' && customerContactEmail.includes('@') && houseBlNumber.trim() && houseBlConsignee.trim() ? { background: '#d97706', borderColor: '#d97706' } :
                   actionModal.actionKind === 'create-house-bl' ? { opacity: 0.4, cursor: 'not-allowed' } :
-                  (actionModal.actionKind === 'save-draft-bl' && !jobRefNumber.trim()) ? { opacity: 0.4, cursor: 'not-allowed' } :
-                  (actionModal.actionKind === 'save-draft-bl') ? { background: '#0891b2', borderColor: '#0891b2' } :
-                  (actionModal.actionKind === 'generate-si' && (!siField('shipper_name').trim() || !siField('consignee_name').trim())) ? { opacity: 0.4, cursor: 'not-allowed' } :
+                  (actionModal.actionKind === 'generate-si' && siIsNvocc && (!siField('shipper_name').trim() || !siField('consignee_name').trim())) ? { opacity: 0.4, cursor: 'not-allowed' } :
                   (actionModal.actionKind === 'generate-si') ? { background: '#0891b2', borderColor: '#0891b2' } :
-                  (actionModal.actionKind === 'create-bl' && blActiveTab === 'mbl' && (!mblField('master_bl_number').trim() || !mblField('consignee').trim())) ? { opacity: 0.4, cursor: 'not-allowed' } :
+                  (actionModal.actionKind === 'create-bl' && blActiveTab === 'mbl' && (!mblField('waybillNo').trim() || !mblField('consigneeName').trim())) ? { opacity: 0.4, cursor: 'not-allowed' } :
                   (actionModal.actionKind === 'create-bl' && blActiveTab === 'mbl') ? { background: '#0d9488', borderColor: '#0d9488' } :
                   (actionModal.actionKind === 'create-bl' && blActiveTab === 'hbl' && (!hblField('shipperName').trim() || !hblField('consigneeName').trim())) ? { opacity: 0.4, cursor: 'not-allowed' } :
                   (actionModal.actionKind === 'create-bl' && blActiveTab === 'hbl') ? { background: '#d97706', borderColor: '#d97706' } :
@@ -6039,8 +6045,8 @@ ABC Logistics (Pvt) Ltd`
                  actionModal.actionKind === 'create-house-bl' && sendMethod === 'email' ? <><Mail size={12} /> Create &amp; Send House BL via Email</> :
                  actionModal.actionKind === 'create-house-bl' && sendMethod === 'whatsapp' ? <><MessageCircle size={12} /> Create &amp; Confirm House BL Sent</> :
                  actionModal.actionKind === 'approve-quote' && formDecision === 'reject' ? 'Reject' :
-                 actionModal.actionKind === 'save-draft-bl' ? <><FileText size={12} /> Save Draft BL</> :
-                 actionModal.actionKind === 'generate-si' ? <><FileText size={12} /> Generate SI Document</> :
+                 actionModal.actionKind === 'generate-si' && siIsNvocc ? <><FileText size={12} /> Generate SI Document</> :
+                 actionModal.actionKind === 'generate-si' && !siIsNvocc ? <><Check size={12} /> Confirm SI Submitted</> :
                  actionModal.actionKind === 'create-bl' && blActiveTab === 'mbl' ? <><FileText size={12} /> Record Master BL</> :
                  actionModal.actionKind === 'create-bl' && blActiveTab === 'hbl' ? <><FileText size={12} /> Create House BL</> :
                  <>Confirm &amp; Push <ChevronRight size={12} /></>}
