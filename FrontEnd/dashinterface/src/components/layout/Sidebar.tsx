@@ -5,6 +5,7 @@ import {
   UserPlus, PackagePlus, MessageSquarePlus,
   ListPlus, FileSpreadsheet, Search, ShieldAlert, CreditCard,
   ArrowUpDown, Zap, Lock, Anchor, PackageCheck, AlertTriangle, Inbox, DollarSign,
+  PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react'
 import {
   ROLE_PAGE_ACCESS, ROLE_QUICK_COMMANDS, ROLE_ACTIONS, ROLE_COLORS,
@@ -15,6 +16,8 @@ interface SidebarProps {
   current: PageId
   onNav: (page: PageId) => void
   activeRole: UserRole
+  collapsed: boolean
+  onToggleCollapse: () => void
 }
 
 const NAV_ITEMS: { id: PageId; label: string; icon: typeof MessageSquare }[] = [
@@ -39,7 +42,7 @@ const ROLE_NAV_VISIBLE: Partial<Record<UserRole, PageId[]>> = {
   Finance: ['workspace'],
 }
 
-export default function Sidebar({ current, onNav, activeRole }: SidebarProps) {
+export default function Sidebar({ current, onNav, activeRole, collapsed, onToggleCollapse }: SidebarProps) {
   const [helpOpen, setHelpOpen] = useState(false)
   const accessiblePages = ROLE_PAGE_ACCESS[activeRole]
   const visibleNavItems = ROLE_NAV_VISIBLE[activeRole]
@@ -48,8 +51,17 @@ export default function Sidebar({ current, onNav, activeRole }: SidebarProps) {
 
   return (
     <>
-      <nav className="db-sidebar">
-        <div className="db-sidebar-section">Menu</div>
+      <nav className={`db-sidebar ${collapsed ? 'db-sidebar-collapsed' : ''}`}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', marginBottom: 8 }}>
+          {!collapsed && <div className="db-sidebar-section" style={{ margin: 0 }}>Menu</div>}
+          <button
+            onClick={onToggleCollapse}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 4, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+          </button>
+        </div>
 
         {visibleNavItems.map(item => {
           const Icon = item.icon
@@ -59,24 +71,26 @@ export default function Sidebar({ current, onNav, activeRole }: SidebarProps) {
               key={item.id}
               className={`db-nav-item ${current === item.id ? 'active' : ''} ${!accessible ? 'disabled' : ''}`}
               onClick={() => accessible && onNav(item.id)}
-              title={accessible ? item.label : `Restricted — requires different role`}
-              style={{ opacity: accessible ? 1 : 0.35, cursor: accessible ? 'pointer' : 'not-allowed' }}
+              title={item.label}
+              style={{ opacity: accessible ? 1 : 0.35, cursor: accessible ? 'pointer' : 'not-allowed', justifyContent: collapsed ? 'center' : undefined }}
             >
               <span className="db-nav-item-icon"><Icon size={15} /></span>
-              {item.label}
-              {!accessible && <Lock size={10} style={{ marginLeft: 'auto', opacity: 0.6 }} />}
+              {!collapsed && item.label}
+              {!collapsed && !accessible && <Lock size={10} style={{ marginLeft: 'auto', opacity: 0.6 }} />}
             </div>
           )
         })}
 
         <div className="db-sidebar-footer">
-          <div className="db-nav-item" onClick={() => setHelpOpen(true)}>
-            <span className="db-nav-item-icon"><HelpCircle size={15} /></span>
-            Help &amp; Guide
-          </div>
-          <div className="db-nav-item">
+          {!collapsed && (
+            <div className="db-nav-item" onClick={() => setHelpOpen(true)}>
+              <span className="db-nav-item-icon"><HelpCircle size={15} /></span>
+              Help &amp; Guide
+            </div>
+          )}
+          <div className="db-nav-item" title="Sign Out" style={{ justifyContent: collapsed ? 'center' : undefined }}>
             <span className="db-nav-item-icon"><LogOut size={15} /></span>
-            Sign Out
+            {!collapsed && 'Sign Out'}
           </div>
         </div>
       </nav>

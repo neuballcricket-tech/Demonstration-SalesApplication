@@ -801,6 +801,8 @@ export interface Booking {
   filing_cutoff_date?: string
   si_requested?: boolean
   si_submitted?: boolean
+  bl_vessel_confirmed?: boolean   // true after CS confirms vessel schedule (step 11)
+  bl_booking_created?: boolean    // true after CS creates vessel booking in Gensoft (step 12)
   draft_bl_sent?: boolean
   job_reference_number?: string
   bl_status?: 'pending' | 'approved' | 'changes-requested'
@@ -815,6 +817,7 @@ export interface Booking {
   house_bl_created?: boolean
   liner_bl_instruction_generated?: boolean  // true after CS generates SI / Liner BL instruction
   pre_advice_sent?: boolean         // true after CS sends pre-advice to door agent (door-to-door / port-to-door)
+  pre_alert_sent?: boolean          // true after CS sends pre-alert to destination agent
   release_order_attached?: boolean  // true after Procurement attaches release order and sends to CS
   release_order_fields?: ReleaseOrderFields
   // --- Backend integration IDs (internal, never rendered in UI) ---

@@ -1,0 +1,722 @@
+{
+  "document": "Master Bill of Lading — MSC Sea Waybill",
+  "reference": "MEDUKL812774",
+  "note": "On a Master B/L the Shipper is the freight forwarder (CLS), the Consignee is the destination agent (PFE Express). The actual cargo owner only appears on the House B/L.",
+  "sections": [
+    {
+      "id": "docheader",
+      "title": "Document header",
+      "hint": "Carrier-issued identifiers. The waybill number is assigned by MSC — CLS records it here as a reference.",
+      "fields": [
+        {
+          "k": "waybillNo",
+          "l": "Sea Waybill no.",
+          "t": "code",
+          "dt": "VARCHAR(20)",
+          "req": 1,
+          "v": "MEDUKL812774",
+          "pat": "^[A-Z]{3}[A-Z]{2}\\d{6}$",
+          "patMsg": "Format: 3-letter carrier code + 2-letter country + 6 digits.",
+          "w": 3,
+          "note": "Carrier-generated. Unique globally. Do not alter."
+        },
+        {
+          "k": "waybillSeq",
+          "l": "No. & sequence of waybills",
+          "t": "num",
+          "dt": "TINYINT",
+          "req": 1,
+          "v": "1",
+          "min": 1,
+          "max": 9,
+          "int": 1,
+          "w": 2
+        },
+        {
+          "k": "riderPages",
+          "l": "No. of rider pages",
+          "t": "num",
+          "dt": "TINYINT",
+          "req": 1,
+          "v": "1",
+          "min": 0,
+          "max": 20,
+          "int": 1,
+          "w": 2
+        },
+        {
+          "k": "transportType",
+          "l": "Transport type",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "PORT-TO-PORT",
+            "COMBINED TRANSPORT"
+          ],
+          "v": "PORT-TO-PORT",
+          "w": 3,
+          "note": "Combined Transport activates Place of Receipt and Place of Delivery fields."
+        },
+        {
+          "k": "lloydsImo",
+          "l": "Lloyds / IMO number",
+          "t": "code",
+          "dt": "VARCHAR(10)",
+          "v": "9484479",
+          "pat": "^\\d{7}$",
+          "patMsg": "7-digit IMO vessel identifier.",
+          "w": 2
+        }
+      ]
+    },
+    {
+      "id": "carrier",
+      "title": "Carrier",
+      "hint": "Printed top-left on every MSC document. These are static for MSC but other carriers differ.",
+      "fields": [
+        {
+          "k": "carrierName",
+          "l": "Carrier name",
+          "t": "text",
+          "dt": "VARCHAR(80)",
+          "req": 1,
+          "v": "MEDITERRANEAN SHIPPING COMPANY S.A.",
+          "max": 80,
+          "w": 8
+        },
+        {
+          "k": "carrierAddress",
+          "l": "Carrier address",
+          "t": "textarea",
+          "dt": "TEXT",
+          "req": 1,
+          "v": "12-14, chemin Rieu - CH -1208 GENEVA, Switzerland",
+          "lines": 3,
+          "linelen": 60,
+          "w": 8
+        },
+        {
+          "k": "carrierWebsite",
+          "l": "Carrier website",
+          "t": "text",
+          "dt": "VARCHAR(120)",
+          "v": "www.msc.com",
+          "w": 4
+        }
+      ]
+    },
+    {
+      "id": "shipper",
+      "title": "Shipper  (= the freight forwarder on a Master B/L)",
+      "hint": "On the Master B/L this is CLS Synergy — NOT the cargo owner. The cargo owner only appears on the House B/L.",
+      "fields": [
+        {
+          "k": "shipperName",
+          "l": "Shipper name",
+          "t": "text",
+          "dt": "VARCHAR(70)",
+          "req": 1,
+          "v": "CL SYNERGY LIMITED",
+          "max": 70,
+          "w": 6
+        },
+        {
+          "k": "shipperAddress",
+          "l": "Shipper address",
+          "t": "textarea",
+          "dt": "TEXT · max 6 lines × 45",
+          "req": 1,
+          "v": "NO.30, 6TH FLOOR,\nR.A.DE MEL MAWATHA,\nCOLOMBO 03, SRI LANKA.",
+          "lines": 6,
+          "linelen": 45,
+          "w": 6
+        },
+        {
+          "k": "shipperContactName",
+          "l": "Contact name",
+          "t": "text",
+          "dt": "VARCHAR(70)",
+          "v": "CHAMODI ATHAPATTU",
+          "w": 4
+        },
+        {
+          "k": "shipperContactPhone",
+          "l": "Contact phone",
+          "t": "text",
+          "dt": "VARCHAR(20)",
+          "v": "011 5300250",
+          "pat": "^[\\d\\s\\+\\-\\(\\)]{6,20}$",
+          "patMsg": "Digits, spaces, +, - and () only.",
+          "w": 4
+        },
+        {
+          "k": "shipperContactEmail",
+          "l": "Contact email",
+          "t": "email",
+          "dt": "VARCHAR(120)",
+          "v": "PRICING@clsynergy.com",
+          "w": 4
+        }
+      ]
+    },
+    {
+      "id": "consignee",
+      "title": "Consignee  (= the destination agent on a Master B/L)",
+      "hint": "On the Master B/L this is PFE Express Ltd — the entity MSC will release cargo to at destination.",
+      "fields": [
+        {
+          "k": "consigneeName",
+          "l": "Consignee name",
+          "t": "text",
+          "dt": "VARCHAR(70)",
+          "req": 1,
+          "v": "PFE EXPRESS LIMITED",
+          "max": 70,
+          "w": 6
+        },
+        {
+          "k": "consigneeAddress",
+          "l": "Consignee address",
+          "t": "textarea",
+          "dt": "TEXT · max 6 lines × 45",
+          "req": 1,
+          "v": "UNIT 1, ALBERT WAY, EASTWAYS,\nWITHAM, ESSEX, CM8 3ZR",
+          "lines": 6,
+          "linelen": 45,
+          "w": 6
+        }
+      ]
+    },
+    {
+      "id": "notify",
+      "title": "Notify parties",
+      "hint": "MSC takes no responsibility for failure to notify. The clause is printed verbatim on the bill.",
+      "fields": [
+        {
+          "k": "notifyClause",
+          "l": "Notify disclaimer clause",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "No responsibility shall attach to Carrier or to his Agent for failure to notify - see Clause 20",
+            "NONE"
+          ],
+          "w": 8,
+          "note": "Standard MSC clause. Must print on the face of the bill."
+        },
+        {
+          "k": "notifyName",
+          "l": "Notify party name",
+          "t": "text",
+          "dt": "VARCHAR(70)",
+          "req": 1,
+          "v": "ALDI STORES LTD",
+          "max": 70,
+          "w": 6
+        },
+        {
+          "k": "notifyAddress",
+          "l": "Notify party address",
+          "t": "textarea",
+          "dt": "TEXT · max 6 lines × 45",
+          "req": 1,
+          "v": "HOLLY LANE, ATHERSTONE,\nWARWICKSHIRE,CV9 2SQ UK",
+          "lines": 6,
+          "linelen": 45,
+          "w": 6
+        },
+        {
+          "k": "notifyContactName",
+          "l": "Notify contact name",
+          "t": "text",
+          "dt": "VARCHAR(70)",
+          "v": "AMANDA ROBINSON",
+          "w": 4
+        },
+        {
+          "k": "notifyContactPhone",
+          "l": "Notify contact phone",
+          "t": "text",
+          "dt": "VARCHAR(20)",
+          "v": "+44 (1827) 333265",
+          "w": 4
+        },
+        {
+          "k": "notifyContactEmail",
+          "l": "Notify contact email",
+          "t": "email",
+          "dt": "VARCHAR(120)",
+          "v": "AMANDA.ROBINSON@ALDI.CO.UK",
+          "w": 4
+        }
+      ]
+    },
+    {
+      "id": "podagent",
+      "title": "Port of discharge agent",
+      "hint": "MSC's own office at the destination. Cargo is released through them, not through PFE Express directly.",
+      "fields": [
+        {
+          "k": "podAgentName",
+          "l": "POD agent name",
+          "t": "text",
+          "dt": "VARCHAR(80)",
+          "req": 1,
+          "v": "Mediterranean Shipping Company ( U.K. ) Ltd.",
+          "max": 80,
+          "w": 6
+        },
+        {
+          "k": "podAgentDept",
+          "l": "Department / location",
+          "t": "text",
+          "dt": "VARCHAR(60)",
+          "v": "MEDITE HOUSE, THE HAVENS, Ipswich",
+          "w": 6
+        },
+        {
+          "k": "podAgentAddress",
+          "l": "POD agent address",
+          "t": "textarea",
+          "dt": "TEXT",
+          "req": 1,
+          "v": "MEDITE HOUSE\nTHE HAVENS\nIpswich",
+          "lines": 5,
+          "linelen": 60,
+          "w": 6
+        },
+        {
+          "k": "podAgentPhone",
+          "l": "Phone",
+          "t": "text",
+          "dt": "VARCHAR(20)",
+          "v": "+44 1473 277 777",
+          "w": 3
+        },
+        {
+          "k": "podAgentFax",
+          "l": "Fax",
+          "t": "text",
+          "dt": "VARCHAR(20)",
+          "v": "+44 1473 277 700",
+          "w": 3
+        },
+        {
+          "k": "podAgentEmail",
+          "l": "Email",
+          "t": "email",
+          "dt": "VARCHAR(120)",
+          "v": "mscukgeneral@mscuk.com",
+          "w": 6
+        }
+      ]
+    },
+    {
+      "id": "containers",
+      "title": "Container / Rider page",
+      "fields": [
+        {
+          "k": "containerNo",
+          "l": "Container #",
+          "dt": "CHAR(11)",
+          "req": 1,
+          "rule": "ISO 6346 check digit"
+        },
+        {
+          "k": "containerType",
+          "l": "Type/size",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "20' DRY VAN",
+            "40' DRY VAN",
+            "40' HIGH CUBE",
+            "20' REEFER",
+            "40' REEFER",
+            "20' FLAT RACK",
+            "40' FLAT RACK",
+            "20' OPEN TOP",
+            "40' OPEN TOP"
+          ]
+        },
+        {
+          "k": "sealNo",
+          "l": "Seal no",
+          "dt": "VARCHAR(20)"
+        },
+        {
+          "k": "poNumber",
+          "l": "PO #",
+          "dt": "VARCHAR(35)"
+        },
+        {
+          "k": "hsCode",
+          "l": "HS code",
+          "dt": "VARCHAR(12)"
+        },
+        {
+          "k": "descriptionOfGoods",
+          "l": "Description of goods",
+          "dt": "TEXT",
+          "req": 1
+        },
+        {
+          "k": "grossWeight",
+          "l": "Gross weight (KGS)",
+          "dt": "DECIMAL(12,3)",
+          "req": 1
+        },
+        {
+          "k": "cbm",
+          "l": "CBM",
+          "dt": "DECIMAL(10,3)"
+        }
+      ]
+    },
+    {
+      "id": "voyage",
+      "title": "Vessel & voyage",
+      "hint": "Vessel data drives the manifest. The IMO number ties back to the Lloyd's register entry.",
+      "fields": [
+        {
+          "k": "vesselVoyage",
+          "l": "Vessel name & voyage no.",
+          "t": "text",
+          "dt": "VARCHAR(50)",
+          "req": 1,
+          "v": "MSC TRIESTE - QB613W",
+          "max": 50,
+          "w": 6
+        },
+        {
+          "k": "portOfLoading",
+          "l": "Port of loading",
+          "t": "text",
+          "dt": "VARCHAR(50)",
+          "req": 1,
+          "v": "COLOMBO",
+          "max": 50,
+          "w": 3
+        },
+        {
+          "k": "portOfDischarge",
+          "l": "Port of discharge",
+          "t": "text",
+          "dt": "VARCHAR(50)",
+          "req": 1,
+          "v": "FELIXSTOWE",
+          "max": 50,
+          "w": 3
+        },
+        {
+          "k": "placeOfReceipt",
+          "l": "Place of receipt",
+          "t": "text",
+          "dt": "VARCHAR(50)",
+          "v": "",
+          "max": 50,
+          "w": 4,
+          "note": "Combined Transport only. Leave blank for Port-to-Port."
+        },
+        {
+          "k": "placeOfDelivery",
+          "l": "Place of delivery",
+          "t": "text",
+          "dt": "VARCHAR(50)",
+          "v": "",
+          "max": 50,
+          "w": 4,
+          "note": "Combined Transport only. Leave blank for Port-to-Port."
+        },
+        {
+          "k": "loadType",
+          "l": "Load type",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "FCL/FCL",
+            "FCL/LCL",
+            "LCL/LCL",
+            "LCL/FCL"
+          ],
+          "v": "FCL/FCL",
+          "w": 4
+        }
+      ]
+    },
+    {
+      "id": "refs",
+      "title": "References",
+      "hint": "The booking ref is MSC's; the shipper's ref is CLS's own job number.",
+      "fields": [
+        {
+          "k": "bookingRef",
+          "l": "Booking ref (MSC)",
+          "t": "code",
+          "dt": "VARCHAR(20)",
+          "req": 1,
+          "v": "EBKG16382178",
+          "pat": "^[A-Z]{4}\\d{8}$",
+          "patMsg": "4 letters + 8 digits (MSC booking number format).",
+          "w": 4
+        },
+        {
+          "k": "shipperRef",
+          "l": "Shipper's ref (CLS job #)",
+          "t": "code",
+          "dt": "VARCHAR(35)",
+          "v": "",
+          "w": 4
+        },
+        {
+          "k": "carrierReceipt",
+          "l": "Carrier's receipt (# of cntrs/pkgs)",
+          "t": "text",
+          "dt": "VARCHAR(20)",
+          "req": 1,
+          "v": "5 cntrs",
+          "w": 4,
+          "note": "Printed in the dedicated box on the face of the bill. Matches the container count in the rider."
+        }
+      ]
+    },
+    {
+      "id": "cargo_summary",
+      "title": "Cargo summary (face of bill)",
+      "hint": "Totals printed on the main page. Must reconcile with the rider page row-by-row totals below.",
+      "fields": [
+        {
+          "k": "totalItems",
+          "l": "Total items / packages",
+          "t": "num",
+          "dt": "INT",
+          "req": 1,
+          "v": "18000",
+          "min": 1,
+          "int": 1,
+          "w": 3
+        },
+        {
+          "k": "totalGrossWeight",
+          "l": "Total gross weight",
+          "t": "num",
+          "dt": "DECIMAL(12,3)",
+          "req": 1,
+          "v": "103680",
+          "min": 0.001,
+          "w": 3
+        },
+        {
+          "k": "weightUnit",
+          "l": "Weight unit",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "KGS",
+            "LBS",
+            "MT"
+          ],
+          "v": "KGS",
+          "w": 2
+        },
+        {
+          "k": "totalNetWeight",
+          "l": "Total net weight",
+          "t": "num",
+          "dt": "DECIMAL(12,3)",
+          "v": "86400",
+          "min": 0,
+          "w": 3,
+          "note": "TOTAL NETT WEIGHT stated on first container's description line in the sample."
+        },
+        {
+          "k": "cargoDescription",
+          "l": "Cargo clause / load statement",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "SHIPPER'S LOAD, STOW AND COUNT;FCL/FCL;SAID TO CONTAIN",
+            "SAID TO CONTAIN",
+            "CARRIER'S COUNT"
+          ],
+          "v": "SHIPPER'S LOAD, STOW AND COUNT;FCL/FCL;SAID TO CONTAIN",
+          "w": 12,
+          "note": "This clause prints in the body of the bill and limits carrier's liability under Clause 14."
+        }
+      ]
+    },
+    {
+      "id": "freight",
+      "title": "Freight & charges",
+      "hint": "On a Sea Waybill freight is almost always shown as 'AS PER AGREEMENT' — the actual amounts are in separate rate confirmations between the carrier and the forwarder.",
+      "fields": [
+        {
+          "k": "freightCharges",
+          "l": "Freight & charges",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "AS PER AGREEMENT",
+            "PREPAID",
+            "COLLECT",
+            "PAYABLE AT DESTINATION"
+          ],
+          "v": "AS PER AGREEMENT",
+          "w": 4
+        },
+        {
+          "k": "freightClause",
+          "l": "Freight clause",
+          "t": "text",
+          "dt": "VARCHAR(120)",
+          "v": "Cargo shall not be delivered unless Freight & Charges are paid (see Clause 16)",
+          "w": 8
+        },
+        {
+          "k": "declaredValue",
+          "l": "Declared value (ad valorem)",
+          "t": "text",
+          "dt": "VARCHAR(20)",
+          "v": "XXXXXXXXXXXXXXXX",
+          "w": 4,
+          "note": "Only applicable if ad valorem charges paid — see Clause 7.3. X's mean not declared."
+        }
+      ]
+    },
+    {
+      "id": "issuance",
+      "title": "Issuance & signature",
+      "hint": "The shipped-on-board date and place of issue print on the face. The signature block is the carrier's agent acting for MSC.",
+      "fields": [
+        {
+          "k": "placeOfIssue",
+          "l": "Place of issue",
+          "t": "text",
+          "dt": "VARCHAR(50)",
+          "req": 1,
+          "v": "Colombo",
+          "max": 50,
+          "w": 4
+        },
+        {
+          "k": "dateOfIssue",
+          "l": "Date of issue",
+          "t": "date",
+          "dt": "DATE",
+          "req": 1,
+          "v": "2026-09-02",
+          "w": 4
+        },
+        {
+          "k": "shippedOnBoardDate",
+          "l": "Shipped on board date",
+          "t": "date",
+          "dt": "DATE",
+          "req": 1,
+          "v": "2026-09-02",
+          "w": 4,
+          "note": "Cannot precede the date of issue. Once locked by the carrier it cannot be amended without a letter of indemnity."
+        },
+        {
+          "k": "signedOnBehalfOf",
+          "l": "Signed on behalf of carrier",
+          "t": "text",
+          "dt": "VARCHAR(120)",
+          "req": 1,
+          "v": "MSC Mediterranean Shipping Company S.A.",
+          "max": 120,
+          "w": 6
+        },
+        {
+          "k": "signingAgent",
+          "l": "Signing agent (company)",
+          "t": "text",
+          "dt": "VARCHAR(70)",
+          "req": 1,
+          "v": "MSC LANKA (PVT) LTD",
+          "max": 70,
+          "w": 4
+        },
+        {
+          "k": "agentCode",
+          "l": "Agent code",
+          "t": "code",
+          "dt": "VARCHAR(20)",
+          "req": 1,
+          "v": "PV 3102",
+          "w": 2
+        },
+        {
+          "k": "agentCapacity",
+          "l": "Agent capacity",
+          "t": "text",
+          "dt": "VARCHAR(80)",
+          "req": 1,
+          "v": "AS AGENT FOR THE CARRIER",
+          "max": 80,
+          "w": 6
+        }
+      ]
+    },
+    {
+      "id": "clauses",
+      "title": "Special clauses (printed on face)",
+      "hint": "These are the carrier's standard printed notices. They appear verbatim on the bill — record exactly what MSC uses so the generated document is faithful.",
+      "fields": [
+        {
+          "k": "thermalClause",
+          "l": "Thermal / seasonal clause",
+          "t": "textarea",
+          "dt": "TEXT",
+          "lines": 5,
+          "linelen": 80,
+          "w": 12,
+          "v": "Carrier has no liability or responsibility whatsoever for thermal loss or damage to the goods by reason of natural variations in atmospheric temperatures during the winter period, and / or caused by inadequate packing of the Goods for carriage in dry-van containers, and / or inherent vice of the Goods, in such temperatures."
+        },
+        {
+          "k": "palletsClause",
+          "l": "Pallets / equipment clause",
+          "t": "textarea",
+          "dt": "TEXT",
+          "lines": 4,
+          "linelen": 80,
+          "w": 12,
+          "v": "Containers, pallets or similar articles of transport supplied by or on behalf of the carrier shall be returned to the carrier in the same order and condition as handed over to the shipper or consignee..."
+        },
+        {
+          "k": "riderNote",
+          "l": "Rider reference note",
+          "t": "text",
+          "dt": "VARCHAR(120)",
+          "v": "Please see attached RIDER for Container / Cargo Description(s).",
+          "w": 8
+        }
+      ]
+    }
+  ],
+  "crossFieldRules": [
+    "sum(containers.grossWeight) = totalGrossWeight",
+    "totalNetWeight <= totalGrossWeight",
+    "count(active containers) = carrierReceipt integer",
+    "shippedOnBoardDate >= dateOfIssue",
+    "transportType = PORT-TO-PORT implies placeOfReceipt = blank",
+    "transportType = COMBINED TRANSPORT implies placeOfReceipt is present",
+    "portOfLoading != portOfDischarge",
+    "shipper on Master BL must be the forwarder, not the cargo owner"
+  ],
+  "keyDifferencesFromHouseBL": [
+    "Shipper = freight forwarder (not cargo owner)",
+    "Consignee = destination agent (not buyer)",
+    "Document type = Sea Waybill (non-negotiable) — no originals issued",
+    "Release at POD requires proof of identity only, no surrender of document",
+    "Freight shown as 'AS PER AGREEMENT' — no line-item charges on face",
+    "Carrier's receipt counts containers, not packages",
+    "No B/L term, no number-of-originals, no notify disclaimer fields — those live on the House BL"
+  ]
+}

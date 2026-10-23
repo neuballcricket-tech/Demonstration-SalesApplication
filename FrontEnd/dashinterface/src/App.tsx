@@ -32,7 +32,7 @@ import {
   type BackendReleaseOrderPayload, type LinerRecord,
 } from './types'
 import { RoleContext, type RoleContextValue } from './RoleContext'
-import { MOCK_INQUIRIES, MOCK_ACTIVITY } from './mockData'
+import { MOCK_INQUIRIES, MOCK_ACTIVITY, MOCK_BOOKINGS } from './mockData'
 import {
   apiCreateFollowup,
   apiCreateQuote, apiSetQuoteStatus,
@@ -276,10 +276,10 @@ export default function App() {
         ]).then(([bookingRecords, releaseOrders]) => {
           let mapped = bookingRecords.map(r => mapBackendBooking(r, cl, liners))
           for (const ro of releaseOrders) mapped = applyReleaseOrder(mapped, ro)
-          setBookings(mapped)
+          setBookings([...mapped, ...MOCK_BOOKINGS])
         }).catch(err => {
           console.warn('[loadAppData] Could not load bookings:', err)
-          setBookings([])
+          setBookings(MOCK_BOOKINGS)
         })
       })
       .catch(() => console.warn('[loadAppData] Could not load client/liner list'))
@@ -312,6 +312,7 @@ export default function App() {
   }
 
   const [currentPage, setCurrentPage] = useState<PageId>('workspace')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   // When navigating to workspace from rate-check, this tells Workspace which step to open on mount.
   // Cleared by a useEffect once workspace has mounted and captured the value.
   const [workspaceInitialStep, setWorkspaceInitialStep] = useState<string | null>(null)
@@ -785,6 +786,18 @@ export default function App() {
     setVesselSchedules(prev => [...prev, { ...vs, id }])
   }
 
+  const markBlVesselConfirmed = (bookingId: string) => {
+    setBookings(prev => prev.map(b =>
+      b.id === bookingId ? { ...b, bl_vessel_confirmed: true } : b
+    ))
+  }
+
+  const markBlBookingCreated = (bookingId: string) => {
+    setBookings(prev => prev.map(b =>
+      b.id === bookingId ? { ...b, bl_booking_created: true } : b
+    ))
+  }
+
   const markDraftBlSent = (bookingId: string, jobReferenceNumber?: string) => {
     setBookings(prev => prev.map(b =>
       b.id === bookingId ? { ...b, draft_bl_sent: true, ...(jobReferenceNumber ? { job_reference_number: jobReferenceNumber } : {}) } : b
@@ -800,6 +813,12 @@ export default function App() {
   const markPreAdviceSent = (bookingId: string) => {
     setBookings(prev => prev.map(b =>
       b.id === bookingId ? { ...b, pre_advice_sent: true } : b
+    ))
+  }
+
+  const markPreAlertSent = (bookingId: string) => {
+    setBookings(prev => prev.map(b =>
+      b.id === bookingId ? { ...b, pre_alert_sent: true } : b
     ))
   }
 
@@ -1165,9 +1184,12 @@ export default function App() {
             onMarkSiSubmitted={markSiSubmitted}
             vesselSchedules={vesselSchedules}
             onAddVesselSchedule={addVesselSchedule}
+            onMarkBlVesselConfirmed={markBlVesselConfirmed}
+            onMarkBlBookingCreated={markBlBookingCreated}
             onMarkDraftBlSent={markDraftBlSent}
             onMarkLinerBlGenerated={markLinerBlGenerated}
             onMarkPreAdviceSent={markPreAdviceSent}
+            onMarkPreAlertSent={markPreAlertSent}
             onSetBlStatus={setBlStatus}
             onRecordMasterBl={recordMasterBl}
             onCreateHouseBl={createHouseBl}
@@ -1285,25 +1307,8 @@ export default function App() {
           onNavigateProfile={() => setCurrentPage('profile')}
         />
 
-        {/* TEST BRANCH: floating role switcher — remove before merging to dev/master */}
-        <div style={{
-          position: 'fixed', bottom: 16, right: 16, zIndex: 9999,
-          background: '#1e293b', border: '1px solid #334155', borderRadius: 10,
-          padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 6,
-          boxShadow: '0 4px 16px rgba(0,0,0,0.4)', fontSize: 12,
-        }}>
-          <span style={{ color: '#94a3b8', marginRight: 4 }}>Role:</span>
-          {(['CS', 'Sales', 'Procurement', 'Finance', 'Admin'] as UserRole[]).map(r => (
-            <button key={r} onClick={() => setTestRole(r)} style={{
-              padding: '3px 9px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 600,
-              background: activeRole === r ? '#3b82f6' : '#334155',
-              color: activeRole === r ? '#fff' : '#94a3b8',
-            }}>{r}</button>
-          ))}
-        </div>
-
         <div className="db-body">
-          <Sidebar current={currentPage} onNav={navigateTo} activeRole={activeRole} />
+          <Sidebar current={currentPage} onNav={navigateTo} activeRole={activeRole} collapsed={sidebarCollapsed} onToggleCollapse={() => setSidebarCollapsed(c => !c)} />
           <main className={`db-main ${currentPage === 'workspace' ? 'db-main-flush' : ''}`}>
             {renderPage()}
           </main>

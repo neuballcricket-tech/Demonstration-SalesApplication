@@ -1,0 +1,1332 @@
+{
+  "document": "House Bill of Lading",
+  "source": "GensoftERP export manifestation screen (CL Synergy Limited)",
+  "generated": "2026-09-08",
+  "sections": [
+    {
+      "id": "bl",
+      "title": "B/L details",
+      "hint": "Identifiers. The house B/L number is system-generated; the custom number is what customs sees.",
+      "fields": [
+        {
+          "k": "branch",
+          "l": "Branch",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "COLOMBO",
+            "GALLE",
+            "HAMBANTOTA"
+          ],
+          "v": "COLOMBO",
+          "w": 3
+        },
+        {
+          "k": "bookingNo",
+          "l": "Booking no.",
+          "t": "code",
+          "dt": "VARCHAR(20)",
+          "req": 1,
+          "v": "NGP2609-0014",
+          "pat": "^[A-Z0-9\\-\\/]{4,20}$",
+          "patMsg": "Letters, digits, hyphen or slash.",
+          "w": 3
+        },
+        {
+          "k": "shipmentCategory",
+          "l": "Shipment category",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "LOCAL EXPORT",
+            "RE-EXPORT",
+            "TRANSHIPMENT",
+            "CROSS TRADE"
+          ],
+          "v": "LOCAL EXPORT",
+          "w": 3
+        },
+        {
+          "k": "blType",
+          "l": "B/L type",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "OWN",
+            "CO-LOAD",
+            "MASTER ONLY"
+          ],
+          "v": "OWN",
+          "w": 3
+        },
+        {
+          "k": "houseBlNo",
+          "l": "Sub job / house B/L #",
+          "t": "code",
+          "dt": "VARCHAR(30)",
+          "req": 1,
+          "v": "CLSSENGP26090033-01",
+          "ro": 1,
+          "w": 4,
+          "note": "System-generated. Unique across the branch."
+        },
+        {
+          "k": "customBlNo",
+          "l": "Custom B/L #",
+          "t": "code",
+          "dt": "VARCHAR(30)",
+          "v": "CLSSENGP26090033-01",
+          "w": 4
+        },
+        {
+          "k": "sttNo",
+          "l": "STT #",
+          "t": "code",
+          "dt": "VARCHAR(20)",
+          "v": "",
+          "w": 2,
+          "note": "Transhipment only."
+        },
+        {
+          "k": "hsCode",
+          "l": "HS code",
+          "t": "code",
+          "dt": "VARCHAR(12)",
+          "v": "",
+          "pat": "^\\d{4}(\\.?\\d{2}){1,3}$",
+          "patMsg": "6–10 digits, optional dots. e.g. 2009.89 or 2009.89.90",
+          "w": 2
+        },
+        {
+          "k": "deliveryNo",
+          "l": "Delivery no.",
+          "t": "code",
+          "dt": "VARCHAR(20)",
+          "v": "",
+          "w": 3
+        }
+      ]
+    },
+    {
+      "id": "parties",
+      "title": "Parties",
+      "hint": "Shipper, consignee and notify print on the face of the bill. The rest drive billing and internal routing.",
+      "fields": [
+        {
+          "k": "shipperName",
+          "l": "Shipper name",
+          "t": "text",
+          "dt": "VARCHAR(70)",
+          "req": 1,
+          "v": "NDC EXPORTS (PVT) LTD",
+          "max": 70,
+          "w": 6
+        },
+        {
+          "k": "shipperRef",
+          "l": "Shipper reference (PO#)",
+          "t": "text",
+          "dt": "VARCHAR(35)",
+          "v": "",
+          "max": 35,
+          "w": 3
+        },
+        {
+          "k": "emailRef",
+          "l": "Email reference",
+          "t": "email",
+          "dt": "VARCHAR(120)",
+          "v": "",
+          "w": 3
+        },
+        {
+          "k": "shipperAddress",
+          "l": "Shipper address",
+          "t": "textarea",
+          "dt": "TEXT · max 5 lines × 45",
+          "req": 1,
+          "v": "NADALAGAMUWA WADUMUNNEGEDARA,\nSRI LANKA",
+          "lines": 5,
+          "linelen": 45,
+          "w": 6
+        },
+        {
+          "k": "shipperFlags",
+          "l": "Print on shipper block",
+          "t": "checkgroup",
+          "dt": "BOOLEAN ×3",
+          "w": 6,
+          "boxes": [
+            [
+              "shipperTel",
+              "Telephone",
+              0
+            ],
+            [
+              "shipperFax",
+              "Fax",
+              0
+            ],
+            [
+              "shipperOnInvoice",
+              "Show reference on shipper invoice",
+              0
+            ]
+          ]
+        },
+        {
+          "k": "consignedTo",
+          "l": "Consigned",
+          "t": "select",
+          "dt": "ENUM",
+          "v": "",
+          "opts": [
+            "",
+            "TO ORDER",
+            "TO ORDER OF SHIPPER",
+            "TO ORDER OF BANK",
+            "STRAIGHT / NAMED"
+          ],
+          "w": 3,
+          "note": "Blank means a named consignee. Anything to order makes the bill negotiable."
+        },
+        {
+          "k": "consigneeName",
+          "l": "Consignee name",
+          "t": "text",
+          "dt": "VARCHAR(70)",
+          "req": 1,
+          "v": "EIE IMPORT GMBH",
+          "max": 70,
+          "w": 5
+        },
+        {
+          "k": "notifyType",
+          "l": "Notify type",
+          "t": "select",
+          "dt": "ENUM",
+          "v": "",
+          "opts": [
+            "",
+            "SAME AS CONSIGNEE",
+            "THIRD PARTY",
+            "AGENT"
+          ],
+          "w": 4
+        },
+        {
+          "k": "consigneeAddress",
+          "l": "Consignee address",
+          "t": "textarea",
+          "dt": "TEXT · max 5 lines × 45",
+          "req": 1,
+          "v": "HOFER STRASSE 5,\n4642 SATTLEDT, AUSTRIA",
+          "lines": 5,
+          "linelen": 45,
+          "w": 6
+        },
+        {
+          "k": "notifyName",
+          "l": "Notify name",
+          "t": "text",
+          "dt": "VARCHAR(70)",
+          "req": 1,
+          "v": "ALDI SUED DIENSTLEISTUNGS-GMBH AND CO. OHG,",
+          "max": 70,
+          "w": 6
+        },
+        {
+          "k": "notifyAddress",
+          "l": "Notify address",
+          "t": "textarea",
+          "dt": "TEXT · max 5 lines × 45",
+          "req": 1,
+          "v": "ALDI SUED DIENSTLEISTUNGS-GMBH AND CO. OHG,\nAND SCHENKER DEUTSCHLAND AG\nHEIDENKAMPSWEG 79, 20097 HAMBURG, GERMANY *",
+          "lines": 5,
+          "linelen": 45,
+          "w": 6
+        },
+        {
+          "k": "alsoNotify",
+          "l": "Also notify",
+          "t": "textarea",
+          "dt": "TEXT",
+          "v": "",
+          "lines": 5,
+          "linelen": 45,
+          "w": 6
+        },
+        {
+          "k": "customerCategory",
+          "l": "Customer category",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "DIRECT",
+            "AGENT",
+            "NOMINATION",
+            "CO-LOADER"
+          ],
+          "v": "DIRECT",
+          "w": 3
+        },
+        {
+          "k": "businessType",
+          "l": "Business type",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "AGENT NOMINATION",
+            "FREE HAND",
+            "CONTROLLED",
+            "TRIANGLE"
+          ],
+          "v": "AGENT NOMINATION",
+          "w": 3
+        },
+        {
+          "k": "customerShipper",
+          "l": "Customer / shipper",
+          "t": "text",
+          "dt": "FK → customer",
+          "req": 1,
+          "v": "PFE EXPRESS LTD",
+          "w": 3
+        },
+        {
+          "k": "billingParty",
+          "l": "Billing party",
+          "t": "text",
+          "dt": "FK → customer",
+          "req": 1,
+          "v": "PFE EXPRESS LTD",
+          "w": 3
+        },
+        {
+          "k": "salesPerson",
+          "l": "Sales person",
+          "t": "select",
+          "dt": "FK → employee",
+          "req": 1,
+          "opts": [
+            "",
+            "THULANI ABEYRATHNE",
+            "DILUSHIKA ANTHONY"
+          ],
+          "v": "THULANI ABEYRATHNE",
+          "w": 3
+        },
+        {
+          "k": "csExecutive",
+          "l": "CS executive",
+          "t": "select",
+          "dt": "FK → employee",
+          "req": 1,
+          "opts": [
+            "",
+            "THULANI ABEYRATHNE",
+            "DILUSHIKA ANTHONY"
+          ],
+          "v": "DILUSHIKA ANTHONY",
+          "w": 3
+        },
+        {
+          "k": "documentationBy",
+          "l": "Documentation by",
+          "t": "select",
+          "dt": "FK → employee",
+          "req": 1,
+          "opts": [
+            "",
+            "THULANI ABEYRATHNE",
+            "DILUSHIKA ANTHONY"
+          ],
+          "v": "DILUSHIKA ANTHONY",
+          "w": 3
+        },
+        {
+          "k": "introducedBy",
+          "l": "Introduced by",
+          "t": "select",
+          "dt": "FK → employee",
+          "opts": [
+            "",
+            "THULANI ABEYRATHNE",
+            "DILUSHIKA ANTHONY"
+          ],
+          "v": "",
+          "w": 3
+        },
+        {
+          "k": "nominatedAgent",
+          "l": "Nominated agent",
+          "t": "text",
+          "dt": "FK → agent",
+          "req": 1,
+          "v": "PFE EXPRESS LTD",
+          "w": 6,
+          "note": "Mandatory when business type is agent nomination."
+        }
+      ]
+    },
+    {
+      "id": "cargo",
+      "title": "Cargo summary",
+      "hint": "Printed totals. The container rows below have to add up to these numbers.",
+      "fields": [
+        {
+          "k": "cargoType",
+          "l": "Cargo type",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "GENERAL",
+            "REEFER",
+            "HAZARDOUS",
+            "OUT OF GAUGE"
+          ],
+          "v": "GENERAL",
+          "w": 3
+        },
+        {
+          "k": "commodity",
+          "l": "Commodity",
+          "t": "text",
+          "dt": "VARCHAR(60)",
+          "v": "",
+          "w": 5
+        },
+        {
+          "k": "noOfContainersOnBl",
+          "l": "No. of containers on B/L",
+          "t": "num",
+          "dt": "INT",
+          "req": 1,
+          "v": "6",
+          "min": 1,
+          "max": 999,
+          "int": 1,
+          "w": 2
+        },
+        {
+          "k": "cntrFlags",
+          "l": "Container print options",
+          "t": "checkgroup",
+          "dt": "BOOLEAN ×2",
+          "w": 12,
+          "boxes": [
+            [
+              "showCntrOnBl",
+              "Show containers on B/L",
+              1
+            ],
+            [
+              "showCntrOnAttachment",
+              "Show containers on attachment",
+              0
+            ]
+          ]
+        },
+        {
+          "k": "totalPackages",
+          "l": "No. of packages in figures",
+          "t": "num",
+          "dt": "DECIMAL(12,2)",
+          "req": 1,
+          "v": "21600",
+          "min": 1,
+          "w": 3
+        },
+        {
+          "k": "packageType",
+          "l": "Package type",
+          "t": "text",
+          "dt": "VARCHAR(20)",
+          "req": 1,
+          "v": "TRAYS",
+          "max": 20,
+          "w": 3
+        },
+        {
+          "k": "printDetails",
+          "l": "Print details",
+          "t": "select",
+          "dt": "ENUM",
+          "opts": [
+            "PACKAGE DETAILS",
+            "CONTAINER DETAILS",
+            "BOTH",
+            "NONE"
+          ],
+          "v": "PACKAGE DETAILS",
+          "w": 3
+        },
+        {
+          "k": "grossWeight",
+          "l": "Gross weight",
+          "t": "num",
+          "dt": "DECIMAL(12,3)",
+          "req": 1,
+          "v": "125280",
+          "min": 0.001,
+          "w": 3
+        },
+        {
+          "k": "weightUom",
+          "l": "Weight unit",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "KG",
+            "LBS",
+            "MT"
+          ],
+          "v": "KG",
+          "w": 2
+        },
+        {
+          "k": "grossDecimals",
+          "l": "Gross weight decimals",
+          "t": "select",
+          "dt": "TINYINT",
+          "opts": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "v": "2",
+          "w": 2
+        },
+        {
+          "k": "netWeight",
+          "l": "Net weight",
+          "t": "num",
+          "dt": "DECIMAL(12,3)",
+          "v": "103680",
+          "min": 0,
+          "w": 3
+        },
+        {
+          "k": "netPrintWith",
+          "l": "Print net weight with",
+          "t": "select",
+          "dt": "ENUM",
+          "opts": [
+            "BOTH",
+            "GROSS ONLY",
+            "NET ONLY",
+            "NONE"
+          ],
+          "v": "BOTH",
+          "w": 2
+        },
+        {
+          "k": "cbm",
+          "l": "CBM (volume)",
+          "t": "num",
+          "dt": "DECIMAL(10,3)",
+          "req": 1,
+          "v": "150",
+          "min": 0.001,
+          "w": 2
+        },
+        {
+          "k": "cbmDecimals",
+          "l": "CBM decimals",
+          "t": "select",
+          "dt": "TINYINT",
+          "opts": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
+          "v": "2",
+          "w": 2
+        },
+        {
+          "k": "wmRatio",
+          "l": "Weight / measurement ratio",
+          "t": "num",
+          "dt": "INT",
+          "v": "1000",
+          "min": 1,
+          "w": 3,
+          "note": "kg per CBM. 1000 is the standard ocean ratio."
+        },
+        {
+          "k": "marksNumbers",
+          "l": "Marks &amp; numbers",
+          "t": "textarea",
+          "dt": "TEXT · max 12 lines × 17",
+          "req": 1,
+          "v": "CONTAINER AND SEAL\nDETAILS AS PER\nATTACHED SHEET",
+          "lines": 12,
+          "linelen": 17,
+          "w": 6,
+          "note": "Narrow column on the printed bill. Long lines get truncated, not wrapped."
+        }
+      ]
+    },
+    {
+      "id": "containers",
+      "title": "Containers",
+      "fields": [
+        {
+          "k": "containerNo",
+          "l": "Container #",
+          "dt": "CHAR(11)",
+          "req": 1,
+          "rule": "ISO 6346 with check digit"
+        },
+        {
+          "k": "size",
+          "l": "Size",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "20",
+            "40",
+            "45"
+          ]
+        },
+        {
+          "k": "type",
+          "l": "Type",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "GP",
+            "HC",
+            "RF",
+            "OT",
+            "FR",
+            "TK"
+          ]
+        },
+        {
+          "k": "shipmentType",
+          "l": "Shipment type",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "FCL/FCL",
+            "FCL/LCL",
+            "LCL/LCL",
+            "LCL/FCL"
+          ]
+        },
+        {
+          "k": "sealNo",
+          "l": "Seal no",
+          "dt": "VARCHAR(20)",
+          "req": 1
+        },
+        {
+          "k": "packages",
+          "l": "Packages",
+          "dt": "DECIMAL(12,2)",
+          "req": 1
+        },
+        {
+          "k": "packageType",
+          "l": "Package type",
+          "dt": "VARCHAR(20)",
+          "req": 1
+        },
+        {
+          "k": "grossWeight",
+          "l": "Gross weight",
+          "dt": "DECIMAL(12,3)",
+          "req": 1
+        },
+        {
+          "k": "cbm",
+          "l": "CBM",
+          "dt": "DECIMAL(10,3)",
+          "req": 1
+        }
+      ]
+    },
+    {
+      "id": "goods",
+      "title": "Goods description",
+      "hint": "Free text that prints in the body of the bill. Nothing here is validated by the carrier — get it wrong and the bill gets amended at a fee.",
+      "fields": [
+        {
+          "k": "descriptionOfGoods",
+          "l": "Description of goods",
+          "t": "textarea",
+          "dt": "TEXT · max 30 lines × 60",
+          "req": 1,
+          "lines": 30,
+          "linelen": 60,
+          "w": 6,
+          "v": "06X20GP CONTAINERS FCL/FCL\n21600 TRAYS SAID TO CONTAIN;\n\nCONVENTIONAL COCONUT MILK - 05% - 07%\n400ML          X       86400 CANS\n04 CANS PER TRAY X      21600 TRAYS\nCONVENTIONAL COCONUT MILK - 14% - 16%\n400ML          X      172800 CANS\n08 CANS PER TRAY X      21600 TRAYS"
+        },
+        {
+          "k": "linerBlDescription",
+          "l": "Liner B/L description",
+          "t": "textarea",
+          "dt": "TEXT · max 30 lines × 60",
+          "req": 1,
+          "lines": 30,
+          "linelen": 60,
+          "w": 6,
+          "v": "06X20GP CONTAINERS FCL/FCL\n21600 TRAYS SAID TO CONTAIN\nCONVENTIONAL COCONUT MILK - 05% - 07%\n400ML X 86400 CANS\n04 CANS PER TRAY X 21600 TRAYS\nCONVENTIONAL COCONUT MILK - 14% - 16%\n400ML X 172800 CANS\n08 CANS PER TRAY X 21600 TRAYS",
+          "note": "What goes to the carrier for the master bill. Usually a flattened copy of the house description."
+        },
+        {
+          "k": "descriptionPrefix",
+          "l": "Description prefix (bottom)",
+          "t": "text",
+          "dt": "VARCHAR(120)",
+          "v": "",
+          "w": 6
+        },
+        {
+          "k": "printToBlText",
+          "l": "Clause printed to B/L",
+          "t": "text",
+          "dt": "VARCHAR(60)",
+          "v": "SHIPPER'S LOAD COUNT & SEAL",
+          "w": 4
+        },
+        {
+          "k": "goodsFlags",
+          "l": "",
+          "t": "checkgroup",
+          "dt": "BOOLEAN",
+          "w": 2,
+          "boxes": [
+            [
+              "printToBl",
+              "Print clause to B/L",
+              0
+            ]
+          ]
+        },
+        {
+          "k": "attachSheet",
+          "l": "Attach sheet",
+          "t": "select",
+          "dt": "ENUM",
+          "opts": [
+            "NO",
+            "YES"
+          ],
+          "v": "NO",
+          "w": 2
+        },
+        {
+          "k": "sapDescription",
+          "l": "SAP description",
+          "t": "textarea",
+          "dt": "TEXT",
+          "v": "",
+          "lines": 5,
+          "linelen": 60,
+          "w": 6
+        }
+      ]
+    },
+    {
+      "id": "routing",
+      "title": "Routing and delivery",
+      "hint": "Places print on the bill; the five-letter codes drive EDI and the manifest.",
+      "fields": [
+        {
+          "k": "deliveryType",
+          "l": "Delivery type",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "CY/CY",
+            "CY/CFS",
+            "CFS/CY",
+            "CFS/CFS",
+            "DOOR/DOOR"
+          ],
+          "v": "CY/CY",
+          "w": 3
+        },
+        {
+          "k": "incoterm",
+          "l": "Incoterm",
+          "t": "select",
+          "dt": "ENUM",
+          "opts": [
+            "",
+            "EXW",
+            "FCA",
+            "FAS",
+            "FOB",
+            "CFR",
+            "CIF",
+            "CPT",
+            "CIP",
+            "DAP",
+            "DPU",
+            "DDP"
+          ],
+          "v": "",
+          "w": 3,
+          "note": "Blank on the sample. Required if the freight term has to be justified to customs."
+        },
+        {
+          "k": "countryOfOrigin",
+          "l": "Country of origin",
+          "t": "text",
+          "dt": "VARCHAR(40)",
+          "req": 1,
+          "v": "SRI LANKA",
+          "w": 3
+        },
+        {
+          "k": "transitTime",
+          "l": "Transit time (days)",
+          "t": "num",
+          "dt": "INT",
+          "v": "27",
+          "min": 1,
+          "max": 120,
+          "int": 1,
+          "w": 3
+        },
+        {
+          "k": "placeOfReceipt",
+          "l": "Place of receipt",
+          "t": "text",
+          "dt": "VARCHAR(50)",
+          "req": 1,
+          "v": "COLOMBO,SRI LANKA",
+          "w": 6
+        },
+        {
+          "k": "portOfLoading",
+          "l": "Port of loading",
+          "t": "text",
+          "dt": "VARCHAR(50)",
+          "req": 1,
+          "v": "COLOMBO,SRI LANKA",
+          "w": 4
+        },
+        {
+          "k": "polCode",
+          "l": "POL code",
+          "t": "code",
+          "dt": "CHAR(5) UN/LOCODE",
+          "req": 1,
+          "v": "LKCMB",
+          "pat": "^[A-Z]{2}[A-Z0-9]{3}$",
+          "patMsg": "Five characters: two-letter country + three-character location.",
+          "w": 2
+        },
+        {
+          "k": "portOfDischarge",
+          "l": "Port of discharge",
+          "t": "text",
+          "dt": "VARCHAR(50)",
+          "req": 1,
+          "v": "LONDON GATEWAY, UNITED KINGDOM",
+          "w": 4
+        },
+        {
+          "k": "podCode",
+          "l": "POD code",
+          "t": "code",
+          "dt": "CHAR(5) UN/LOCODE",
+          "req": 1,
+          "v": "LONGP",
+          "pat": "^[A-Z]{2}[A-Z0-9]{3}$",
+          "patMsg": "Five characters: two-letter country + three-character location.",
+          "w": 2
+        },
+        {
+          "k": "podEta",
+          "l": "POD ETA",
+          "t": "date",
+          "dt": "DATE",
+          "req": 1,
+          "v": "2026-09-29",
+          "w": 3
+        },
+        {
+          "k": "podAta",
+          "l": "POD ATA",
+          "t": "date",
+          "dt": "DATE",
+          "v": "",
+          "w": 3,
+          "note": "Filled after arrival."
+        },
+        {
+          "k": "finalDestination",
+          "l": "Final destination",
+          "t": "text",
+          "dt": "VARCHAR(50)",
+          "req": 1,
+          "v": "LONDON GATEWAY, UNITED KINGDOM",
+          "w": 4
+        },
+        {
+          "k": "fdCode",
+          "l": "Code",
+          "t": "code",
+          "dt": "CHAR(5)",
+          "v": "LONGP",
+          "pat": "^([A-Z]{2}[A-Z0-9]{3})?$",
+          "patMsg": "Five characters or blank.",
+          "w": 2
+        },
+        {
+          "k": "fdEta",
+          "l": "Final destination ETA",
+          "t": "date",
+          "dt": "DATE",
+          "v": "2026-09-29",
+          "w": 3
+        },
+        {
+          "k": "placeOfDelivery",
+          "l": "Place of delivery",
+          "t": "text",
+          "dt": "VARCHAR(50)",
+          "req": 1,
+          "v": "LONDON GATEWAY, UNITED KINGDOM",
+          "w": 4
+        },
+        {
+          "k": "podelCode",
+          "l": "Code",
+          "t": "code",
+          "dt": "CHAR(5)",
+          "v": "LONGP",
+          "pat": "^([A-Z]{2}[A-Z0-9]{3})?$",
+          "patMsg": "Five characters or blank.",
+          "w": 2
+        },
+        {
+          "k": "podelEta",
+          "l": "Place of delivery ETA",
+          "t": "date",
+          "dt": "DATE",
+          "v": "2026-09-29",
+          "w": 3
+        }
+      ]
+    },
+    {
+      "id": "issue",
+      "title": "Issuance",
+      "hint": "Dates and negotiability. These decide whether the cargo can be released at the far end.",
+      "fields": [
+        {
+          "k": "placeOfBlIssued",
+          "l": "Place of B/L issued",
+          "t": "text",
+          "dt": "VARCHAR(50)",
+          "req": 1,
+          "v": "COLOMBO,SRI LANKA",
+          "w": 4
+        },
+        {
+          "k": "dateOfBlIssued",
+          "l": "Date of B/L issued",
+          "t": "date",
+          "dt": "DATE",
+          "req": 1,
+          "v": "2026-09-02",
+          "w": 4
+        },
+        {
+          "k": "shippedOnBoardDate",
+          "l": "Shipped on board date",
+          "t": "date",
+          "dt": "DATE",
+          "req": 1,
+          "v": "2026-09-02",
+          "w": 4,
+          "note": "Locked once the vessel sails. Cannot precede the FCL cut-off."
+        },
+        {
+          "k": "receivedForShipment",
+          "l": "Received for shipment",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "NO",
+            "YES"
+          ],
+          "v": "NO",
+          "w": 3,
+          "note": "YES prints a received-for-shipment bill and suppresses the on-board notation."
+        },
+        {
+          "k": "blTerm",
+          "l": "B/L term",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "NON-NEGO",
+            "NEGOTIABLE",
+            "SEAWAY",
+            "EXPRESS"
+          ],
+          "v": "NON-NEGO",
+          "w": 3
+        },
+        {
+          "k": "noOfOriginalBls",
+          "l": "No. of original B/Ls",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "ZERO (0)",
+            "ONE (1)",
+            "TWO (2)",
+            "THREE (3)"
+          ],
+          "v": "ZERO (0)",
+          "w": 3
+        },
+        {
+          "k": "permitNo",
+          "l": "Permit no.",
+          "t": "code",
+          "dt": "VARCHAR(25)",
+          "v": "",
+          "w": 3
+        },
+        {
+          "k": "blStatus",
+          "l": "B/L status",
+          "t": "checkgroup",
+          "dt": "BOOLEAN ×3",
+          "w": 6,
+          "boxes": [
+            [
+              "surrendered",
+              "Surrendered",
+              0
+            ],
+            [
+              "holdCargo",
+              "Hold cargo",
+              0
+            ],
+            [
+              "emailSurrenderLetter",
+              "Email surrender letter",
+              0
+            ]
+          ]
+        },
+        {
+          "k": "remarks",
+          "l": "Remarks",
+          "t": "textarea",
+          "dt": "TEXT",
+          "v": "",
+          "lines": 5,
+          "linelen": 60,
+          "w": 6
+        }
+      ]
+    },
+    {
+      "id": "freight",
+      "title": "Freight and charges terms",
+      "hint": "Prepaid or collect, and where the money is collected.",
+      "fields": [
+        {
+          "k": "freightTerm",
+          "l": "Freight term",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "PREPAID",
+            "COLLECT",
+            "PAYABLE AS ARRANGED"
+          ],
+          "v": "COLLECT",
+          "w": 3
+        },
+        {
+          "k": "freightTermText",
+          "l": "Freight term text",
+          "t": "text",
+          "dt": "VARCHAR(60)",
+          "v": "",
+          "w": 3
+        },
+        {
+          "k": "freightAmount",
+          "l": "Freight amount",
+          "t": "num",
+          "dt": "DECIMAL(14,2)",
+          "v": "",
+          "min": 0,
+          "w": 3
+        },
+        {
+          "k": "freightPayableAt",
+          "l": "Freight payable at",
+          "t": "textarea",
+          "dt": "VARCHAR(120)",
+          "v": "",
+          "lines": 3,
+          "linelen": 60,
+          "w": 3,
+          "note": "Required when the freight term is collect — the destination office needs somewhere to invoice."
+        },
+        {
+          "k": "freightTermDetails",
+          "l": "Freight term details",
+          "t": "textarea",
+          "dt": "TEXT",
+          "v": "",
+          "lines": 4,
+          "linelen": 60,
+          "w": 4
+        },
+        {
+          "k": "originCharges",
+          "l": "Origin charges",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "PREPAID",
+            "COLLECT"
+          ],
+          "v": "PREPAID",
+          "w": 4
+        },
+        {
+          "k": "destinationCharges",
+          "l": "Destination charges",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "PREPAID",
+            "COLLECT"
+          ],
+          "v": "COLLECT",
+          "w": 4
+        }
+      ]
+    },
+    {
+      "id": "agents",
+      "title": "Destination agent and carrier",
+      "fields": [
+        {
+          "k": "podAgent",
+          "l": "POD agent",
+          "t": "text",
+          "dt": "FK → agent",
+          "req": 1,
+          "v": "PFE EXPRESS LTD",
+          "w": 6
+        },
+        {
+          "k": "contactPerson",
+          "l": "Contact person",
+          "t": "select",
+          "dt": "FK → contact",
+          "opts": [
+            "",
+            "SELECT CONTACT PERSON"
+          ],
+          "v": "",
+          "w": 6
+        },
+        {
+          "k": "podAgentAddress",
+          "l": "POD agent address",
+          "t": "textarea",
+          "dt": "TEXT",
+          "req": 1,
+          "lines": 6,
+          "linelen": 60,
+          "w": 6,
+          "v": "UNIT 1, ALBERT WAY, EASTWAYS, WITHAM,\nESSEX, CM8 3ZR, UNITED KINGDOM.\nT +44 (0)1376 533000 F +44 (0)1376533001"
+        },
+        {
+          "k": "agentForCarrier",
+          "l": "Agent for carrier",
+          "t": "text",
+          "dt": "VARCHAR(70)",
+          "req": 1,
+          "v": "MAERSK LANKA (PRIVATE) LIMITED",
+          "w": 6
+        },
+        {
+          "k": "detentionDays",
+          "l": "Detention / demurrage clause",
+          "t": "text",
+          "dt": "VARCHAR(120)",
+          "v": "14 DAYS FREE DETENTION & DEMURRAGE AT DESTINATION",
+          "w": 8
+        },
+        {
+          "k": "blFormat",
+          "l": "B/L format",
+          "t": "select",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "CLS_FMC",
+            "CLS_STD",
+            "CLS_NEUTRAL"
+          ],
+          "v": "CLS_FMC",
+          "w": 4
+        },
+        {
+          "k": "printFlags",
+          "l": "Print options",
+          "t": "checkgroup",
+          "dt": "BOOLEAN ×5",
+          "w": 12,
+          "boxes": [
+            [
+              "printAgentForCarrier",
+              "Print agent for carrier",
+              0
+            ],
+            [
+              "displayOnCarrierDraft",
+              "Display on carrier draft",
+              0
+            ],
+            [
+              "displayTariffCharges",
+              "Display tariff charges",
+              0
+            ],
+            [
+              "displayAdditionalText",
+              "Display additional text",
+              0
+            ],
+            [
+              "draftConfirmed",
+              "Draft confirmed",
+              0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "manifestCharges",
+      "title": "Manifest charges",
+      "fields": [
+        {
+          "k": "description",
+          "l": "Description",
+          "dt": "VARCHAR(60)",
+          "req": 1
+        },
+        {
+          "k": "rateType",
+          "l": "Rate type",
+          "dt": "ENUM",
+          "req": 1,
+          "opts": [
+            "BL",
+            "CNTR",
+            "TON",
+            "CBM",
+            "W/M",
+            "PKG",
+            "LUMPSUM"
+          ]
+        },
+        {
+          "k": "quantity",
+          "l": "Quantity",
+          "dt": "DECIMAL(10,2)",
+          "req": 1
+        },
+        {
+          "k": "currency",
+          "l": "Currency",
+          "dt": "CHAR(3) ISO 4217",
+          "req": 1
+        },
+        {
+          "k": "exchangeRate",
+          "l": "Exchange rate",
+          "dt": "DECIMAL(12,4)",
+          "req": 1
+        },
+        {
+          "k": "prepaidRate",
+          "l": "Prepaid rate",
+          "dt": "DECIMAL(14,2)"
+        },
+        {
+          "k": "prepaidTotal",
+          "l": "Prepaid total",
+          "dt": "DECIMAL(14,2)",
+          "rule": "quantity × prepaidRate"
+        },
+        {
+          "k": "collectRate",
+          "l": "Collect rate",
+          "dt": "DECIMAL(14,2)"
+        },
+        {
+          "k": "collectTotal",
+          "l": "Collect total",
+          "dt": "DECIMAL(14,2)",
+          "rule": "quantity × collectRate"
+        }
+      ]
+    }
+  ],
+  "crossFieldRules": [
+    "count(containers where included) = noOfContainersOnBl",
+    "sum(containers.packages) = totalPackages",
+    "sum(containers.grossWeight) = grossWeight",
+    "sum(containers.cbm) = cbm",
+    "netWeight <= grossWeight",
+    "blTerm = NEGOTIABLE implies noOfOriginalBls >= 1",
+    "surrendered = true implies noOfOriginalBls = 0",
+    "dateOfBlIssued >= shippedOnBoardDate",
+    "podEta > shippedOnBoardDate",
+    "abs(podEta - shippedOnBoardDate) ~= transitTime",
+    "receivedForShipment = NO implies shippedOnBoardDate is present",
+    "polCode != podCode",
+    "freightTerm = COLLECT implies freightPayableAt is present",
+    "charge line: prepaidRate and collectRate are mutually exclusive",
+    "charge currency != base implies exchangeRate > 0",
+    "draftConfirmed = true implies zero errors"
+  ],
+  "knownGaps": [
+    "No VGM value, weighing method or authorised party — mandatory under SOLAS VI/2 before loading.",
+    "No dangerous goods block (UN number, IMO class, packing group, flashpoint, EmS, 24h emergency contact).",
+    "No reefer block (set temperature, ventilation, humidity).",
+    "No out-of-gauge dimensions.",
+    "No shipper or consignee tax identifier (EORI, VAT, TIN) — required for EU and UK entry.",
+    "No declared value / ad valorem field.",
+    "HS code is a single header field; multi-commodity shipments need it per cargo line."
+  ]
+}

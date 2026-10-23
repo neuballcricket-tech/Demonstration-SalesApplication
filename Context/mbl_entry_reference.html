@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Master B/L (Sea Waybill) — field reference &amp; validation</title>
+<style>
+  :root{
+    --ink:#0e1520;
+    --ink-2:#3a4558;
+    --ink-3:#6a7a92;
+    --line:#cdd5e0;
+    --line-2:#e4eaf1;
+    --paper:#f2f5f9;
+    --card:#ffffff;
+    --navy:#0d2b52;
+    --navy-2:#1a4480;
+    --navy-3:#2a5fa8;
+    --amber:#a05c00;
+    --amber-bg:#fff4e0;
+    --red:#991b1b;
+    --red-bg:#fef2f2;
+    --green:#14532d;
+    --green-bg:#f0fdf4;
+    --focus:#1a4480;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font:13.5px/1.5 "Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono,code,input[data-mono]{font-family:ui-monospace,"Cascadia Code","Fira Code",monospace;letter-spacing:.01em}
+
+  /* ── top bar ── */
+  .topbar{
+    background:var(--navy);color:#fff;
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+    padding:11px 22px;position:sticky;top:0;z-index:50;
+    border-bottom:3px solid var(--navy-3);
+  }
+  .topbar .brand{display:flex;align-items:center;gap:10px}
+  .topbar .brand .carrier{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#8fafd4;font-weight:600}
+  .topbar h1{font-size:15px;font-weight:700;margin:0;color:#fff}
+  .topbar .tag{
+    font-size:10.5px;padding:2px 8px;border-radius:2px;font-weight:700;letter-spacing:.04em;
+    background:#e8b83b;color:#1a0e00;
+  }
+  .topbar .spacer{flex:1}
+  .topbar button{
+    background:transparent;border:1px solid #4d7ab5;color:#c5d9f0;
+    padding:5px 12px;border-radius:3px;font-size:12px;cursor:pointer;font-family:inherit;
+  }
+  .topbar button:hover{background:#1a4480}
+  .topbar button.primary{background:#e8b83b;border-color:#e8b83b;color:#1a0e00;font-weight:700}
+
+  .wrap{max-width:1160px;margin:0 auto;padding:20px 20px 130px}
+
+  /* ── doc comparison banner ── */
+  .compare{
+    display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:22px;
+  }
+  .compare .side{
+    padding:14px 18px;border:1px solid var(--line);background:var(--card);
+    border-top:3px solid;
+  }
+  .compare .side.mbl{border-top-color:var(--navy-3)}
+  .compare .side.hbl{border-top-color:#6b8f5e}
+  .compare h3{margin:0 0 10px;font-size:12.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+  .compare .mbl h3{color:var(--navy-3)}
+  .compare .hbl h3{color:#6b8f5e}
+  .compare .row{display:flex;gap:8px;font-size:12px;padding:3px 0;border-bottom:1px dotted var(--line-2)}
+  .compare .row:last-child{border-bottom:none}
+  .compare .lbl{width:40%;color:var(--ink-3)}
+  .compare .val{flex:1;font-weight:500}
+
+  /* ── sections ── */
+  section{background:var(--card);border:1px solid var(--line);margin-bottom:16px}
+  .sec-head{
+    display:flex;align-items:center;gap:12px;
+    padding:9px 16px;background:#edf1f7;border-bottom:1px solid var(--line);
+  }
+  .sec-head h2{margin:0;font-size:13px;font-weight:700;letter-spacing:.03em;color:var(--navy)}
+  .sec-head .hint{font-size:12px;color:var(--ink-3)}
+  .sec-head .count{margin-left:auto;font-size:11px;color:var(--ink-3)}
+  .sec-body{padding:14px 16px}
+
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:10px 14px}
+  .f{grid-column:span 4}
+  .f.w2{grid-column:span 2}
+  .f.w3{grid-column:span 3}
+  .f.w6{grid-column:span 6}
+  .f.w8{grid-column:span 8}
+  .f.w12{grid-column:span 12}
+
+  label.lbl{display:block;font-size:11.5px;color:var(--ink-2);margin-bottom:3px;font-weight:600}
+  label.lbl .req{color:var(--red);margin-left:2px}
+  .dt{
+    display:inline-block;font-size:10px;padding:0 4px;margin-left:5px;
+    background:#edf1f7;border:1px solid var(--line-2);border-radius:2px;
+    color:var(--ink-3);vertical-align:1px;white-space:nowrap;font-family:ui-monospace,monospace;
+  }
+  body.specoff .dt{display:none}
+
+  input,select,textarea{
+    width:100%;padding:5px 8px;border:1px solid var(--line);border-radius:2px;
+    background:#fff;color:var(--ink);font-size:13px;font-family:inherit;
+  }
+  input[readonly]{background:#f3f6fb;color:var(--ink-2)}
+  textarea{resize:vertical;min-height:56px;line-height:1.35}
+  select{padding:4px 7px}
+  input[type=text].right,input[type=number].right{text-align:right}
+  :focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+  input.bad,select.bad,textarea.bad{border-color:var(--red);background:var(--red-bg)}
+  input.warn,select.warn,textarea.warn{border-color:var(--amber);background:var(--amber-bg)}
+  .vmsg{font-size:11px;margin-top:2px;min-height:0}
+  .vmsg.err{color:var(--red)}
+  .vmsg.wrn{color:var(--amber)}
+  .note{font-size:11px;color:var(--ink-3);margin-top:3px}
+
+  .checkrow{display:flex;flex-wrap:wrap;gap:6px 18px;padding:2px 0}
+  .chk{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink-2)}
+  .chk input{width:auto;margin:0}
+
+  /* ── container table ── */
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{
+    text-align:left;font-size:11px;font-weight:700;letter-spacing:.03em;
+    background:#edf1f7;border:1px solid var(--line);padding:5px 7px;white-space:nowrap;color:var(--navy);
+  }
+  td{border:1px solid var(--line);padding:2px 3px;vertical-align:middle}
+  td input,td select{border:1px solid transparent;background:transparent;padding:4px 5px;font-size:12.5px}
+  td input:focus,td select:focus{background:#fff;border-color:var(--line)}
+  td input.bad{background:var(--red-bg);border-color:var(--red)}
+  td.num input{text-align:right;font-variant-numeric:tabular-nums}
+  tfoot td{background:#f0f4fa;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+  .tblbar{display:flex;gap:8px;margin-top:8px;align-items:center}
+  .tblbar button{
+    background:#fff;border:1px solid var(--line);padding:4px 11px;border-radius:2px;
+    font-size:12px;cursor:pointer;color:var(--ink-2);font-family:inherit;
+  }
+  .tblbar button:hover{border-color:var(--navy-3);color:var(--navy)}
+  .rmv{background:none;border:none;color:var(--red);cursor:pointer;font-size:15px;line-height:1;padding:2px 5px}
+
+  /* ── waybill preview strip ── */
+  .preview-strip{
+    background:var(--navy);color:#fff;
+    padding:10px 18px;margin-bottom:16px;
+    display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+    font-size:12px;
+  }
+  .preview-strip .ps-item{display:flex;flex-direction:column;gap:2px}
+  .preview-strip .ps-label{font-size:10px;color:#8fafd4;font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+  .preview-strip .ps-val{font-weight:700;font-size:13px;color:#fff}
+  .preview-strip .ps-val.mono{font-family:ui-monospace,monospace;font-size:12px;letter-spacing:.05em}
+  .preview-strip .divider{width:1px;height:36px;background:#2a5fa8;margin:0 4px}
+
+  /* ── validation panel ── */
+  .panel{
+    position:fixed;left:0;right:0;bottom:0;
+    background:#fff;border-top:2px solid var(--navy);
+    box-shadow:0 -4px 20px rgba(13,43,82,.15);z-index:60;
+    max-height:44vh;display:flex;flex-direction:column;
+  }
+  .panel-head{
+    display:flex;align-items:center;gap:12px;padding:8px 20px;
+    background:#edf1f7;border-bottom:1px solid var(--line);cursor:pointer;
+  }
+  .panel-head strong{font-size:13px;color:var(--navy)}
+  .pill{font-size:11px;padding:2px 9px;border-radius:10px;border:1px solid;font-weight:600}
+  .pill.e{color:var(--red);background:var(--red-bg);border-color:#fca5a5}
+  .pill.w{color:var(--amber);background:var(--amber-bg);border-color:#fcd34d}
+  .pill.o{color:var(--green);background:var(--green-bg);border-color:#86efac}
+  .panel.collapsed .panel-body{display:none}
+  .panel-body{overflow:auto;padding:8px 20px 14px}
+  .vitem{display:flex;gap:10px;padding:5px 0;border-bottom:1px solid var(--line-2);font-size:12.5px;align-items:baseline}
+  .vitem:last-child{border-bottom:none}
+  .vtag{font-size:10px;padding:1px 6px;border-radius:2px;font-weight:700;flex:0 0 auto}
+  .vtag.e{color:#fff;background:var(--red)}
+  .vtag.w{color:#431407;background:#fcd34d}
+  .vwhere{color:var(--ink-3);flex:0 0 auto;min-width:210px;font-size:12px}
+  .vlink{color:var(--navy-3);cursor:pointer;text-decoration:underline}
+  .ptoggle{margin-left:auto;font-size:12px;color:var(--ink-3)}
+
+  @media(max-width:800px){
+    .f,.f.w6,.f.w8,.f.w3,.f.w2{grid-column:span 12}
+    .compare{grid-template-columns:1fr}
+    .vitem{flex-wrap:wrap}
+  }
+  @media(prefers-reduced-motion:no-preference){
+    .flash{animation:fl .8s ease-out}
+    @keyframes fl{0%{background:#fef3c7}100%{background:transparent}}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <span class="carrier">MSC</span>
+    <h1>Master B/L — Sea Waybill</h1>
+    <span class="tag">MASTER</span>
+  </div>
+  <span class="topbar-sub" style="font-size:12px;color:#8fafd4">Field reference &amp; validation · rebuilt from MEDUKL812774</span>
+  <span class="spacer"></span>
+  <button id="btnSpec">Hide data types</button>
+  <button id="btnJson">Export field spec (JSON)</button>
+  <button class="primary" id="btnValidate">Validate</button>
+</div>
+
+<!-- live preview strip -->
+<div class="preview-strip" id="previewStrip">
+  <div class="ps-item"><span class="ps-label">Waybill no.</span><span class="ps-val mono" id="ps-wbn">MEDUKL812774</span></div>
+  <div class="divider"></div>
+  <div class="ps-item"><span class="ps-label">Vessel / voyage</span><span class="ps-val" id="ps-vessel">MSC TRIESTE - QB613W</span></div>
+  <div class="divider"></div>
+  <div class="ps-item"><span class="ps-label">POL → POD</span><span class="ps-val" id="ps-route">COLOMBO → FELIXSTOWE</span></div>
+  <div class="divider"></div>
+  <div class="ps-item"><span class="ps-label">Containers</span><span class="ps-val" id="ps-cntrs">5 × 20' DRY VAN</span></div>
+  <div class="divider"></div>
+  <div class="ps-item"><span class="ps-label">Gross weight</span><span class="ps-val" id="ps-gw">103,680 KGS</span></div>
+  <div class="divider"></div>
+  <div class="ps-item"><span class="ps-label">Freight</span><span class="ps-val" id="ps-freight">AS PER AGREEMENT</span></div>
+</div>
+
+<div class="wrap">
+
+  <!-- comparison -->
+  <div class="compare">
+    <div class="side mbl">
+      <h3>Master B/L (this form)</h3>
+      <div class="row"><span class="lbl">Issued by</span><span class="val">MSC (the carrier)</span></div>
+      <div class="row"><span class="lbl">Shipper on doc</span><span class="val">CL Synergy Limited (the forwarder)</span></div>
+      <div class="row"><span class="lbl">Consignee on doc</span><span class="val">PFE Express Limited (destination agent)</span></div>
+      <div class="row"><span class="lbl">Cargo owner visible?</span><span class="val">No</span></div>
+      <div class="row"><span class="lbl">Document of title?</span><span class="val">No — Sea Waybill is non-negotiable</span></div>
+      <div class="row"><span class="lbl">Release method</span><span class="val">Proof of identity at POD — no surrender needed</span></div>
+    </div>
+    <div class="side hbl">
+      <h3>House B/L (separate form)</h3>
+      <div class="row"><span class="lbl">Issued by</span><span class="val">CL Synergy (the forwarder)</span></div>
+      <div class="row"><span class="lbl">Shipper on doc</span><span class="val">NDC Exports (PVT) Ltd — the actual cargo owner</span></div>
+      <div class="row"><span class="lbl">Consignee on doc</span><span class="val">EIE Import GmbH — the actual buyer</span></div>
+      <div class="row"><span class="lbl">Cargo owner visible?</span><span class="val">Yes</span></div>
+      <div class="row"><span class="lbl">Document of title?</span><span class="val">Can be — depends on B/L term</span></div>
+      <div class="row"><span class="lbl">Release method</span><span class="val">Surrender originals or telex release</span></div>
+    </div>
+  </div>
+
+  <div id="sections"></div>
+
+  <!-- containers / rider page -->
+  <section id="sec-containers">
+    <div class="sec-head">
+      <h2>Container / Rider page</h2>
+      <span class="hint">One row per container. Mirrors the MSC Rider page — what prints there maps 1-to-1 to these fields.</span>
+    </div>
+    <div class="sec-body">
+      <table id="cntrTable">
+        <thead>
+          <tr>
+            <th style="width:26px"></th>
+            <th>Container # <span class="dt">CHAR(11) ISO 6346</span></th>
+            <th style="width:110px">Type / size <span class="dt">ENUM</span></th>
+            <th>Seal no <span class="dt">VARCHAR(20)</span></th>
+            <th>PO # <span class="dt">VARCHAR(35)</span></th>
+            <th>HS code <span class="dt">VARCHAR(12)</span></th>
+            <th>Description of goods <span class="dt">TEXT</span></th>
+            <th style="width:110px">Gross wt (KGS) <span class="dt">DECIMAL(12,3)</span></th>
+            <th style="width:90px">CBM <span class="dt">DECIMAL(10,3)</span></th>
+            <th style="width:28px"></th>
+          </tr>
+        </thead>
+        <tbody id="cntrBody"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="7" style="text-align:right;font-size:12px">Row totals</td>
+            <td class="num" id="tGw"></td>
+            <td class="num" id="tCbm"></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+      <div class="tblbar">
+        <button type="button" id="addCntr">Add container</button>
+        <span class="note">Container number validated against ISO 6346 check digit. Seal number on a Sea Waybill is carrier-reported — MSC does not guarantee it matches physical seal at destination.</span>
+      </div>
+    </div>
+  </section>
+
+  <div id="sections2"></div>
+
+</div>
+
+<!-- validation panel -->
+<div class="panel collapsed" id="panel">
+  <div class="panel-head" id="panelHead">
+    <strong>Validation</strong>
+    <span class="pill e" id="pillE">0 errors</span>
+    <span class="pill w" id="pillW">0 warnings</span>
+    <span class="pill o" id="pillO">not run</span>
+    <span class="ptoggle" id="ptoggle">Show details ▲</span>
+  </div>
+  <div class="panel-body" id="panelBody"></div>
+</div>
+
+<script>
+/* ─── field dictionary ─── */
+const CTYPES = ["20' DRY VAN","40' DRY VAN","40' HIGH CUBE","20' REEFER","40' REEFER","20' FLAT RACK","40' FLAT RACK","20' OPEN TOP","40' OPEN TOP"];
+const TRANSPORT_TYPES = ["PORT-TO-PORT","COMBINED TRANSPORT"];
+const FREIGHT_TERMS = ["AS PER AGREEMENT","PREPAID","COLLECT","PAYABLE AT DESTINATION"];
+const LOAD_TYPES = ["FCL/FCL","FCL/LCL","LCL/LCL","LCL/FCL"];
+
+const SECTIONS_A = [
+{
+  id:"docheader", title:"Document header",
+  hint:"Carrier-issued identifiers. The waybill number is assigned by MSC — CLS records it here as a reference.",
+  fields:[
+    {k:"waybillNo",    l:"Sea Waybill no.",       t:"code",   dt:"VARCHAR(20)",   req:1, v:"MEDUKL812774",   pat:"^[A-Z]{3}[A-Z]{2}\\d{6}$", patMsg:"Format: 3-letter carrier code + 2-letter country + 6 digits.", w:3,
+     note:"Carrier-generated. Unique globally. Do not alter."},
+    {k:"waybillSeq",   l:"No. & sequence of waybills", t:"num", dt:"TINYINT",    req:1, v:"1",  min:1, max:9, int:1, w:2},
+    {k:"riderPages",   l:"No. of rider pages",    t:"num",    dt:"TINYINT",      req:1, v:"1",  min:0, max:20, int:1, w:2},
+    {k:"transportType",l:"Transport type",         t:"select", dt:"ENUM",         req:1, opts:TRANSPORT_TYPES, v:"PORT-TO-PORT", w:3,
+     note:"Combined Transport activates Place of Receipt and Place of Delivery fields."},
+    {k:"lloydsImo",    l:"Lloyds / IMO number",   t:"code",   dt:"VARCHAR(10)",  v:"9484479", pat:"^\\d{7}$", patMsg:"7-digit IMO vessel identifier.", w:2}
+  ]
+},
+{
+  id:"carrier", title:"Carrier",
+  hint:"Printed top-left on every MSC document. These are static for MSC but other carriers differ.",
+  fields:[
+    {k:"carrierName",    l:"Carrier name",     t:"text",   dt:"VARCHAR(80)", req:1, v:"MEDITERRANEAN SHIPPING COMPANY S.A.", max:80, w:8},
+    {k:"carrierAddress", l:"Carrier address",  t:"textarea",dt:"TEXT",       req:1, v:"12-14, chemin Rieu - CH -1208 GENEVA, Switzerland", lines:3, linelen:60, w:8},
+    {k:"carrierWebsite", l:"Carrier website",  t:"text",   dt:"VARCHAR(120)",v:"www.msc.com", w:4}
+  ]
+},
+{
+  id:"shipper", title:"Shipper  (= the freight forwarder on a Master B/L)",
+  hint:"On the Master B/L this is CLS Synergy — NOT the cargo owner. The cargo owner only appears on the House B/L.",
+  fields:[
+    {k:"shipperName",    l:"Shipper name",    t:"text",    dt:"VARCHAR(70)", req:1, v:"CL SYNERGY LIMITED", max:70, w:6},
+    {k:"shipperAddress", l:"Shipper address", t:"textarea",dt:"TEXT · max 6 lines × 45", req:1,
+     v:"NO.30, 6TH FLOOR,\nR.A.DE MEL MAWATHA,\nCOLOMBO 03, SRI LANKA.", lines:6, linelen:45, w:6},
+    {k:"shipperContactName",  l:"Contact name",  t:"text",  dt:"VARCHAR(70)", v:"CHAMODI ATHAPATTU", w:4},
+    {k:"shipperContactPhone", l:"Contact phone", t:"text",  dt:"VARCHAR(20)", v:"011 5300250", pat:"^[\\d\\s\\+\\-\\(\\)]{6,20}$", patMsg:"Digits, spaces, +, - and () only.", w:4},
+    {k:"shipperContactEmail", l:"Contact email", t:"email", dt:"VARCHAR(120)",v:"PRICING@clsynergy.com", w:4}
+  ]
+},
+{
+  id:"consignee", title:"Consignee  (= the destination agent on a Master B/L)",
+  hint:"On the Master B/L this is PFE Express Ltd — the entity MSC will release cargo to at destination.",
+  fields:[
+    {k:"consigneeName",    l:"Consignee name",    t:"text",    dt:"VARCHAR(70)", req:1, v:"PFE EXPRESS LIMITED", max:70, w:6},
+    {k:"consigneeAddress", l:"Consignee address", t:"textarea",dt:"TEXT · max 6 lines × 45", req:1,
+     v:"UNIT 1, ALBERT WAY, EASTWAYS,\nWITHAM, ESSEX, CM8 3ZR", lines:6, linelen:45, w:6}
+  ]
+},
+{
+  id:"notify", title:"Notify parties",
+  hint:"MSC takes no responsibility for failure to notify. The clause is printed verbatim on the bill.",
+  fields:[
+    {k:"notifyClause",   l:"Notify disclaimer clause", t:"select", dt:"ENUM", req:1,
+     opts:["No responsibility shall attach to Carrier or to his Agent for failure to notify - see Clause 20","NONE"], w:8,
+     note:"Standard MSC clause. Must print on the face of the bill."},
+    {k:"notifyName",     l:"Notify party name",    t:"text",    dt:"VARCHAR(70)", req:1, v:"ALDI STORES LTD", max:70, w:6},
+    {k:"notifyAddress",  l:"Notify party address", t:"textarea",dt:"TEXT · max 6 lines × 45", req:1,
+     v:"HOLLY LANE, ATHERSTONE,\nWARWICKSHIRE,CV9 2SQ UK", lines:6, linelen:45, w:6},
+    {k:"notifyContactName",  l:"Notify contact name",  t:"text",  dt:"VARCHAR(70)", v:"AMANDA ROBINSON", w:4},
+    {k:"notifyContactPhone", l:"Notify contact phone", t:"text",  dt:"VARCHAR(20)", v:"+44 (1827) 333265", w:4},
+    {k:"notifyContactEmail", l:"Notify contact email", t:"email", dt:"VARCHAR(120)",v:"AMANDA.ROBINSON@ALDI.CO.UK", w:4}
+  ]
+},
+{
+  id:"podagent", title:"Port of discharge agent",
+  hint:"MSC's own office at the destination. Cargo is released through them, not through PFE Express directly.",
+  fields:[
+    {k:"podAgentName",    l:"POD agent name",    t:"text",    dt:"VARCHAR(80)", req:1, v:"Mediterranean Shipping Company ( U.K. ) Ltd.", max:80, w:6},
+    {k:"podAgentDept",    l:"Department / location", t:"text",dt:"VARCHAR(60)", v:"MEDITE HOUSE, THE HAVENS, Ipswich", w:6},
+    {k:"podAgentAddress", l:"POD agent address", t:"textarea",dt:"TEXT", req:1,
+     v:"MEDITE HOUSE\nTHE HAVENS\nIpswich", lines:5, linelen:60, w:6},
+    {k:"podAgentPhone",   l:"Phone",  t:"text",  dt:"VARCHAR(20)", v:"+44 1473 277 777", w:3},
+    {k:"podAgentFax",     l:"Fax",    t:"text",  dt:"VARCHAR(20)", v:"+44 1473 277 700", w:3},
+    {k:"podAgentEmail",   l:"Email",  t:"email", dt:"VARCHAR(120)",v:"mscukgeneral@mscuk.com", w:6}
+  ]
+}
+];
+
+const SECTIONS_B = [
+{
+  id:"voyage", title:"Vessel & voyage",
+  hint:"Vessel data drives the manifest. The IMO number ties back to the Lloyd's register entry.",
+  fields:[
+    {k:"vesselVoyage",  l:"Vessel name & voyage no.",t:"text",  dt:"VARCHAR(50)", req:1, v:"MSC TRIESTE - QB613W", max:50, w:6},
+    {k:"portOfLoading", l:"Port of loading",         t:"text",  dt:"VARCHAR(50)", req:1, v:"COLOMBO", max:50, w:3},
+    {k:"portOfDischarge",l:"Port of discharge",      t:"text",  dt:"VARCHAR(50)", req:1, v:"FELIXSTOWE", max:50, w:3},
+    {k:"placeOfReceipt",l:"Place of receipt",        t:"text",  dt:"VARCHAR(50)", v:"", max:50, w:4,
+     note:"Combined Transport only. Leave blank for Port-to-Port."},
+    {k:"placeOfDelivery",l:"Place of delivery",      t:"text",  dt:"VARCHAR(50)", v:"", max:50, w:4,
+     note:"Combined Transport only. Leave blank for Port-to-Port."},
+    {k:"loadType",      l:"Load type",               t:"select",dt:"ENUM",        req:1, opts:LOAD_TYPES, v:"FCL/FCL", w:4}
+  ]
+},
+{
+  id:"refs", title:"References",
+  hint:"The booking ref is MSC's; the shipper's ref is CLS's own job number.",
+  fields:[
+    {k:"bookingRef",   l:"Booking ref (MSC)",      t:"code",  dt:"VARCHAR(20)", req:1, v:"EBKG16382178",
+     pat:"^[A-Z]{4}\\d{8}$", patMsg:"4 letters + 8 digits (MSC booking number format).", w:4},
+    {k:"shipperRef",   l:"Shipper's ref (CLS job #)", t:"code",dt:"VARCHAR(35)", v:"", w:4},
+    {k:"carrierReceipt",l:"Carrier's receipt (# of cntrs/pkgs)", t:"text", dt:"VARCHAR(20)", req:1, v:"5 cntrs", w:4,
+     note:"Printed in the dedicated box on the face of the bill. Matches the container count in the rider."}
+  ]
+},
+{
+  id:"cargo_summary", title:"Cargo summary (face of bill)",
+  hint:"Totals printed on the main page. Must reconcile with the rider page row-by-row totals below.",
+  fields:[
+    {k:"totalItems",      l:"Total items / packages", t:"num",   dt:"INT",          req:1, v:"18000",    min:1, int:1, w:3},
+    {k:"totalGrossWeight",l:"Total gross weight",     t:"num",   dt:"DECIMAL(12,3)",req:1, v:"103680",   min:0.001, w:3},
+    {k:"weightUnit",      l:"Weight unit",            t:"select",dt:"ENUM",         req:1, opts:["KGS","LBS","MT"], v:"KGS", w:2},
+    {k:"totalNetWeight",  l:"Total net weight",       t:"num",   dt:"DECIMAL(12,3)",v:"86400", min:0, w:3,
+     note:"TOTAL NETT WEIGHT stated on first container's description line in the sample."},
+    {k:"cargoDescription",l:"Cargo clause / load statement", t:"select",dt:"ENUM", req:1,
+     opts:["SHIPPER'S LOAD, STOW AND COUNT;FCL/FCL;SAID TO CONTAIN","SAID TO CONTAIN","CARRIER'S COUNT"], v:"SHIPPER'S LOAD, STOW AND COUNT;FCL/FCL;SAID TO CONTAIN", w:12,
+     note:"This clause prints in the body of the bill and limits carrier's liability under Clause 14."}
+  ]
+},
+{
+  id:"freight", title:"Freight & charges",
+  hint:"On a Sea Waybill freight is almost always shown as 'AS PER AGREEMENT' — the actual amounts are in separate rate confirmations between the carrier and the forwarder.",
+  fields:[
+    {k:"freightCharges",  l:"Freight & charges",   t:"select",dt:"ENUM",        req:1, opts:FREIGHT_TERMS, v:"AS PER AGREEMENT", w:4},
+    {k:"freightClause",   l:"Freight clause",       t:"text",  dt:"VARCHAR(120)",v:"Cargo shall not be delivered unless Freight & Charges are paid (see Clause 16)", w:8},
+    {k:"declaredValue",   l:"Declared value (ad valorem)", t:"text", dt:"VARCHAR(20)", v:"XXXXXXXXXXXXXXXX", w:4,
+     note:"Only applicable if ad valorem charges paid — see Clause 7.3. X's mean not declared."}
+  ]
+},
+{
+  id:"issuance", title:"Issuance & signature",
+  hint:"The shipped-on-board date and place of issue print on the face. The signature block is the carrier's agent acting for MSC.",
+  fields:[
+    {k:"placeOfIssue",       l:"Place of issue",          t:"text",  dt:"VARCHAR(50)", req:1, v:"Colombo", max:50, w:4},
+    {k:"dateOfIssue",        l:"Date of issue",           t:"date",  dt:"DATE",        req:1, v:"2026-09-02", w:4},
+    {k:"shippedOnBoardDate", l:"Shipped on board date",   t:"date",  dt:"DATE",        req:1, v:"2026-09-02", w:4,
+     note:"Cannot precede the date of issue. Once locked by the carrier it cannot be amended without a letter of indemnity."},
+    {k:"signedOnBehalfOf",   l:"Signed on behalf of carrier", t:"text",dt:"VARCHAR(120)",req:1, v:"MSC Mediterranean Shipping Company S.A.", max:120, w:6},
+    {k:"signingAgent",       l:"Signing agent (company)", t:"text",  dt:"VARCHAR(70)", req:1, v:"MSC LANKA (PVT) LTD", max:70, w:4},
+    {k:"agentCode",          l:"Agent code",              t:"code",  dt:"VARCHAR(20)", req:1, v:"PV 3102", w:2},
+    {k:"agentCapacity",      l:"Agent capacity",          t:"text",  dt:"VARCHAR(80)", req:1, v:"AS AGENT FOR THE CARRIER", max:80, w:6}
+  ]
+},
+{
+  id:"clauses", title:"Special clauses (printed on face)",
+  hint:"These are the carrier's standard printed notices. They appear verbatim on the bill — record exactly what MSC uses so the generated document is faithful.",
+  fields:[
+    {k:"thermalClause", l:"Thermal / seasonal clause", t:"textarea", dt:"TEXT", lines:5, linelen:80, w:12,
+     v:"Carrier has no liability or responsibility whatsoever for thermal loss or damage to the goods by reason of natural variations in atmospheric temperatures during the winter period, and / or caused by inadequate packing of the Goods for carriage in dry-van containers, and / or inherent vice of the Goods, in such temperatures."},
+    {k:"palletsClause", l:"Pallets / equipment clause", t:"textarea",dt:"TEXT", lines:4, linelen:80, w:12,
+     v:"Containers, pallets or similar articles of transport supplied by or on behalf of the carrier shall be returned to the carrier in the same order and condition as handed over to the shipper or consignee..."},
+    {k:"riderNote",     l:"Rider reference note",       t:"text",    dt:"VARCHAR(120)", v:"Please see attached RIDER for Container / Cargo Description(s).", w:8}
+  ]
+}
+];
+
+/* ─── DOM helpers ─── */
+const $ = s => document.querySelector(s);
+const el = (t,c) => { const e=document.createElement(t); if(c) e.className=c; return e; };
+const esc = s => String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;");
+
+const ALLFIELDS = {};
+
+function fieldHTML(f){
+  const wrap = el("div","f"+(f.w?" w"+f.w:""));
+  if(f.t!=="checkgroup"){
+    const lab = el("label","lbl");
+    lab.htmlFor = f.k;
+    lab.innerHTML = f.l + (f.req?'<span class="req">*</span>':'') + '<span class="dt">'+f.dt+'</span>';
+    wrap.appendChild(lab);
+  }
+  let inp;
+  if(f.t==="textarea"){
+    inp=el("textarea"); inp.rows=Math.min(f.lines||4,7);
+  } else if(f.t==="select"){
+    inp=el("select"); (f.opts||[]).forEach(o=>{ const op=el("option"); op.value=o; op.textContent=o||"—"; inp.appendChild(op); });
+  } else if(f.t==="checkgroup"){
+    const row=el("div","checkrow");
+    (f.boxes||[]).forEach(([k,label,on])=>{
+      const w=el("label","chk"); const c=el("input"); c.type="checkbox"; c.id=k; c.checked=!!on;
+      w.appendChild(c); w.appendChild(document.createTextNode(label)); row.appendChild(w);
+    });
+    wrap.appendChild(row);
+    if(f.note){const n=el("div","note");n.textContent=f.note;wrap.appendChild(n);}
+    return wrap;
+  } else if(f.t==="date"){
+    inp=el("input"); inp.type="date";
+  } else if(f.t==="num"){
+    inp=el("input"); inp.type="text"; inp.inputMode="decimal"; inp.classList.add("right");
+    if(!inp.dataset) inp.dataset={};
+    inp.dataset.mono="1";
+  } else if(f.t==="email"){
+    inp=el("input"); inp.type="email";
+  } else {
+    inp=el("input"); inp.type="text";
+    if(f.t==="code") inp.dataset.mono="1";
+  }
+  inp.id=f.k; inp.dataset.key=f.k; inp.value=f.v||"";
+  if(f.ro) inp.readOnly=true;
+  if(f.max) inp.maxLength=f.max;
+  if(f.t==="code") inp.addEventListener("input",()=>{const p=inp.selectionStart;inp.value=inp.value.toUpperCase();inp.setSelectionRange(p,p);});
+  wrap.appendChild(inp);
+  const m=el("div","vmsg"); m.id="msg-"+f.k; wrap.appendChild(m);
+  if(f.note){const n=el("div","note");n.innerHTML=f.note;wrap.appendChild(n);}
+  ALLFIELDS[f.k]=f;
+  return wrap;
+}
+
+function renderSections(list, target){
+  list.forEach(sec=>{
+    const s=el("section"); s.id="sec-"+sec.id;
+    const h=el("div","sec-head");
+    h.innerHTML="<h2>"+sec.title+"</h2>"+(sec.hint?'<span class="hint">'+sec.hint+"</span>":"")+
+                '<span class="count">'+sec.fields.length+" fields</span>";
+    s.appendChild(h);
+    const b=el("div","sec-body"); const g=el("div","grid");
+    sec.fields.forEach(f=>g.appendChild(fieldHTML(f)));
+    b.appendChild(g); s.appendChild(b); target.appendChild(s);
+  });
+}
+
+renderSections(SECTIONS_A, $("#sections"));
+renderSections(SECTIONS_B, $("#sections2"));
+
+// apply select values after DOM exists
+[...SECTIONS_A,...SECTIONS_B].forEach(s=>s.fields.forEach(f=>{
+  if(f.t==="select"){const e=document.getElementById(f.k);if(e)e.value=f.v||"";}
+}));
+
+/* ─── ISO 6346 check digit ─── */
+const LV={A:10,B:12,C:13,D:14,E:15,F:16,G:17,H:18,I:19,J:20,K:21,L:23,M:24,N:25,O:26,P:27,Q:28,R:29,S:30,T:31,U:32,V:34,W:35,X:36,Y:37,Z:38};
+function iso6346(code){
+  if(!/^[A-Z]{4}\d{7}$/.test(code)) return{ok:false,reason:"shape"};
+  let sum=0;
+  for(let i=0;i<10;i++) sum+=(i<4?LV[code[i]]:Number(code[i]))*Math.pow(2,i);
+  const cd=(sum%11)%10;
+  return{ok:cd===Number(code[10]),expected:cd};
+}
+
+/* ─── containers ─── */
+const INIT_CNTRS=[
+  ["CORU2569056","20' DRY VAN","FX42954928","26IB25368","21069092","3600 TRAY/TRAY PACK COCONUT MILK - MIXED TRAY","20736",""],
+  ["UETU3052381","20' DRY VAN","FX42954812","","","3600 TRAY/TRAY PACK COCONUT MILK - MIXED TRAY","20736",""],
+  ["UETU3053496","20' DRY VAN","FX42954888","","","3600 TRAY/TRAY PACK COCONUT MILK - MIXED TRAY","20736",""],
+  ["TGBU1337310","20' DRY VAN","FX42954818","","","3600 TRAY/TRAY PACK COCONUT MILK - MIXED TRAY","20736",""],
+  ["RFSU3069991","20' DRY VAN","FX42954883","","","3600 TRAY/TRAY PACK COCONUT MILK - MIXED TRAY TOTAL NETT WEIGHT: 86,400.00KGS","20736",""]
+];
+
+function selOpts(opts,val){return opts.map(o=>'<option'+(o===val?' selected':'')+'>'+esc(o)+'</option>').join('');}
+
+function addCntrRow(d){
+  d=d||["","20' DRY VAN","","","","","",""];
+  const tr=el("tr");
+  tr.innerHTML=
+    '<td style="text-align:center"><input type="checkbox" checked data-col="add"></td>'+
+    '<td><input type="text" data-col="no" data-mono="1" maxlength="11" value="'+esc(d[0])+'"><div class="vmsg" data-msg="no"></div></td>'+
+    '<td><select data-col="ctype">'+selOpts(CTYPES,d[1])+'</select></td>'+
+    '<td><input type="text" data-col="seal" data-mono="1" maxlength="20" value="'+esc(d[2])+'"></td>'+
+    '<td><input type="text" data-col="po" maxlength="35" value="'+esc(d[3])+'"></td>'+
+    '<td><input type="text" data-col="hs" data-mono="1" maxlength="12" value="'+esc(d[4])+'"></td>'+
+    '<td><input type="text" data-col="desc" value="'+esc(d[5])+'"></td>'+
+    '<td class="num"><input type="text" data-col="gw" inputmode="decimal" value="'+esc(d[6])+'"></td>'+
+    '<td class="num"><input type="text" data-col="cbm" inputmode="decimal" value="'+esc(d[7])+'"></td>'+
+    '<td style="text-align:center"><button type="button" class="rmv">&times;</button></td>';
+  tr.querySelector(".rmv").onclick=()=>{tr.remove();totals();updatePreview();};
+  tr.querySelector('[data-col="no"]').addEventListener("input",e=>{const p=e.target.selectionStart;e.target.value=e.target.value.toUpperCase();e.target.setSelectionRange(p,p);});
+  tr.addEventListener("input",()=>{totals();updatePreview();});
+  $("#cntrBody").appendChild(tr);
+}
+INIT_CNTRS.forEach(addCntrRow);
+$("#addCntr").onclick=()=>{addCntrRow();totals();};
+
+function num(v){if(v===""||v==null)return null;const n=Number(String(v).replace(/,/g,""));return isNaN(n)?NaN:n;}
+function fmt(n,d){return(n==null||isNaN(n))?"—":n.toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d});}
+
+function cntrRows(){
+  return[...$("#cntrBody").querySelectorAll("tr")].map(tr=>({
+    tr,
+    add:tr.querySelector('[data-col="add"]').checked,
+    no:tr.querySelector('[data-col="no"]').value.trim(),
+    ctype:tr.querySelector('[data-col="ctype"]').value,
+    seal:tr.querySelector('[data-col="seal"]').value.trim(),
+    po:tr.querySelector('[data-col="po"]').value.trim(),
+    hs:tr.querySelector('[data-col="hs"]').value.trim(),
+    desc:tr.querySelector('[data-col="desc"]').value.trim(),
+    gw:num(tr.querySelector('[data-col="gw"]').value),
+    cbm:num(tr.querySelector('[data-col="cbm"]').value)
+  }));
+}
+
+function totals(){
+  const r=cntrRows().filter(x=>x.add);
+  const sumGw=r.reduce((a,x)=>a+(isNaN(x.gw)||x.gw==null?0:x.gw),0);
+  const sumCbm=r.reduce((a,x)=>a+(isNaN(x.cbm)||x.cbm==null?0:x.cbm),0);
+  $("#tGw").textContent=fmt(sumGw,3);
+  $("#tCbm").textContent=fmt(sumCbm,3);
+}
+totals();
+
+/* ─── live preview ─── */
+function v(k){const e=document.getElementById(k);return e?e.value.trim():"";}
+function updatePreview(){
+  $("#ps-wbn").textContent=v("waybillNo")||"—";
+  $("#ps-vessel").textContent=v("vesselVoyage")||"—";
+  const pol=v("portOfLoading")||"?", pod=v("portOfDischarge")||"?";
+  $("#ps-route").textContent=pol+" → "+pod;
+  const rows=cntrRows().filter(r=>r.add);
+  const sizes=[...new Set(rows.map(r=>r.ctype))];
+  const counts=sizes.map(s=>rows.filter(r=>r.ctype===s).length+" × "+s).join(", ");
+  $("#ps-cntrs").textContent=counts||"—";
+  const sumGw=rows.reduce((a,x)=>a+(isNaN(x.gw)||x.gw==null?0:x.gw),0);
+  $("#ps-gw").textContent=sumGw?fmt(sumGw,0)+" KGS":"—";
+  $("#ps-freight").textContent=v("freightCharges")||"—";
+}
+document.querySelectorAll("input,select,textarea").forEach(e=>e.addEventListener("input",updatePreview));
+updatePreview();
+
+/* ─── validation ─── */
+let issues=[];
+function push(level,where,msg,anchor){issues.push({level,where,msg,anchor});}
+function clearMarks(){
+  document.querySelectorAll(".bad,.warn").forEach(e=>e.classList.remove("bad","warn"));
+  document.querySelectorAll(".vmsg").forEach(m=>{m.textContent="";m.className="vmsg";});
+}
+function mark(k,level,msg){
+  const e=document.getElementById(k);if(!e)return;
+  e.classList.remove("bad","warn");e.classList.add(level==="e"?"bad":"warn");
+  const m=document.getElementById("msg-"+k);
+  if(m){m.className="vmsg "+(level==="e"?"err":"wrn");m.textContent=msg;}
+}
+
+function validate(){
+  issues=[]; clearMarks();
+
+  // per-field rules
+  Object.values(ALLFIELDS).forEach(f=>{
+    const e=document.getElementById(f.k);if(!e)return;
+    const val=e.value.trim();
+    if(f.req&&val===""){mark(f.k,"e","Required.");push("e",f.l,"Required field is empty.",f.k);return;}
+    if(val==="")return;
+    if(f.pat&&!new RegExp(f.pat).test(val)){mark(f.k,"e",f.patMsg||"Format wrong.");push("e",f.l,f.patMsg||"Format wrong.",f.k);return;}
+    if(f.t==="email"&&!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(val)){mark(f.k,"e","Not a valid email.");push("e",f.l,"Invalid email address.",f.k);return;}
+    if(f.t==="num"){
+      const n=num(val);
+      if(isNaN(n)){mark(f.k,"e","Numbers only.");push("e",f.l,"Numbers only.",f.k);return;}
+      if(f.int&&!Number.isInteger(n)){mark(f.k,"e","Whole number required.");push("e",f.l,"Whole number required.",f.k);return;}
+      if(f.min!=null&&n<f.min){mark(f.k,"e","Min "+f.min+".");push("e",f.l,"Below minimum of "+f.min+".",f.k);}
+      if(f.max!=null&&typeof f.max==="number"&&f.t!=="textarea"&&n>f.max){mark(f.k,"e","Max "+f.max+".");push("e",f.l,"Above maximum of "+f.max+".",f.k);}
+    }
+    if(f.t==="textarea"&&(f.lines||f.linelen)){
+      const rows=val.split("\n");
+      if(f.lines&&rows.length>f.lines){mark(f.k,"e","Max "+f.lines+" lines.");push("e",f.l,"Exceeds "+f.lines+" lines — text will be cut on the printed bill.",f.k);}
+      else if(f.linelen){const over=rows.filter(r=>r.length>f.linelen).length;if(over){mark(f.k,"w",over+" line(s) > "+f.linelen+" chars.");push("w",f.l,over+" line(s) exceed "+f.linelen+" characters.",f.k);}}
+    }
+    if(f.max&&typeof f.max==="number"&&f.t!=="num"&&f.t!=="textarea"&&val.length>f.max){
+      mark(f.k,"e","Max "+f.max+" chars.");push("e",f.l,"Longer than "+f.max+" characters.",f.k);
+    }
+  });
+
+  // container rows
+  const rows=cntrRows(); const seen={};
+  rows.forEach((r,i)=>{
+    const inp=r.tr.querySelector('[data-col="no"]');
+    const msg=r.tr.querySelector('[data-msg="no"]');
+    inp.classList.remove("bad","warn");if(msg)msg.textContent="";
+    if(!r.add)return;
+    if(!r.no){inp.classList.add("bad");push("e","Container row "+(i+1),"Container number missing.");}
+    else{
+      const chk=iso6346(r.no);
+      if(chk.reason==="shape"){inp.classList.add("bad");push("e","Container row "+(i+1),"Must be 4 letters + 7 digits (ISO 6346).");}
+      else if(!chk.ok){inp.classList.add("bad");push("e","Container row "+(i+1),r.no+" fails check digit — should end in "+chk.expected+".");}
+      if(seen[r.no])push("e","Container row "+(i+1),r.no+" is duplicated.");
+      seen[r.no]=1;
+    }
+    if(!r.seal)push("w","Container row "+(i+1),"Seal number empty. MSC requires it for the manifest.");
+    if(!r.desc)push("e","Container row "+(i+1),"Goods description is empty.");
+    if(r.gw==null||isNaN(r.gw)||r.gw<=0)push("e","Container row "+(i+1),"Gross weight must be a positive number.");
+    if(r.hs&&!/^\d{4}(\.?\d{2}){1,3}$/.test(r.hs))push("w","Container row "+(i+1),"HS code format looks wrong: "+r.hs+".");
+    if(r.ctype==="20' DRY VAN"&&r.gw>28000)push("w","Container row "+(i+1),"Payload >28 t on a 20' box — verify road weight limit at destination.");
+    if((r.ctype==="40' DRY VAN"||r.ctype==="40' HIGH CUBE")&&r.gw>26000)push("w","Container row "+(i+1),"Payload >26 t on a 40' box — verify road weight limit at destination.");
+  });
+
+  // totals reconciliation
+  const active=rows.filter(r=>r.add);
+  const sumGw=active.reduce((a,x)=>a+(isNaN(x.gw)||x.gw==null?0:x.gw),0);
+  const declGw=num(v("totalGrossWeight")), declItems=num(v("totalItems")), declNw=num(v("totalNetWeight"));
+  const near=(a,b,t)=>a!=null&&b!=null&&!isNaN(a)&&!isNaN(b)&&Math.abs(a-b)<=t;
+  if(declGw!=null&&!isNaN(declGw)&&!near(declGw,sumGw,0.5)){
+    mark("totalGrossWeight","e","Rows total "+fmt(sumGw,3)+" — header says "+fmt(declGw,3)+".");
+    push("e","Total gross weight","Header "+fmt(declGw,3)+" ≠ container rows "+fmt(sumGw,3)+".","totalGrossWeight");
+  }
+  if(declNw!=null&&declGw!=null&&!isNaN(declNw)&&!isNaN(declGw)&&declNw>declGw){
+    mark("totalNetWeight","e","Net cannot exceed gross.");
+    push("e","Total net weight","Net weight "+fmt(declNw,3)+" exceeds gross "+fmt(declGw,3)+".","totalNetWeight");
+  }
+  if(declNw!=null&&declGw!=null&&!isNaN(declNw)&&!isNaN(declGw)&&declNw>0&&declNw<declGw*0.4){
+    push("w","Total net weight","Net is under 40% of gross — plausible for canned goods but worth confirming.");
+  }
+
+  // carrier's receipt vs actual rows
+  const carrierRcpt=v("carrierReceipt");
+  const rcptNum=parseInt(carrierRcpt);
+  if(!isNaN(rcptNum)&&rcptNum!==active.length){
+    mark("carrierReceipt","e","Carrier's receipt says "+rcptNum+", table has "+active.length+" rows.");
+    push("e","Carrier's receipt",""+rcptNum+" declared, "+active.length+" containers in the rider.","carrierReceipt");
+  }
+
+  // waybill number format vs carrier code
+  const wbn=v("waybillNo");
+  if(wbn&&!/^[A-Z]{5}\d{6}$/.test(wbn)){
+    mark("waybillNo","w","MSC waybill numbers are typically 5 letters + 6 digits.");
+    push("w","Sea Waybill no.","Unusual format — verify against the MSC system.","waybillNo");
+  }
+
+  // dates
+  const d=k=>{const val=v(k);return val?new Date(val+"T00:00:00"):null;};
+  const sob=d("shippedOnBoardDate"), doi=d("dateOfIssue");
+  if(sob&&doi&&sob<doi){
+    mark("shippedOnBoardDate","e","On-board date is before the date of issue.");
+    push("e","Shipped on board date","On-board "+v("shippedOnBoardDate")+" precedes issue date "+v("dateOfIssue")+".","shippedOnBoardDate");
+  }
+  if(sob&&doi&&sob.getTime()===doi.getTime()){
+    push("w","Shipped on board date","Issue and on-board dates are the same. Possible but double-check.");
+  }
+
+  // transport type vs place of receipt/delivery
+  if(v("transportType")==="PORT-TO-PORT"&&v("placeOfReceipt")){
+    mark("placeOfReceipt","w","Should be blank for Port-to-Port. Use Combined Transport if a place of receipt is needed.");
+    push("w","Place of receipt","Populated on a Port-to-Port bill — remove it or change the transport type.","placeOfReceipt");
+  }
+  if(v("transportType")==="PORT-TO-PORT"&&v("placeOfDelivery")){
+    mark("placeOfDelivery","w","Should be blank for Port-to-Port.");
+    push("w","Place of delivery","Populated on a Port-to-Port bill — remove it or change the transport type.","placeOfDelivery");
+  }
+  if(v("transportType")==="COMBINED TRANSPORT"&&!v("placeOfReceipt")){
+    mark("placeOfReceipt","e","Required for Combined Transport.");
+    push("e","Place of receipt","Combined Transport selected but no place of receipt.","placeOfReceipt");
+  }
+
+  // port of loading vs discharge
+  if(v("portOfLoading")&&v("portOfDischarge")&&v("portOfLoading").toUpperCase()===v("portOfDischarge").toUpperCase()){
+    mark("portOfDischarge","e","POL and POD cannot be the same.");
+    push("e","Port of discharge","Load and discharge ports are identical.","portOfDischarge");
+  }
+
+  // shipper on master should not be the cargo owner
+  const shipperName=v("shipperName").toUpperCase();
+  if(shipperName&&!shipperName.includes("SYNERGY")&&!shipperName.includes("CLS")&&!shipperName.includes("FORWARDING")&&!shipperName.includes("LOGISTICS")&&!shipperName.includes("EXPRESS")&&!shipperName.includes("SHIPPING")){
+    push("w","Shipper name","Shipper on the Master B/L should be the freight forwarder (CLS), not the cargo owner. The name '"+v("shipperName")+"' looks like it may be a trading company.","shipperName");
+  }
+
+  // signing agent checks
+  if(!v("agentCode"))push("e","Agent code","Agent code (e.g. PV 3102) is required on the signature block.","agentCode");
+  if(!v("agentCapacity"))push("e","Agent capacity","Must state 'AS AGENT FOR THE CARRIER' or equivalent.","agentCapacity");
+
+  renderPanel();
+}
+
+function renderPanel(){
+  const e=issues.filter(i=>i.level==="e").length, w=issues.length-e;
+  $("#pillE").textContent=e+(e===1?" error":" errors");
+  $("#pillW").textContent=w+(w===1?" warning":" warnings");
+  $("#pillO").textContent=e===0?"ready to transmit":"blocked";
+  $("#pillO").className="pill "+(e===0?"o":"e");
+  const body=$("#panelBody"); body.innerHTML="";
+  if(!issues.length){
+    const d=el("div","vitem"); d.textContent="No issues. Container rows reconcile with the cargo summary totals."; body.appendChild(d);
+  }
+  issues.sort((a,b)=>a.level===b.level?0:a.level==="e"?-1:1).forEach(i=>{
+    const d=el("div","vitem");
+    const t=el("span","vtag "+i.level); t.textContent=i.level==="e"?"ERROR":"CHECK";
+    const wh=el("span","vwhere"); wh.textContent=i.where;
+    const m=el("span");
+    if(i.anchor){
+      const a=el("a","vlink"); a.textContent=i.msg;
+      a.onclick=()=>{const t2=document.getElementById(i.anchor);if(t2){t2.scrollIntoView({block:"center",behavior:"smooth"});t2.focus({preventScroll:true});t2.classList.add("flash");setTimeout(()=>t2.classList.remove("flash"),800);}};
+      m.appendChild(a);
+    } else m.textContent=i.msg;
+    d.append(t,wh,m); body.appendChild(d);
+  });
+  $("#panel").classList.remove("collapsed");
+  $("#ptoggle").textContent="Hide details ▼";
+}
+
+$("#btnValidate").onclick=validate;
+$("#panelHead").onclick=()=>{
+  const p=$("#panel"); p.classList.toggle("collapsed");
+  $("#ptoggle").textContent=p.classList.contains("collapsed")?"Show details ▲":"Hide details ▼";
+};
+
+let specOn=true;
+$("#btnSpec").onclick=()=>{
+  specOn=!specOn;
+  document.body.classList.toggle("specoff",!specOn);
+  $("#btnSpec").textContent=specOn?"Hide data types":"Show data types";
+};
+
+$("#btnJson").onclick=()=>{
+  const spec={
+    document:"Master Bill of Lading — MSC Sea Waybill",
+    reference:"MEDUKL812774",
+    note:"On a Master B/L the Shipper is the freight forwarder (CLS), the Consignee is the destination agent (PFE Express). The actual cargo owner only appears on the House B/L.",
+    sections:[...SECTIONS_A,{id:"containers",title:"Container / Rider page",fields:[
+      {k:"containerNo",l:"Container #",dt:"CHAR(11)",req:1,rule:"ISO 6346 check digit"},
+      {k:"containerType",l:"Type/size",dt:"ENUM",req:1,opts:CTYPES},
+      {k:"sealNo",l:"Seal no",dt:"VARCHAR(20)"},
+      {k:"poNumber",l:"PO #",dt:"VARCHAR(35)"},
+      {k:"hsCode",l:"HS code",dt:"VARCHAR(12)"},
+      {k:"descriptionOfGoods",l:"Description of goods",dt:"TEXT",req:1},
+      {k:"grossWeight",l:"Gross weight (KGS)",dt:"DECIMAL(12,3)",req:1},
+      {k:"cbm",l:"CBM",dt:"DECIMAL(10,3)"}
+    ]},...SECTIONS_B],
+    crossFieldRules:[
+      "sum(containers.grossWeight) = totalGrossWeight",
+      "totalNetWeight <= totalGrossWeight",
+      "count(active containers) = carrierReceipt integer",
+      "shippedOnBoardDate >= dateOfIssue",
+      "transportType = PORT-TO-PORT implies placeOfReceipt = blank",
+      "transportType = COMBINED TRANSPORT implies placeOfReceipt is present",
+      "portOfLoading != portOfDischarge",
+      "shipper on Master BL must be the forwarder, not the cargo owner"
+    ],
+    keyDifferencesFromHouseBL:[
+      "Shipper = freight forwarder (not cargo owner)",
+      "Consignee = destination agent (not buyer)",
+      "Document type = Sea Waybill (non-negotiable) — no originals issued",
+      "Release at POD requires proof of identity only, no surrender of document",
+      "Freight shown as 'AS PER AGREEMENT' — no line-item charges on face",
+      "Carrier's receipt counts containers, not packages",
+      "No B/L term, no number-of-originals, no notify disclaimer fields — those live on the House BL"
+    ]
+  };
+  const blob=new Blob([JSON.stringify(spec,null,2)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="mbl_field_spec.json"; a.click(); URL.revokeObjectURL(a.href);
+};
+</script>
+</body>
+</html>
