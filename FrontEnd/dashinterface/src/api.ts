@@ -11,6 +11,8 @@ import type {
   DeliveryType, UnifiedRate, PortRecord, ServiceScope, RateSourceType,
   LinerRecord, TradeLaneRecord, ContactPersonRecord, EmployeeRecord, ClientRecord,
   ContainerLine, BackendReleaseOrderPayload, CompletedRateRequestsResponse,
+  OceanSchedule, SchedulePayload, IncomingRateRequest,
+  AggregateScheduleRatesResponse, TrackingContainer,
 } from './types'
 
 const BASE = import.meta.env.VITE_API_BASE || '/api'
@@ -242,7 +244,7 @@ export function apiCreateInquiry(data: {
       commodity_index: idx,
       container_type:  c.containerType ?? undefined,
       qty:             c.quantity,
-      destination:     c.destination || data.destination || '',
+      destination:     c.destination || data.destination || undefined,
       zip_code:        c.zipCode     || undefined,
       address:         c.address     ?? undefined,
       temperature:     c.temperature ?? undefined,
@@ -279,7 +281,7 @@ export function apiCreateInquiry(data: {
     },
     inquiry: {
       sbu:              data.sbu              ?? undefined,
-      origin:           data.origin           ?? '',
+      origin:           data.origin           || undefined,
       service_mode:     serviceMode,
       priority:         data.priority         ?? undefined,
       incoterm:         data.incoterm         ?? undefined,
@@ -320,7 +322,7 @@ function buildInquiryAndContainers(data: {
   return {
     inquiry: {
       sbu:              data.sbu              ?? undefined,
-      origin:           data.origin           ?? '',
+      origin:           data.origin           || undefined,
       service_mode:     serviceMode,
       priority:         data.priority         ?? undefined,
       incoterm:         data.incoterm         ?? undefined,
@@ -340,7 +342,7 @@ function buildInquiryAndContainers(data: {
       commodity_index: idx,
       container_type:  c.containerType ?? undefined,
       qty:             c.quantity,
-      destination:     c.destination || data.destination || '',
+      destination:     c.destination || data.destination || undefined,
       zip_code:        c.zipCode     || undefined,
       address:         c.address     ?? undefined,
       temperature:     c.temperature ?? undefined,
@@ -1013,6 +1015,12 @@ export function apiGetEmployeesDb(): Promise<EmployeeRecord[]> {
   return get<EmployeeRecord[]>('/employees')
 }
 
+/** Fetch employees from auth module, optionally filtered by department. */
+export function apiGetAuthEmployees(dept?: string): Promise<EmployeeRecord[]> {
+  const qs = dept ? `?dept=${encodeURIComponent(dept)}` : ''
+  return get<EmployeeRecord[]>(`/auth/employees${qs}`)
+}
+
 export function apiGetClientsDb(): Promise<ClientRecord[]> {
   return get<ClientRecord[]>('/clients/clients')
 }
@@ -1046,28 +1054,56 @@ export function apiCreateRateRequest(data: {
   emp_id_requested: number
   is_given?: boolean
   remark: string
+  selected_schedules?: SchedulePayload[]
 }): Promise<RateRequestRecord> {
   return post<RateRequestRecord>('/rate-requests', data)
 }
 
 /**
- * Patch an existing rate request — used when Procurement sends the rate brief
- * to Sales (marking is_given=true) and updating the remark with the message
- * to the salesperson.
- * NOTE: Requires PATCH /rate-requests/{request_id} to be added to the backend router.
+ * Patch a rate request as Customer Service — updates remark and is_given flag.
+ * Backend route: PATCH /rate-requests/{request_id}/cs
  */
-export function apiPatchRateRequest(requestId: number, data: {
-  emp_id_requester?: number
-  emp_id_requested?: number
+export function apiPatchRateRequestCs(requestId: number, data: {
   is_given?: boolean
-  remark: string              // required in backend RateRequestPatch — no default
+  remark: string
+  selected_schedules?: SchedulePayload[]
 }): Promise<Record<string, unknown>> {
-  return patch<Record<string, unknown>>(`/rate-requests/${requestId}`, data)
+  return patch<Record<string, unknown>>(`/rate-requests/${requestId}/cs`, data)
+}
+
+/**
+ * Patch a rate request as Procurement — updates remark and is_given flag.
+ * Backend route: PATCH /rate-requests/{request_id}/proc
+ */
+export function apiPatchRateRequestProc(requestId: number, data: {
+  is_given?: boolean
+  remark: string
+  options?: { rate_type: string; rate_id: number; schedule_id?: number }[]
+}): Promise<Record<string, unknown>> {
+  return patch<Record<string, unknown>>(`/rate-requests/${requestId}/proc`, data)
 }
 
 /** Delete a rate request. */
 export function apiDeleteRateRequest(requestId: number): Promise<Record<string, unknown>> {
   return del<Record<string, unknown>>(`/rate-requests/${requestId}`)
+}
+
+/** Fetch incoming rate requests for the current procurement employee. */
+export function apiGetIncomingRateRequests(): Promise<IncomingRateRequest[]> {
+  return get<IncomingRateRequest[]>('/rate-requests/incoming')
+}
+
+/** Fetch aggregate schedule + rate data for the given schedule IDs and client. */
+export function apiGetAggregateScheduleRates(params: {
+  cli_id: number
+  schedule_ids: number[]
+  request_id: number
+}): Promise<AggregateScheduleRatesResponse> {
+  const qs = new URLSearchParams()
+  qs.set('cli_id', String(params.cli_id))
+  qs.set('schedule_ids', params.schedule_ids.join(','))
+  qs.set('request_id', String(params.request_id))
+  return get<AggregateScheduleRatesResponse>(`/inquiries/schedules/aggregate-rates?${qs.toString()}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -1086,6 +1122,7 @@ export function apiAddRateRequestOption(requestId: number, data: {
   request_id: number
   rate_type: string
   rate_id: number
+  schedule_id?: number
 }): Promise<RateRequestOptionRecord> {
   return post<RateRequestOptionRecord>(`/rate-requests/${requestId}/options`, data)
 }
@@ -1114,6 +1151,140 @@ export function apiFetchCompletedRateRequests(): Promise<CompletedRateRequestsRe
 }
 
 // ---------------------------------------------------------------------------
+// Ocean Schedules (INTTRA)
+// ---------------------------------------------------------------------------
+
+/** Map a single snake_case schedule row from the backend into camelCase OceanSchedule. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapSchedule(r: any): OceanSchedule {
+  return {
+    scac:                    r.scac ?? null,
+    carrierName:             r.carrier_name ?? r.carrierName ?? null,
+    serviceName:             r.service_name ?? r.serviceName ?? null,
+    vesselName:              r.vessel_name ?? r.vesselName ?? null,
+    voyageNumber:            r.voyage_number ?? r.voyageNumber ?? null,
+    imoNumber:               r.imo_number ?? r.imoNumber ?? null,
+    originUnloc:             r.origin_unloc ?? r.originUnloc ?? null,
+    originCountry:           r.origin_country ?? r.originCountry ?? null,
+    originCityName:          r.origin_city_name ?? r.originCityName ?? null,
+    originSubdivision:       r.origin_subdivision ?? r.originSubdivision ?? null,
+    originTerminal:          r.origin_terminal ?? r.originTerminal ?? null,
+    destinationUnloc:        r.destination_unloc ?? r.destinationUnloc ?? null,
+    destinationCountry:      r.destination_country ?? r.destinationCountry ?? null,
+    destinationCityName:     r.destination_city_name ?? r.destinationCityName ?? null,
+    destinationSubdivision:  r.destination_subdivision ?? r.destinationSubdivision ?? null,
+    destinationTerminal:     r.destination_terminal ?? r.destinationTerminal ?? null,
+    originDepartureDate:     r.origin_departure_date ?? r.originDepartureDate ?? null,
+    destinationArrivalDate:  r.destination_arrival_date ?? r.destinationArrivalDate ?? null,
+    estimatedTerminalCutoff: r.estimated_terminal_cutoff ?? r.estimatedTerminalCutoff ?? null,
+    terminalCutoff:          r.terminal_cutoff ?? r.terminalCutoff ?? null,
+    bkCutoff:                r.bk_cutoff ?? r.bkCutoff ?? null,
+    siCutoff:                r.si_cutoff ?? r.siCutoff ?? null,
+    hazBkCutoff:             r.haz_bk_cutoff ?? r.hazBkCutoff ?? null,
+    vgmCutoff:               r.vgm_cutoff ?? r.vgmCutoff ?? null,
+    reeferCutoff:            r.reefer_cutoff ?? r.reeferCutoff ?? null,
+    totalDuration:           r.total_duration ?? r.totalDuration ?? null,
+    scheduleType:            r.schedule_type ?? r.scheduleType ?? null,
+    allowsRORO:              r.allows_roro ?? r.allowsRORO ?? null,
+    allowsBreakbulk:         r.allows_breakbulk ?? r.allowsBreakbulk ?? null,
+    scheduleSource:          r.schedule_source ?? r.scheduleSource ?? null,
+    createdDate:             r.created_date ?? r.createdDate ?? null,
+    legs:                    r.legs ?? null,
+    linId:                   r.lin_id ?? r.linId ?? null,
+    sch_id:                  r.schedule_id ?? r.sch_id,
+  }
+}
+
+/** Search ocean schedules via the INTTRA integration endpoint. */
+export function apiSearchSchedules(params: {
+  scac: string             // required — comma-separated carrier SCAC codes
+  originPort: string
+  destinationPort: string
+  searchDate: string       // required — ISO date string (YYYY-MM-DD)
+  searchDateType?: 'ByDepartureDate'
+  weeksOut?: number
+  directOnly?: boolean
+}): Promise<OceanSchedule[]> {
+  const qs = new URLSearchParams()
+  qs.set('scac', params.scac)
+  qs.set('originPort', params.originPort)
+  qs.set('destinationPort', params.destinationPort)
+  qs.set('searchDate', params.searchDate)
+  qs.set('searchDateType', params.searchDateType ?? 'ByDepartureDate')
+  if (params.weeksOut != null) qs.set('weeksOut', String(params.weeksOut))
+  if (params.directOnly != null) qs.set('directOnly', String(params.directOnly))
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return get<any[]>(`/inquiries/schedules?${qs.toString()}`).then(rows => rows.map(mapSchedule))
+}
+
+/** Fetch all schedules already stored in the database. */
+export function apiGetAllSchedules(): Promise<OceanSchedule[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return get<any[]>('/inquiries/schedules/all').then(rows => rows.map(mapSchedule))
+}
+
+/** Fetch all saved schedules with their matched rates (enriched view). */
+export function apiGetAllAggregateRates(): Promise<AggregateScheduleRatesResponse> {
+  return get<AggregateScheduleRatesResponse>('/inquiries/schedules/enriched')
+}
+
+/** Fetch enriched schedule+rates with optional client/inquiry/port-pair filters. */
+export function apiGetEnrichedScheduleRates(params?: { cli_id?: number; inq_id?: number; port_pair?: string }): Promise<AggregateScheduleRatesResponse> {
+  const qs = new URLSearchParams()
+  if (params?.cli_id != null) qs.append('cli_id', String(params.cli_id))
+  if (params?.inq_id != null) qs.append('inq_id', String(params.inq_id))
+  if (params?.port_pair) qs.append('port_pair', params.port_pair)
+  const query = qs.toString()
+  return get<AggregateScheduleRatesResponse>(`/inquiries/schedules/enriched${query ? `?${query}` : ''}`)
+}
+
+/** Bulk search ocean schedules for multiple port pairs via POST /schedules/bulk. */
+export function apiSearchSchedulesBulk(params: {
+  scacs: string
+  portPairs: { originPort: string; destinationPort: string }[]
+  searchDate: string
+  weeksOut: number
+  directOnly?: boolean
+}): Promise<OceanSchedule[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return post<any[]>('/inquiries/schedules/bulk', {
+    scacs: params.scacs,
+    portPairs: params.portPairs,
+    searchDate: params.searchDate,
+    searchDateType: 'ByDepartureDate',
+    weeksOut: params.weeksOut,
+    directOnly: params.directOnly ?? false,
+  }).then(pairs => {
+    const all: OceanSchedule[] = []
+    for (const pair of pairs) {
+      // Backend returns flat schedule objects directly in pair.schedules
+      const schedules = Array.isArray(pair.schedules) ? pair.schedules : []
+      for (const s of schedules) all.push(mapSchedule(s))
+    }
+    return all
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Tracking Events (Track & Trace)
+// ---------------------------------------------------------------------------
+
+/** Search tracking events by reference number(s). At least one parameter required. */
+export function apiTrackingEvents(params: {
+  inttra_booking_reference?: string
+  carrier_booking_reference?: string
+  bill_of_lading_number?: string
+  equipment_reference?: string
+}): Promise<TrackingContainer[]> {
+  const qs = new URLSearchParams()
+  if (params.inttra_booking_reference) qs.set('inttra_booking_reference', params.inttra_booking_reference)
+  if (params.carrier_booking_reference) qs.set('carrier_booking_reference', params.carrier_booking_reference)
+  if (params.bill_of_lading_number) qs.set('bill_of_lading_number', params.bill_of_lading_number)
+  if (params.equipment_reference) qs.set('equipment_reference', params.equipment_reference)
+  return get<TrackingContainer[]>(`/tracking/events?${qs.toString()}`)
+}
+
+// ---------------------------------------------------------------------------
 // Quotations (backend /quotations/ resource)
 // ---------------------------------------------------------------------------
 
@@ -1124,6 +1295,7 @@ export interface QuotationRecord {
   sent_via: string
   acceptence_deadline: string | null   // backend typo — must match exactly
   status: string
+  is_follow_up: boolean
 }
 
 export interface QuotationOptionPayload {
@@ -1132,6 +1304,12 @@ export interface QuotationOptionPayload {
   option_id: number
   amt: number
   currency: string
+  vessel?: string
+  voyage?: string
+  remark?: string
+  margin: number
+  is_percentage?: boolean
+  final_amt: number
 }
 
 /** Row returned by GET /quotations/{quote_id} — one row per option (LEFT JOIN). */
@@ -1142,11 +1320,27 @@ export interface QuotationOptionRow {
   sent_via: string
   acceptence_deadline: string | null
   status: string
+  is_follow_up: boolean
   option_id: number | null
   rate_id: number | null
   amt: number | null
   option_currency: string | null
   option_inq_id: number | null
+  vessel: string | null
+  voyage: string | null
+  remark: string | null
+  margin: number | null
+  is_percentage: boolean | null
+  final_amt: number | null
+  // Joined inquiry/client fields
+  client_name: string | null
+  origin: string | null
+  destination: string | null
+  qty: number | null
+  container_type: string | null
+  contact_name: string | null
+  email: string | null
+  whatsapp: string | null
 }
 
 /** Create a structured quotation record in the backend. */
@@ -1155,7 +1349,8 @@ export function apiCreateQuotation(data: {
   quote_date: string
   sent_via: string
   options?: QuotationOptionPayload[]
-  acceptance_deadline?: string        // QuotationNew uses correct spelling; DB column is acceptance_deadline
+  acceptence_deadline?: string        // backend field name (intentional typo)
+  is_follow_up?: boolean
 }): Promise<QuotationRecord> {
   return post<QuotationRecord>('/quotations/', data)
 }
@@ -1197,6 +1392,127 @@ export function apiDeleteQuotation(quoteId: number): Promise<Record<string, unkn
   return del<Record<string, unknown>>(`/quotations/${quoteId}`)
 }
 
+/** Unsent quotation record from GET /quotations/unsent. */
+export interface UnsentQuotation {
+  inq_id: number
+  status: string
+  quote_date: string
+  acceptence_deadline: string | null
+  body_json: Record<string, unknown> | null
+  body_html: string | null
+}
+
+/** Fetch all quotations that have not yet been sent (status = 'saved'). */
+export function apiGetUnsentQuotations(): Promise<UnsentQuotation[]> {
+  return get<UnsentQuotation[]>('/quotations/unsent')
+}
+
+/** Flat row from GET /quotations/sent — one row per quotation+option combination. */
+export interface SentQuotationRow {
+  quote_id: number
+  inq_id: number
+  emp_id: number
+  status: string
+  quote_date: string
+  is_follow_up: boolean
+  acceptance_deadline: string | null
+  sent_via: string
+  accepted_option: number | null
+  body_json: Record<string, unknown> | null
+  body_html: string | null
+  s3_url: string | null
+  client_name: string
+  origin: string
+  destination: string
+  qty: number
+  container_type: string
+  option_id: number | null
+  rate_id: number | null
+  vessel: string | null
+  voyage: string | null
+  amt: number | null
+  remark: string | null
+  margin: number | null
+  is_percentage: boolean | null
+  final_amt: number | null
+  option_currency: string | null
+  option_inq_id: number | null
+}
+
+/** Fetch all quotations in approval_pending status (sent, awaiting customer response). */
+export function apiGetSentQuotations(): Promise<SentQuotationRow[]> {
+  return get<SentQuotationRow[]>('/quotations/sent')
+}
+
+/** Accepted quotation row — one row per accepted quotation+option from GET /quotations/accepted. */
+export interface AcceptedQuotationRow {
+  inq_id: number
+  cli_id: number
+  client_name: string
+  origin: string
+  destination: string
+  qty: number
+  container_type: string
+  cargo_ready_date: string | null
+  delivery_type: string | null
+  delivery_term: string | null
+  commodity: number | null
+  hs_code: string | null
+  agreed_rate: number | null
+  rate_remark: string | null
+  currency: string | null
+  rate_id: number | null
+  option_id: number | null
+  rate_type: string | null
+  schedule_id: number | null
+  vessel: string | null
+  voyage: string | null
+  vessel_etd: string | null
+  lin_id: number | null
+}
+
+/** Fetch all accepted quotations (customer accepted — ready for booking). */
+export function apiGetAcceptedQuotations(): Promise<AcceptedQuotationRow[]> {
+  return get<AcceptedQuotationRow[]>('/quotations/accepted')
+}
+
+/** Fetch presigned S3 download URL for a saved quotation file. */
+export function apiGetQuotationFile(quoteId: number): Promise<{ quote_id: number; download_url: string }> {
+  return get<{ quote_id: number; download_url: string }>(`/quotations/${quoteId}/file`)
+}
+
+/** Upload quotation document (PDF file + optional body_json / body_html) via multipart form-data. */
+export interface QuotationDocumentResponse {
+  quote_id: number
+  s3_url: string
+  body_json: Record<string, unknown> | null
+  body_html: string | null
+}
+
+export async function apiUploadQuotationDocument(
+  quoteId: number,
+  file: Blob,
+  fileName: string,
+  bodyHtml?: string,
+  bodyJson?: Record<string, unknown>,
+): Promise<QuotationDocumentResponse> {
+  const form = new FormData()
+  form.append('file', file, fileName)
+  if (bodyHtml) form.append('body_html', bodyHtml)
+  if (bodyJson) form.append('body_json', JSON.stringify(bodyJson))
+
+  const res = await fetch(`${BASE}/quotations/${quoteId}/document`, {
+    method: 'POST',
+    body: form,
+  })
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null)
+    console.error(`POST /quotations/${quoteId}/document failed ${res.status}:`, detail)
+    throw new Error(`POST /quotations/${quoteId}/document failed: ${res.status}`)
+  }
+  return res.json()
+}
+
 // ---------------------------------------------------------------------------
 // KYC Stage
 // ---------------------------------------------------------------------------
@@ -1229,6 +1545,11 @@ export function apiCreateActivity(_data: {
 // Booking Requests
 // ---------------------------------------------------------------------------
 
+export interface BookingContainer {
+  container_type: string
+  qty: number
+}
+
 export interface BookingRequestPayload {
   inq_id: number
   cli_id: number
@@ -1246,6 +1567,7 @@ export interface BookingRequestPayload {
   hs_code: string
   bl_type: string
   notes: string
+  containers: BookingContainer[]
   rate_remark?: string
   contract_no?: string
   ra_number?: string

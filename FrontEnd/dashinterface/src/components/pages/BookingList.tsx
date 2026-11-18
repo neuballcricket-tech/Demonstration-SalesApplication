@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react'
-import { Eye, X } from 'lucide-react'
+import { PackageCheck, Eye, X } from 'lucide-react'
 import {
   EMPLOYEES, daysUntil,
   type Booking, type ActivityEntry,
 } from '../../types'
 import { useRole } from '../../RoleContext'
+import { PAGE_WRAPPER, PAGE_TITLE_ROW, PAGE_TITLE_ICON, PAGE_TITLE_H2, CARD, FIELD_LABEL, INPUT_STYLE } from './pageStyles'
 
 interface BookingListProps {
   bookings: Booking[]
@@ -52,28 +53,27 @@ export default function BookingList({ bookings, activityLog }: BookingListProps)
   const hasFilters = filterCustomer || filterStatus || filterLiner || filterOrigin || filterDestination || filterDate
 
   return (
-    <div className="db-page-anim">
+    <div style={PAGE_WRAPPER}>
       {/* Page header */}
-      <div className="db-page-head">
-        <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>Booking List</h2>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
-            {filtered.length} booking{filtered.length !== 1 ? 's' : ''}{hasFilters ? ' (filtered)' : ''} · {activeRole} view
-          </p>
-        </div>
+      <div style={PAGE_TITLE_ROW}>
+        <PackageCheck size={18} style={PAGE_TITLE_ICON} />
+        <h2 style={PAGE_TITLE_H2}>Booking List</h2>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+          {filtered.length} booking{filtered.length !== 1 ? 's' : ''}{hasFilters ? ' (filtered)' : ''} · {activeRole} view
+        </span>
       </div>
 
       {/* Filters */}
-      <div className="db-chart-card" style={{ marginBottom: 16, padding: '16px 20px' }}>
+      <div style={{ ...CARD, marginBottom: 16, padding: '16px 20px' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
           <div>
-            <label style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Customer</label>
-            <input className="lt-input" style={{ width: '100%', fontSize: 12 }} value={filterCustomer}
+            <label style={FIELD_LABEL}>Customer</label>
+            <input style={INPUT_STYLE} value={filterCustomer}
               onChange={e => setFilterCustomer(e.target.value)} placeholder="Search..." />
           </div>
           <div>
-            <label style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Status</label>
-            <select className="lt-input" style={{ width: '100%', fontSize: 12 }} value={filterStatus}
+            <label style={FIELD_LABEL}>Status</label>
+            <select style={INPUT_STYLE} value={filterStatus}
               onChange={e => setFilterStatus(e.target.value)}>
               <option value="">All</option>
               <option value="Pending Liner">Pending Liner</option>
@@ -84,24 +84,24 @@ export default function BookingList({ bookings, activityLog }: BookingListProps)
             </select>
           </div>
           <div>
-            <label style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Shipping Line</label>
-            <input className="lt-input" style={{ width: '100%', fontSize: 12 }} value={filterLiner}
+            <label style={FIELD_LABEL}>Shipping Line</label>
+            <input style={INPUT_STYLE} value={filterLiner}
               onChange={e => setFilterLiner(e.target.value)} placeholder="Search..." />
           </div>
           <div>
-            <label style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Origin</label>
-            <input className="lt-input" style={{ width: '100%', fontSize: 12 }} value={filterOrigin}
+            <label style={FIELD_LABEL}>Origin</label>
+            <input style={INPUT_STYLE} value={filterOrigin}
               onChange={e => setFilterOrigin(e.target.value)} placeholder="Search..." />
           </div>
           <div>
-            <label style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Destination</label>
-            <input className="lt-input" style={{ width: '100%', fontSize: 12 }} value={filterDestination}
+            <label style={FIELD_LABEL}>Destination</label>
+            <input style={INPUT_STYLE} value={filterDestination}
               onChange={e => setFilterDestination(e.target.value)} placeholder="Search..." />
           </div>
           <div>
-            <label style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', marginBottom: 4, display: 'block' }}>Created Date</label>
+            <label style={FIELD_LABEL}>Created Date</label>
             <div style={{ display: 'flex', gap: 4 }}>
-              <input type="date" className="lt-input" style={{ flex: 1, fontSize: 12 }} value={filterDate}
+              <input type="date" style={{ ...INPUT_STYLE, flex: 1 }} value={filterDate}
                 onChange={e => setFilterDate(e.target.value)} />
               {filterDate && <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0 4px' }} onClick={() => setFilterDate('')}><X size={13} /></button>}
             </div>
@@ -116,7 +116,7 @@ export default function BookingList({ bookings, activityLog }: BookingListProps)
       </div>
 
       {/* Table */}
-      <div className="db-chart-card" style={{ padding: '0 0 8px' }}>
+      <div style={{ ...CARD, padding: '0 0 8px' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
             <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.06em' }}>

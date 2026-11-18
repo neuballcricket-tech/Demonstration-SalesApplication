@@ -1,18 +1,21 @@
-import { useState, useEffect } from 'react'
-import { ArrowLeft, ChevronRight, FileDown, FileText, Globe, Loader2, PanelRight, Plus, Send, X } from 'lucide-react'
+import { useState, useEffect, useMemo, useRef, Fragment } from 'react'
+import { ArrowLeft, ChevronRight, FileDown, FileText, Loader2, PanelRight, Plus, Send, Ship, X, Filter } from 'lucide-react'
 import {
-  RATE_SOURCE_COLORS, COMMODITY_TYPES, portOptions,
+  RATE_SOURCE_COLORS, COMMODITY_TYPES, portOptions, CONTAINER_TYPE_LABELS,
   type Inquiry, type Customer, type ContainerLine, type UnifiedRate,
   type WorkflowStage, type ActivityEntry,
   type PortRecord, type LinerRecord, type TradeLaneRecord, type EmployeeRecord,
+  type IncomingScheduleDetail, type AggregateScheduleRatesResponse, type AggregateRate, type SchedulePayload,
+  linerDisplay,
 } from '../../types'
 import { useRole } from '../../RoleContext'
-import { apiFetchAllRates, apiGetPorts, apiGetLiners, apiGetTradeLanes, apiGetEmployeesDb, apiCreateVesselRate, apiCreateFakRate, apiCreateSpecialRate, apiCreateRateRequest, apiPatchRateRequest, apiAddRateRequestOption } from '../../api'
+import { FIELD_LABEL, INPUT_STYLE } from './pageStyles'
+import { apiFetchAllRates, apiGetPorts, apiGetLiners, apiGetTradeLanes, apiGetEmployeesDb, apiGetAuthEmployees, apiCreateVesselRate, apiCreateFakRate, apiCreateSpecialRate, apiCreateRateRequest, apiPatchRateRequestCs, apiPatchRateRequestProc, apiAddRateRequestOption, apiGetIncomingRateRequests, apiGetAggregateScheduleRates, apiGetEnrichedScheduleRates } from '../../api'
 
 type ManualRateTab = 'vessel-spot' | 'fak' | 'special'
 const MR_TAB_LABELS: Record<ManualRateTab, string> = { 'vessel-spot': 'Spot Rate', fak: 'FAK', special: 'Special Rate' }
-const MR_CONTAINER_TYPES = ['20GP', '40GP', '40HC', '20 Reefer', '40 Reefer', '20 Flat Rack', '40 Flat Rack', '20 Open Tops', '40 Open Tops']
-const MR_VESSEL_CONTAINER_TYPES = [...MR_CONTAINER_TYPES, 'Tanker']
+const MR_CONTAINER_TYPES = ['20GP', '40GP', '40HC', '20RF', '40RF', '20FR', '40FR', '20OT', '40OT'] as const
+const MR_VESSEL_CONTAINER_TYPES = [...MR_CONTAINER_TYPES, 'TANKER'] as const
 interface MrContainerRate {
   containerType: string
   tus: string
@@ -30,6 +33,8 @@ const SURCHARGE_TYPES = [
 interface ManualRateEntry {
   id: string
   tab: ManualRateTab
+  scheduleId: number | null
+  scheduleSummary: string | null
   liner: string
   tradeLane: string
   origin: string
@@ -58,6 +63,542 @@ interface ManualRateEntry {
   commodityType: string
   commodityName: string
   surcharges: { type: string; amount: string; currency: string }[]
+}
+
+// ---- Pivot data model for enriched schedule+rate tables ----
+
+const RATE_TYPE_ORDER_RC = ['Tariff', 'FAK', 'Special', 'VBV', 'NAC', 'Contracted']
+const CNTR_SORT_RC: Record<string, number> = { '20GP': 0, '40GP': 1, '40HC': 2, '20RF': 3, '40RF': 4, '45HC': 5 }
+const RATE_COLORS_RC: Record<string, string> = {
+  Tariff: '#2563eb', FAK: '#7c3aed', Special: '#d97706', VBV: '#16a34a',
+  NAC: '#0891b2', Contracted: '#dc2626',
+}
+
+interface SelectableRateCell {
+  rateId: number
+  rateTypeKey: string
+  rate: number
+  currency: string
+  note: string | null
+  validFrom: string
+  validTo: string
+  freeTime: string | null
+  transit: string | null
+}
+
+interface SelectablePivotRow {
+  scheduleId: number
+  linerName: string | null
+  vesselName: string | null
+  voyageNumber: string | null
+  origin: string
+  destination: string
+  originCity: string | null
+  destinationCity: string | null
+  etd: string | null
+  eta: string | null
+  bkCutoff: string | null
+  totalDuration: number | null
+  scheduleType: string | null
+  rates: Record<string, Record<string, SelectableRateCell[]>>
+}
+
+interface SelectablePivotResult {
+  rows: SelectablePivotRow[]
+  rateTypes: string[]
+  containerTypes: string[]
+}
+
+function pivotEnrichedData(data: AggregateScheduleRatesResponse): SelectablePivotResult {
+  const allCntr = new Set<string>()
+  const allRT = new Set<string>()
+  const rows: SelectablePivotRow[] = []
+
+  for (const entry of Object.values(data)) {
+    const s = entry.schedule
+    const rates: Record<string, Record<string, SelectableRateCell[]>> = {}
+
+    const add = (arr: AggregateRate[], rt: string, rtKey: string) => {
+      for (const r of arr) {
+        allCntr.add(r.container_type)
+        allRT.add(rt)
+        if (!rates[rt]) rates[rt] = {}
+        if (!rates[rt][r.container_type]) rates[rt][r.container_type] = []
+        rates[rt][r.container_type].push({
+          rateId: r.rate_id, rateTypeKey: rtKey,
+          rate: r.rate, currency: r.currency,
+          note: r.note ?? r.special_remark ?? null,
+          validFrom: r.valid_from, validTo: r.valid_to,
+          freeTime: r.free_time, transit: r.transit,
+        })
+      }
+    }
+
+    add(entry.tariff_rates, 'Tariff', 'tariff_rates')
+    add(entry.fak_rates, 'FAK', 'fak_rates')
+    add(entry.special_rate, 'Special', 'special_rate')
+    add(entry.vessel_by_vessel_rate, 'VBV', 'vessel_by_vessel_rate')
+    if (entry.nac) add(entry.nac, 'NAC', 'nac')
+    if (entry.contracted_rates) add(entry.contracted_rates, 'Contracted', 'contracted_rates')
+
+    rows.push({
+      scheduleId: s.schedule_id,
+      linerName: s.liner_name ?? null,
+      vesselName: s.vessel_name ?? null,
+      voyageNumber: s.voyage_number ?? null,
+      origin: s.origin_unloc ?? '',
+      destination: s.destination_unloc ?? '',
+      originCity: s.origin_city_name ?? null,
+      destinationCity: s.destination_city_name ?? null,
+      etd: s.origin_departure_date,
+      eta: s.destination_arrival_date,
+      bkCutoff: s.bk_cutoff ?? null,
+      totalDuration: s.total_duration,
+      scheduleType: s.schedule_type,
+      rates,
+    })
+  }
+
+  const containerTypes = [...allCntr].sort((a, b) => {
+    const oa = CNTR_SORT_RC[a] ?? 99, ob = CNTR_SORT_RC[b] ?? 99
+    return oa !== ob ? oa - ob : a.localeCompare(b)
+  })
+  const rateTypes = RATE_TYPE_ORDER_RC.filter(rt => allRT.has(rt))
+
+  return { rows, rateTypes, containerTypes }
+}
+
+// ---- Selection helpers for pivot table ----
+
+function getGroupAggKeys(row: SelectablePivotRow, rateType: string): string[] {
+  const cells = row.rates[rateType]
+  if (!cells) return []
+  const keys: string[] = []
+  for (const ctCells of Object.values(cells)) {
+    for (const c of ctCells) keys.push(`${row.scheduleId}:${c.rateTypeKey}:${c.rateId}`)
+  }
+  return keys
+}
+
+function isGroupSelected(row: SelectablePivotRow, rateType: string, selected: Set<string>): boolean {
+  const keys = getGroupAggKeys(row, rateType)
+  return keys.length > 0 && keys.every(k => selected.has(k))
+}
+
+function isGroupPartial(row: SelectablePivotRow, rateType: string, selected: Set<string>): boolean {
+  const keys = getGroupAggKeys(row, rateType)
+  if (keys.length === 0) return false
+  const count = keys.filter(k => selected.has(k)).length
+  return count > 0 && count < keys.length
+}
+
+function toggleGroup(row: SelectablePivotRow, rateType: string, selected: Set<string>): Set<string> {
+  const keys = getGroupAggKeys(row, rateType)
+  const next = new Set(selected)
+  const allSelected = keys.every(k => next.has(k))
+  if (allSelected) { for (const k of keys) next.delete(k) }
+  else { for (const k of keys) next.add(k) }
+  return next
+}
+
+// ---- Row-level selection: toggle all rate type groups for an entire schedule row ----
+
+function getRowAllKeys(row: SelectablePivotRow, rateTypes: string[]): string[] {
+  const keys: string[] = []
+  for (const rt of rateTypes) keys.push(...getGroupAggKeys(row, rt))
+  return keys
+}
+
+function isRowSelected(row: SelectablePivotRow, rateTypes: string[], selected: Set<string>): boolean {
+  const keys = getRowAllKeys(row, rateTypes)
+  return keys.length > 0 && keys.every(k => selected.has(k))
+}
+
+function isRowPartial(row: SelectablePivotRow, rateTypes: string[], selected: Set<string>): boolean {
+  const keys = getRowAllKeys(row, rateTypes)
+  if (keys.length === 0) return false
+  const count = keys.filter(k => selected.has(k)).length
+  return count > 0 && count < keys.length
+}
+
+function toggleRow(row: SelectablePivotRow, rateTypes: string[], selected: Set<string>): Set<string> {
+  const keys = getRowAllKeys(row, rateTypes)
+  const next = new Set(selected)
+  const allSelected = keys.every(k => next.has(k))
+  if (allSelected) { for (const k of keys) next.delete(k) }
+  else { for (const k of keys) next.add(k) }
+  return next
+}
+
+function countPivotRates(pivot: SelectablePivotResult): number {
+  let count = 0
+  for (const row of pivot.rows) {
+    for (const rt of Object.values(row.rates)) {
+      for (const cells of Object.values(rt)) count += cells.length
+    }
+  }
+  return count
+}
+
+// ---------------------------------------------------------------------------
+// SelectablePivotRateTable — rate types as columns, container types as sub-cols
+// ---------------------------------------------------------------------------
+
+function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onToggleGroup, onToggleRow, onToggleSchedule, onAttachManualRate, emptyMessage }: {
+  pivot: SelectablePivotResult
+  selectedIds: Set<string>
+  selectedScheduleIds: Set<number>
+  onToggleGroup: (row: SelectablePivotRow, rateType: string) => void
+  onToggleRow: (row: SelectablePivotRow) => void
+  onToggleSchedule: (scheduleId: number) => void
+  onAttachManualRate?: (row: SelectablePivotRow) => void
+  emptyMessage?: string
+}) {
+  const { rows, rateTypes, containerTypes } = pivot
+
+  // Filters
+  const [fCarrier, setFCarrier] = useState<Set<string>>(new Set())
+  const [fOrigin, setFOrigin] = useState<Set<string>>(new Set())
+  const [fDest, setFDest] = useState<Set<string>>(new Set())
+  const [openFilter, setOpenFilter] = useState<string | null>(null)
+  const filterBarRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => { setFCarrier(new Set()); setFOrigin(new Set()); setFDest(new Set()); setOpenFilter(null) }, [rows])
+
+  useEffect(() => {
+    if (!openFilter) return
+    const handler = (e: MouseEvent) => {
+      if (filterBarRef.current && !filterBarRef.current.contains(e.target as Node)) setOpenFilter(null)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [openFilter])
+
+  const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—'
+
+  const distinct = useMemo(() => {
+    const carriers = new Map<string, number>()
+    const origins = new Map<string, number>()
+    const destinations = new Map<string, number>()
+    for (const r of rows) {
+      const c = r.linerName || '—'; carriers.set(c, (carriers.get(c) ?? 0) + 1)
+      const o = r.originCity || r.origin || '—'; origins.set(o, (origins.get(o) ?? 0) + 1)
+      const d = r.destinationCity || r.destination || '—'; destinations.set(d, (destinations.get(d) ?? 0) + 1)
+    }
+    return { carriers, origins, destinations }
+  }, [rows]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const filtered = useMemo(() => {
+    if (!fCarrier.size && !fOrigin.size && !fDest.size) return rows
+    return rows.filter(r => {
+      if (fCarrier.size && !fCarrier.has(r.linerName || '—')) return false
+      if (fOrigin.size && !fOrigin.has(r.originCity || r.origin || '—')) return false
+      if (fDest.size && !fDest.has(r.destinationCity || r.destination || '—')) return false
+      return true
+    })
+  }, [rows, fCarrier, fOrigin, fDest])
+
+  const activeCount = [fCarrier, fOrigin, fDest].filter(s => s.size > 0).length
+  const clearAll = () => { setFCarrier(new Set()); setFOrigin(new Set()); setFDest(new Set()); setOpenFilter(null) }
+
+  if (rows.length === 0) {
+    return <div style={{ padding: 16, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>{emptyMessage || 'No schedule rates available.'}</div>
+  }
+
+  const SCHED_COL_COUNT = 9 + (onAttachManualRate ? 1 : 0) // 1 select checkbox + 8 schedule fields + optional attach col
+  const rateCols = rateTypes.length * (1 + containerTypes.length) // +1 for checkbox per group
+  const totalCols = SCHED_COL_COUNT + rateCols
+
+  const FILTERS: { key: string; label: string; values: Map<string, number>; active: Set<string>; set: React.Dispatch<React.SetStateAction<Set<string>>> }[] = [
+    { key: 'carrier', label: 'Carrier', values: distinct.carriers, active: fCarrier, set: setFCarrier },
+    { key: 'origin', label: 'Origin', values: distinct.origins, active: fOrigin, set: setFOrigin },
+    { key: 'destination', label: 'Destination', values: distinct.destinations, active: fDest, set: setFDest },
+  ]
+
+  const thBase: React.CSSProperties = {
+    padding: '5px 4px', fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.3,
+    textAlign: 'center', whiteSpace: 'nowrap', borderLeft: '1px solid rgba(255,255,255,0.2)',
+  }
+  const tdBase: React.CSSProperties = {
+    padding: '5px 4px', fontSize: 10, color: 'var(--text)', verticalAlign: 'middle',
+    borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)',
+  }
+
+  function cellTooltip(cell: SelectableRateCell): string {
+    const lines: string[] = []
+    lines.push(`${cell.currency} ${cell.rate.toLocaleString()}`)
+    if (cell.validFrom && cell.validTo) lines.push(`Valid: ${fmtDate(cell.validFrom)} \u2013 ${fmtDate(cell.validTo)}`)
+    if (cell.transit) lines.push(`Transit: ${cell.transit} days`)
+    if (cell.freeTime) lines.push(`Free time: ${cell.freeTime} days`)
+    if (cell.note) lines.push(`Note: ${cell.note}`)
+    return lines.join('\n')
+  }
+
+  return (
+    <>
+      {/* Count + clear */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, padding: '0 2px' }}>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+          {filtered.length === rows.length
+            ? `${rows.length} schedule${rows.length !== 1 ? 's' : ''}`
+            : `${filtered.length} of ${rows.length} (filtered)`}
+        </div>
+        {activeCount > 0 && (
+          <button onClick={clearAll} style={{ fontSize: 10, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
+            <X size={10} /> Clear filters
+          </button>
+        )}
+      </div>
+
+      {/* Filter chips */}
+      <div ref={filterBarRef} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+        {FILTERS.map(f => {
+          const isOpen = openFilter === f.key
+          const hasActive = f.active.size > 0
+          const entries = [...f.values.entries()].sort((a, b) => b[1] - a[1])
+          if (entries.length <= 1) return null
+          return (
+            <div key={f.key} style={{ position: 'relative' }}>
+              <button onClick={() => setOpenFilter(isOpen ? null : f.key)}
+                style={{
+                  fontSize: 11, padding: '3px 10px', borderRadius: 14, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  border: hasActive ? '1px solid #0f8fa8' : '1px solid var(--border)',
+                  background: hasActive ? 'rgba(15,143,168,0.08)' : 'transparent',
+                  color: hasActive ? '#0f8fa8' : 'var(--text-secondary)',
+                  fontWeight: hasActive ? 600 : 400,
+                }}>
+                <Filter size={10} />
+                {f.label}
+                {hasActive && <span style={{ fontSize: 9, background: '#0f8fa8', color: '#fff', borderRadius: 8, padding: '0 5px', fontWeight: 700 }}>{f.active.size}</span>}
+              </button>
+              {isOpen && (
+                <div style={{
+                  position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 50,
+                  background: 'var(--card, #fff)', border: '1px solid var(--border)', borderRadius: 8,
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.12)', minWidth: 180, maxHeight: 240, overflowY: 'auto', padding: '4px 0',
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 10px', borderBottom: '1px solid var(--border)' }}>
+                    <button onClick={() => f.set(new Set(entries.map(e => e[0])))} style={{ fontSize: 10, color: '#0f8fa8', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Select all</button>
+                    <button onClick={() => f.set(new Set())} style={{ fontSize: 10, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>Clear</button>
+                  </div>
+                  {entries.map(([val, count]) => (
+                    <label key={val} style={{
+                      display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', cursor: 'pointer',
+                      fontSize: 11, color: 'var(--text)', background: f.active.has(val) ? 'rgba(15,143,168,0.04)' : 'transparent',
+                    }}>
+                      <input type="checkbox" checked={f.active.has(val)} onChange={() => {
+                        f.set(prev => { const n = new Set(prev); if (n.has(val)) n.delete(val); else n.add(val); return n })
+                      }} />
+                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
+                      <span style={{ fontSize: 9, color: 'var(--text-muted)', flexShrink: 0 }}>{count}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Pivot table */}
+      <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto', maxHeight: 500 }}>
+          <table style={{ borderCollapse: 'collapse', minWidth: SCHED_COL_COUNT * 80 + rateCols * 58 }}>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
+              {/* Row 1: group headers */}
+              <tr style={{ background: 'var(--accent, #0f8fa8)' }}>
+                <th rowSpan={2} style={{
+                  padding: '5px 4px', fontSize: 8, fontWeight: 700, color: '#fff',
+                  letterSpacing: 0.3, textAlign: 'center', whiteSpace: 'nowrap',
+                  borderBottom: '1px solid rgba(255,255,255,0.2)',
+                  borderRight: '1px solid rgba(255,255,255,0.2)',
+                  width: 32, minWidth: 32,
+                }}>
+                  SELECT
+                </th>
+                <th colSpan={8} style={{
+                  padding: '5px 8px', fontSize: 10, fontWeight: 700, color: '#fff',
+                  letterSpacing: 0.5, textAlign: 'center',
+                  borderBottom: '1px solid rgba(255,255,255,0.2)',
+                }}>
+                  SCHEDULE
+                </th>
+                {onAttachManualRate && (
+                  <th rowSpan={2} style={{
+                    padding: '5px 4px', fontSize: 8, fontWeight: 700, color: '#fff',
+                    letterSpacing: 0.3, textAlign: 'center', whiteSpace: 'nowrap',
+                    borderBottom: '1px solid rgba(255,255,255,0.2)',
+                    borderLeft: '1px solid rgba(255,255,255,0.2)',
+                    width: 32, minWidth: 32,
+                  }}>
+                  </th>
+                )}
+                {rateTypes.map(rt => (
+                  <th key={rt} colSpan={1 + containerTypes.length} style={{
+                    padding: '5px 4px', fontSize: 10, fontWeight: 700,
+                    color: '#fff', letterSpacing: 0.5, textAlign: 'center',
+                    borderLeft: '2px solid rgba(255,255,255,0.5)',
+                    borderBottom: '1px solid rgba(255,255,255,0.2)',
+                    background: RATE_COLORS_RC[rt] ?? '#64748b',
+                  }}>
+                    {rt.toUpperCase()}
+                  </th>
+                ))}
+              </tr>
+              {/* Row 2: sub-headers */}
+              <tr style={{ background: 'var(--accent, #0f8fa8)' }}>
+                {['CARRIER', 'VESSEL / VOYAGE', 'ORIGIN', 'DEST', 'ETD', 'ETA', 'TT', 'CUTOFF'].map((h) => (
+                  <th key={h} style={{
+                    ...thBase,
+                    textAlign: ['ETD', 'ETA', 'TT', 'CUTOFF'].includes(h) ? 'center' : 'left',
+                  }}>{h}</th>
+                ))}
+                {rateTypes.map(rt => (
+                  <Fragment key={rt}>
+                    <th style={{
+                      ...thBase, width: 28, minWidth: 28, maxWidth: 28, textAlign: 'center',
+                      borderLeft: '2px solid rgba(255,255,255,0.5)',
+                      background: RATE_COLORS_RC[rt] ?? '#64748b',
+                    }}>{'\u2713'}</th>
+                    {containerTypes.map((ct, ctIdx) => (
+                      <th key={`${rt}-${ct}`} style={{
+                        ...thBase, fontSize: 8,
+                        borderLeft: ctIdx === 0 ? '1px solid rgba(255,255,255,0.3)' : thBase.borderLeft,
+                        background: RATE_COLORS_RC[rt] ?? '#64748b',
+                      }}>{ct}</th>
+                    ))}
+                  </Fragment>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr><td colSpan={totalCols} style={{ padding: 20, textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>No schedules match the active filters.</td></tr>
+              )}
+              {filtered.map((row, rowIdx) => {
+                const bg = rowIdx % 2 ? 'rgba(100,116,139,0.04)' : 'transparent'
+                const hasAnySelection = rateTypes.some(rt => isGroupSelected(row, rt, selectedIds) || isGroupPartial(row, rt, selectedIds))
+                const schedSelected = selectedScheduleIds.has(row.scheduleId)
+                return (
+                  <tr key={row.scheduleId} style={{ background: (hasAnySelection || schedSelected) ? 'rgba(15,143,168,0.06)' : bg }}>
+                    <td style={{
+                      ...tdBase, borderLeft: 'none', width: 32, textAlign: 'center', verticalAlign: 'middle',
+                      background: schedSelected ? 'rgba(15,143,168,0.08)' : undefined,
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={schedSelected}
+                        onChange={() => onToggleSchedule(row.scheduleId)}
+                        style={{ cursor: 'pointer', accentColor: '#0f8fa8' }}
+                      />
+                    </td>
+                    <td style={{ ...tdBase, fontWeight: 600 }}>{row.linerName || '—'}</td>
+                    <td style={tdBase}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                        <Ship size={9} style={{ opacity: 0.5, flexShrink: 0 }} />
+                        <span style={{ fontSize: 10 }}>{row.vesselName || '—'}{row.voyageNumber ? ` / ${row.voyageNumber}` : ''}</span>
+                      </div>
+                    </td>
+                    <td style={tdBase}>{row.originCity || row.origin || '—'}</td>
+                    <td style={tdBase}>{row.destinationCity || row.destination || '—'}</td>
+                    <td style={{ ...tdBase, textAlign: 'center' }}>{fmtDate(row.etd)}</td>
+                    <td style={{ ...tdBase, textAlign: 'center' }}>{fmtDate(row.eta)}</td>
+                    <td style={{ ...tdBase, fontWeight: 600, textAlign: 'center' }}>
+                      {row.totalDuration != null ? `${row.totalDuration}d` : '—'}
+                    </td>
+                    <td style={{ ...tdBase, fontSize: 9 }}>{fmtDate(row.bkCutoff)}</td>
+                    {onAttachManualRate && (
+                      <td style={{ ...tdBase, textAlign: 'center', width: 32 }}>
+                        <button
+                          onClick={() => onAttachManualRate(row)}
+                          title="Attach manual rate to this schedule"
+                          style={{
+                            background: 'none', border: '1px solid rgba(217,119,6,0.3)', borderRadius: 4,
+                            cursor: 'pointer', color: '#d97706', padding: '2px 4px', display: 'inline-flex', alignItems: 'center',
+                          }}
+                        >
+                          <Plus size={11} />
+                        </button>
+                      </td>
+                    )}
+                    {rateTypes.map(rt => {
+                      const groupKeys = getGroupAggKeys(row, rt)
+                      const hasRates = groupKeys.length > 0
+                      const checked = isGroupSelected(row, rt, selectedIds)
+                      const partial = isGroupPartial(row, rt, selectedIds)
+                      return (
+                        <Fragment key={rt}>
+                          {/* Checkbox cell */}
+                          <td style={{
+                            ...tdBase, width: 28, textAlign: 'center', verticalAlign: 'middle',
+                            borderLeft: '2px solid var(--border)',
+                            background: checked ? 'rgba(15,143,168,0.08)' : undefined,
+                          }}>
+                            {hasRates && (
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                ref={el => { if (el) el.indeterminate = partial && !checked }}
+                                onChange={() => onToggleGroup(row, rt)}
+                                style={{ cursor: 'pointer', accentColor: '#0f8fa8' }}
+                              />
+                            )}
+                          </td>
+                          {/* Container type cells */}
+                          {containerTypes.map((ct, ctIdx) => {
+                            const cells = row.rates[rt]?.[ct]
+                            const display = cells?.length
+                              ? cells.reduce((best, c) => c.rate < best.rate ? c : best)
+                              : null
+                            return (
+                              <td
+                                key={`${rt}-${ct}`}
+                                title={display ? cellTooltip(display) : undefined}
+                                style={{
+                                  ...tdBase,
+                                  textAlign: 'center',
+                                  borderLeft: ctIdx === 0 ? '1px solid var(--border)' : tdBase.borderLeft,
+                                  background: checked ? 'rgba(15,143,168,0.04)' : undefined,
+                                  padding: '4px 3px',
+                                }}
+                              >
+                                {display ? (
+                                  <>
+                                    <div style={{ fontWeight: 700, fontSize: 10, whiteSpace: 'nowrap' }}>
+                                      {display.currency} {display.rate.toLocaleString()}
+                                    </div>
+                                    {cells!.length > 1 && (
+                                      <div style={{ fontSize: 7, color: '#94a3b8' }}>+{cells!.length - 1} more</div>
+                                    )}
+                                    {display.note && (
+                                      <div style={{
+                                        fontSize: 8, color: '#94a3b8', lineHeight: 1.2, marginTop: 1,
+                                        maxWidth: 72, overflow: 'hidden', textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap', margin: '1px auto 0',
+                                      }}>
+                                        {display.note}
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>—</span>
+                                )}
+                              </td>
+                            )
+                          })}
+                        </Fragment>
+                      )
+                    })}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  )
 }
 
 interface RateCheckProps {
@@ -101,21 +642,11 @@ export default function RateCheck({
   const [linerList, setLinerList] = useState<LinerRecord[]>([])
   const [tradeLaneList, setTradeLaneList] = useState<TradeLaneRecord[]>([])
   const [employeeList, setEmployeeList] = useState<EmployeeRecord[]>([])
+  const [procurementEmployees, setProcurementEmployees] = useState<EmployeeRecord[]>([])
 
   // Helpers to derive prefill values from inquiry / container
   const prefillDest = container?.destination || inquiry.destination
-  const prefillContType = (() => {
-    const raw = container?.containerType || inquiry.container_type || ''
-    // Map Inquiry ContainerType (e.g. '20 GP', '40 HC', '20 REEFER') → manual form labels
-    const map: Record<string, string> = {
-      '20 GP': '20GP', '40 GP': '40GP', '40 HC': '40HC',
-      '20 REEFER': '20 Reefer', '40 REEFER': '40 Reefer',
-      '20 FLAT RACK': '20 Flat Rack', '40 FLAT RACK': '40 Flat Rack',
-      '20 OPEN TOP': '20 Open Tops', '40 OPEN TOP': '40 Open Tops',
-      'TANKER': 'Tanker',
-    }
-    return map[raw] || raw || '20GP'
-  })()
+  const prefillContType = container?.containerType || inquiry.container_type || '20GP'
   const prefillCommodityType = container?.commodityType || inquiry.commodity_type || ''
   const prefillCommodityName = container?.commodityName || ''
   const prefillWeight = String(container?.weight ?? inquiry.cargo_weight ?? '')
@@ -161,6 +692,29 @@ export default function RateCheck({
 
   // Multi-entry manual rates (procurement can add several rate types per inquiry)
   const [manualEntries, setManualEntries] = useState<ManualRateEntry[]>([])
+  // Track backend-created rate IDs from manual entries so we can link them as rate request options on submit
+  const [createdManualRateIds, setCreatedManualRateIds] = useState<{ rateType: string; rateId: number; scheduleId?: number }[]>([])
+
+  // Path 3: schedule-linked manual rate entry — holds the schedule row the user wants to attach a rate to
+  const [linkedSchedule, setLinkedSchedule] = useState<SelectablePivotRow | null>(null)
+
+  // Enriched schedule+rates data (CS/Sales only)
+  const [enrichedData, setEnrichedData] = useState<AggregateScheduleRatesResponse | null>(null)
+  const [enrichedLoading, setEnrichedLoading] = useState(false)
+
+  // Incoming schedule details from CS (Procurement view — read-only)
+  const [incomingSchedules, setIncomingSchedules] = useState<IncomingScheduleDetail[]>([])
+  const [incomingRemark, setIncomingRemark] = useState<string | null>(null)
+
+  // Aggregate schedule + rates data (procurement view)
+  const [aggregateData, setAggregateData] = useState<AggregateScheduleRatesResponse | null>(null)
+  const [aggregateLoading, setAggregateLoading] = useState(false)
+  const [dbRatesOpen, setDbRatesOpen] = useState(true)
+  const [openScheduleCards, setOpenScheduleCards] = useState<Set<string>>(new Set())
+  // Aggregate rate selections — keys are "schedule_id:rate_type:rate_id" e.g. "3:tariff_rates:42"
+  const [selectedAggregateRateIds, setSelectedAggregateRateIds] = useState<Set<string>>(new Set())
+  // Schedule-level selections (independent of rate keys — works for rate-less schedules too)
+  const [selectedScheduleIds, setSelectedScheduleIds] = useState<Set<number>>(new Set())
 
   // Notes
   const [formNote, setFormNote] = useState('')
@@ -175,21 +729,80 @@ export default function RateCheck({
   const canAddEntry = isProcurement && !!(mrLiner.trim() && mrContainers.some(c => c.rate.trim()) && vesselFieldsReady && fakFieldsReady && specialFieldsReady)
   const hasManualEntries = manualEntries.length > 0
   const hasDbSelections = selectedIds.size > 0
-  const containerLabel = container
-    ? `${container.quantity}x ${container.containerType}`
-    : inquiry.container_qty
-      ? `${inquiry.container_qty}x ${inquiry.container_type ?? '20 GP'}`
-      : ''
+  const hasAggregateSelections = selectedAggregateRateIds.size > 0
+  const hasScheduleSelections = selectedScheduleIds.size > 0
+  const allContainers: { qty: number; type: string }[] =
+    inquiry.containers && inquiry.containers.length > 0
+      ? inquiry.containers.map(c => ({ qty: c.quantity, type: c.containerType }))
+      : container
+        ? [{ qty: container.quantity, type: container.containerType }]
+        : inquiry.container_qty
+          ? [{ qty: inquiry.container_qty, type: inquiry.container_type ?? '20GP' }]
+          : []
+  const containerLabel = allContainers.map(c => `${c.qty}x ${c.type}`).join(', ')
 
   // NAC visibility for cs-sales variant
   const canSeeNac = isProcurement || activeRole === 'Procurement' || activeRole === 'Admin' || (custData?.assigned_salesperson_id === activeEmployee.id)
   const visibleRates = canSeeNac ? dbRates : dbRates.filter(r => r.source_type !== 'NAC')
   const nacHidden = dbRates.length - visibleRates.length
 
+  // Enriched pivot for CS/Sales tabular view
+  const enrichedPivot = useMemo<SelectablePivotResult>(
+    () => !isProcurement && enrichedData ? pivotEnrichedData(enrichedData) : { rows: [], rateTypes: [], containerTypes: [] },
+    [isProcurement, enrichedData],
+  )
+  const enrichedEmpty = !isProcurement && enrichedData !== null && enrichedPivot.rows.length === 0
+
+  // Aggregate pivot for Procurement tabular view
+  const aggregatePivot = useMemo<SelectablePivotResult>(
+    () => isProcurement && aggregateData ? pivotEnrichedData(aggregateData) : { rows: [], rateTypes: [], containerTypes: [] },
+    [isProcurement, aggregateData],
+  )
+
+  const handleToggleGroup = (row: SelectablePivotRow, rateType: string) => {
+    setSelectedAggregateRateIds(prev => toggleGroup(row, rateType, prev))
+    // Auto-select the schedule when any rate group is toggled
+    setSelectedScheduleIds(prev => { const n = new Set(prev); n.add(row.scheduleId); return n })
+  }
+
+  const handleToggleRow = (row: SelectablePivotRow) => {
+    // Use whichever pivot's rateTypes are relevant — enriched for CS/Sales, aggregate for Procurement
+    const rt = isProcurement ? aggregatePivot.rateTypes : enrichedPivot.rateTypes
+    setSelectedAggregateRateIds(prev => toggleRow(row, rt, prev))
+    // Also mark the schedule as selected
+    setSelectedScheduleIds(prev => { const n = new Set(prev); n.add(row.scheduleId); return n })
+  }
+
+  const handleToggleSchedule = (scheduleId: number) => {
+    setSelectedScheduleIds(prev => {
+      const next = new Set(prev)
+      if (next.has(scheduleId)) next.delete(scheduleId)
+      else next.add(scheduleId)
+      return next
+    })
+  }
+
+  // Path 3: Attach manual rate to a specific schedule
+  const handleAttachManualRate = (row: SelectablePivotRow) => {
+    console.log('[RateCheck] handleAttachManualRate — row:', JSON.stringify({ scheduleId: row.scheduleId, origin: row.origin, destination: row.destination, originCity: row.originCity, destinationCity: row.destinationCity, linerName: row.linerName, vesselName: row.vesselName }))
+    console.log('[RateCheck] handleAttachManualRate — inquiry.origin:', inquiry.origin, 'inquiry.destination:', inquiry.destination)
+    setLinkedSchedule(row)
+    // Pre-fill form fields from the schedule
+    if (row.linerName) setMrLiner(row.linerName)
+    // Use schedule UNLOCODEs (row.origin / row.destination) — not inquiry city names
+    setMrOrigin(row.origin || inquiry.origin || '')
+    setMrDestination(row.destination || prefillDest || '')
+    setMrVesselName(row.vesselName || '')
+    setMrVoyage(row.voyageNumber || '')
+    setMrVesselEtd(row.etd ? row.etd.slice(0, 10) : '')
+    setMrVesselEta(row.eta ? row.eta.slice(0, 10) : '')
+    setMode('manual-entry')
+  }
+
   // Can proceed to review?
   const canReview = isProcurement
-    ? (hasDbSelections || hasManualEntries)
-    : (hasDbSelections || skipProcurement || (dbSearched && visibleRates.length === 0))
+    ? (hasManualEntries || hasAggregateSelections)
+    : (hasAggregateSelections || skipProcurement || enrichedEmpty)
 
   // Auto-fetch DB rates on mount — fan-out fetch then filter client-side by route / container
   useEffect(() => {
@@ -224,6 +837,19 @@ export default function RateCheck({
       .finally(() => setDbLoading(false))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-fetch enriched schedule+rates for CS/Sales
+  useEffect(() => {
+    if (isProcurement) return
+    setEnrichedLoading(true)
+    apiGetEnrichedScheduleRates({
+      cli_id: inquiry.cli_id ?? undefined,
+      inq_id: inquiry.inq_id ?? undefined,
+    })
+      .then(data => { console.log('[RateCheck] enrichedData keys:', Object.keys(data), 'sample schedule_id:', Object.values(data)[0]?.schedule?.schedule_id); setEnrichedData(data) })
+      .catch(err => { console.error('[RateCheck] enriched rates fetch failed:', err); setEnrichedData({}) })
+      .finally(() => setEnrichedLoading(false))
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Fetch reference data for manual entry (procurement only)
   useEffect(() => {
     if (!isProcurement) return
@@ -237,26 +863,58 @@ export default function RateCheck({
     }).catch(() => {})
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Open a rate request record when this rate check session starts.
-  // Procurement: is_given=false initially, patched to true when brief is sent.
-  // CS/Sales: is_given=false initially, patched to true when submitting or escalating.
+  // Fetch reference data on mount.
+  // Procurement: also fetch existing incoming request (CS-created) to get schedule_details + request_id.
+  // CS/Sales: rate request creation is deferred to submit/escalation time (so schedules can be included).
   useEffect(() => {
-    const remark = `${isProcurement ? 'Procurement' : 'CS/Sales'} rate check initiated for ${inquiry.id}: ${inquiry.origin} → ${dest ?? ''}, ${containerLabel}. Customer: ${inquiry.customer_name}.`
-    apiCreateRateRequest({
-      inq_id: inquiry.inq_id,
-      emp_id_requested: activeEmployee.id,
-      is_given: false,
-      remark,
-    })
-      .then(res => { if (res.request_id) setRateRequestId(res.request_id) })
-      .catch(err => console.error('[RateCheck] rate request create failed:', err))
+    if (!inquiry.inq_id) { console.warn('[RateCheck] inquiry.inq_id is missing'); return }
+    apiGetAuthEmployees('procurement')
+      .then(emps => { setProcurementEmployees(emps) })
+      .catch(() => {})
+
+    if (isProcurement) {
+      // Procurement: fetch the incoming rate request that CS escalated
+      apiGetIncomingRateRequests()
+        .then(incoming => {
+          console.log('[RateCheck] incoming rate requests:', incoming.length, 'looking for inq_id:', inquiry.inq_id)
+          // Use == for loose comparison in case of string/number mismatch
+          const match = incoming.find(r => r.inq_id == inquiry.inq_id) // eslint-disable-line eqeqeq
+          if (match) {
+            console.log('[RateCheck] matched incoming request:', match.request_id, 'schedules:', match.schedule_details?.length ?? 0)
+            setRateRequestId(match.request_id)
+            setIncomingSchedules(match.schedule_details ?? [])
+            setIncomingRemark(match.remark)
+            // Fetch aggregate schedule + rates if we have schedule IDs and a client
+            if (match.schedules?.length > 0 && inquiry.cli_id) {
+              setAggregateLoading(true)
+              apiGetAggregateScheduleRates({ cli_id: inquiry.cli_id, schedule_ids: match.schedules, request_id: match.request_id })
+                .then(agg => {
+                  console.log('[RateCheck] aggregate schedule rates:', Object.keys(agg).length, 'entries')
+                  setAggregateData(agg)
+                  // Auto-expand all schedule cards
+                  setOpenScheduleCards(new Set(Object.keys(agg)))
+                })
+                .catch(err => console.error('[RateCheck] aggregate rates fetch failed:', err))
+                .finally(() => setAggregateLoading(false))
+            }
+          } else {
+            console.warn('[RateCheck] no incoming rate request found for inq_id:', inquiry.inq_id, 'available inq_ids:', incoming.map(r => r.inq_id))
+          }
+        })
+        .catch(err => console.error('[RateCheck] incoming rate request fetch failed:', err))
+    }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Add current manual form as an entry to the brief
   const addEntryToBrief = () => {
     if (!canAddEntry) return
+    const currentLinkedSchedule = linkedSchedule
     setManualEntries(prev => [...prev, {
       id: `mr-${Date.now()}`,
+      scheduleId: currentLinkedSchedule?.scheduleId ?? null,
+      scheduleSummary: currentLinkedSchedule
+        ? `${currentLinkedSchedule.linerName || '—'} / ${currentLinkedSchedule.vesselName || '—'}${currentLinkedSchedule.voyageNumber ? ` V.${currentLinkedSchedule.voyageNumber}` : ''}`
+        : null,
       tab: mrTab, liner: mrLiner, tradeLane: mrTradeLane,
       origin: mrOrigin, destination: mrDestination,
       serviceLane: mrServiceLane, salesperson: mrSalesperson,
@@ -288,8 +946,9 @@ export default function RateCheck({
 
     if (mrTab === 'vessel-spot') {
       filledContainers.forEach(c => {
-        apiCreateVesselRate({
+        const vesselPayload = {
           inq_id: inqId,
+          lin_id: linId,
           voyage: mrVoyage,
           vessel_name: mrVesselName,
           eta: mrVesselEta,
@@ -312,6 +971,12 @@ export default function RateCheck({
           cancellationreason: mrCancelReason || undefined,
           cancellationfee: mrCancelCharge ? Number(mrCancelCharge) : undefined,
           surcharges: surchargePayload.length > 0 ? surchargePayload : undefined,
+          schedule_id: currentLinkedSchedule?.scheduleId ?? undefined,
+        }
+        console.log('[RateCheck] vessel-spot payload →', JSON.stringify(vesselPayload, null, 2))
+        apiCreateVesselRate(vesselPayload).then(res => {
+          const id = (res as any).srid as number | undefined
+          if (id) setCreatedManualRateIds(prev => [...prev, { rateType: 'vessel_by_vessel_rate', rateId: id, scheduleId: currentLinkedSchedule?.scheduleId }])
         }).catch(err => { console.error('[RateCheck] vessel-spot POST failed:', err); onFlash(`ERROR saving vessel rate: ${(err as Error).message}`) })
       })
     } else if (mrTab === 'fak') {
@@ -334,6 +999,10 @@ export default function RateCheck({
           special_remark: mrSpecialRemark || undefined,
           issold: mrIsSold || undefined,
           surcharges: surchargePayload.length > 0 ? surchargePayload : undefined,
+          schedule_id: currentLinkedSchedule?.scheduleId ?? undefined,
+        }).then(res => {
+          const id = (res as any).fak_id as number | undefined
+          if (id) setCreatedManualRateIds(prev => [...prev, { rateType: 'fak_rates', rateId: id, scheduleId: currentLinkedSchedule?.scheduleId }])
         }).catch(err => { console.error('[RateCheck] fak POST failed:', err); onFlash(`ERROR saving FAK rate: ${(err as Error).message}`) })
       })
     } else {
@@ -359,6 +1028,10 @@ export default function RateCheck({
           special_remark: mrSpecialRemark || undefined,
           issold: mrIsSold || undefined,
           surcharges: surchargePayload.length > 0 ? surchargePayload : undefined,
+          schedule_id: currentLinkedSchedule?.scheduleId ?? undefined,
+        }).then(res => {
+          const id = (res as any).sprid as number | undefined
+          if (id) setCreatedManualRateIds(prev => [...prev, { rateType: 'special_rate', rateId: id, scheduleId: currentLinkedSchedule?.scheduleId }])
         }).catch(err => { console.error('[RateCheck] special POST failed:', err); onFlash(`ERROR saving special rate: ${(err as Error).message}`) })
       })
     }
@@ -374,6 +1047,7 @@ export default function RateCheck({
     setMrFclCutDate(''); setMrFclCutTime('')
     setMrCommodityType(prefillCommodityType); setMrCommodityName(prefillCommodityName)
     setMrSurcharges([])
+    setLinkedSchedule(null)
   }
   const removeEntry = (idx: number) => setManualEntries(prev => prev.filter((_, i) => i !== idx))
 
@@ -398,16 +1072,64 @@ export default function RateCheck({
     return p.join(', ')
   }
 
+  // Helper: build SchedulePayload[] from enriched data for selected schedule IDs
+  const getEnrichedSchedulePayloads = (): SchedulePayload[] | undefined => {
+    if (!enrichedData) return undefined
+    // Union: explicit schedule selections + schedule IDs extracted from rate-key selections
+    const fromRateKeys = [...selectedAggregateRateIds].map(k => Number(k.split(':')[0]))
+    const wantedIds = new Set([...selectedScheduleIds, ...fromRateKeys])
+    if (wantedIds.size === 0) return undefined
+    // enrichedData keys are array indices (0,1,2…), NOT schedule_ids — match by schedule.schedule_id
+    const payloads: SchedulePayload[] = []
+    for (const entry of Object.values(enrichedData)) {
+      const s = entry.schedule
+      if (!wantedIds.has(s.schedule_id)) continue
+      payloads.push({
+        scac: s.scac,
+        lin_id: s.lin_id,
+        service_name: s.service_name ?? null,
+        vessel_name: s.vessel_name,
+        voyage_number: s.voyage_number,
+        origin_unloc: s.origin_unloc,
+        origin_city_name: s.origin_city_name ?? null,
+        destination_unloc: s.destination_unloc,
+        destination_city_name: s.destination_city_name ?? null,
+        origin_departure_date: s.origin_departure_date,
+        destination_arrival_date: s.destination_arrival_date,
+        terminal_cutoff: s.terminal_cutoff ?? null,
+        bk_cutoff: s.bk_cutoff ?? null,
+        si_cutoff: s.si_cutoff ?? null,
+        vgm_cutoff: s.vgm_cutoff ?? null,
+        total_duration: s.total_duration,
+        schedule_type: s.schedule_type,
+        legs: s.legs ?? null,
+      })
+    }
+    console.log('[RateCheck] getEnrichedSchedulePayloads:', wantedIds.size, 'wanted →', payloads.length, 'matched')
+    return payloads.length > 0 ? payloads : undefined
+  }
+
+  // Helper: create a CS/Sales rate request
+  const createCsRateRequest = (remark: string, isGiven: boolean) => {
+    const schedules = getEnrichedSchedulePayloads()
+    console.log('[RateCheck] createCsRateRequest:', { inq_id: inquiry.inq_id, is_given: isGiven, remark, selected_schedules: schedules })
+    return apiCreateRateRequest({
+      inq_id: inquiry.inq_id!,
+      emp_id_requested: 6, // beta: backend hardcodes emp_id 6
+      is_given: isGiven,
+      remark,
+      selected_schedules: schedules,
+    })
+  }
+
   // Submit handler
-  const handleSubmit = () => {
-    // Non-procurement branches remain simple
+  const handleSubmit = async () => {
+    // Non-procurement branches: create rate request at submit time (includes schedules)
     if (!isProcurement && skipProcurement) {
-      if (rateRequestId) {
-        apiPatchRateRequest(rateRequestId, {
-          is_given: true,
-          remark: `Procurement escalation skipped. CS/Sales proceeding directly to quotation for ${inquiry.id}. ${inquiry.origin} → ${dest ?? ''}. ${formNote || ''}`.trim(),
-        }).catch(err => console.error('[RateCheck] rate request patch failed:', err))
-      }
+      createCsRateRequest(
+        `Procurement escalation skipped. CS/Sales proceeding directly to quotation for ${inquiry.inq_id}. ${inquiry.origin} → ${dest ?? ''}. ${formNote || ''}`.trim(),
+        true,
+      ).catch(err => console.error('[RateCheck] rate request create failed:', err))
       onAdvanceWorkflow(inquiry.id, 'quotation-prep')
       onLogActivity({
         actor_role: activeRole,
@@ -423,13 +1145,13 @@ export default function RateCheck({
       ;(onGoToQuotations ?? onGoBack)()
       return
     }
-    if (!isProcurement && !hasDbSelections) {
-      if (rateRequestId) {
-        apiPatchRateRequest(rateRequestId, {
-          is_given: false,
-          remark: `No suitable rates found. Escalating to Procurement for rate sourcing. ${inquiry.id}: ${inquiry.origin} → ${dest ?? ''}. ${formNote || ''}`.trim(),
-        }).catch(err => console.error('[RateCheck] rate request patch failed:', err))
-      }
+    if (!isProcurement && !hasDbSelections && !hasAggregateSelections) {
+      try {
+        await createCsRateRequest(
+          `No suitable rates found. Escalating to Procurement for rate sourcing. ${inquiry.inq_id}: ${inquiry.origin} → ${dest ?? ''}. ${formNote || ''}`.trim(),
+          false,
+        )
+      } catch (err) { console.error('[RateCheck] rate request create failed:', err) }
       onAdvanceWorkflow(inquiry.id, 'procurement-request')
       onLogActivity({
         actor_role: activeRole,
@@ -446,61 +1168,126 @@ export default function RateCheck({
       return
     }
 
-    // Combined: DB selections + manual entries (procurement) or DB only (cs-sales)
+    // Combined: DB selections + manual entries + aggregate selections (procurement) or DB only (cs-sales)
     const selected = hasDbSelections ? (isProcurement ? dbRates : visibleRates).filter(r => selectedIds.has(r.id)) : []
     const dbSummary = selected.map(r => `${r.liner_name || 'N/A'} ${r.source_type} $${r.rate ?? 0} (${r.container_type || 'N/A'})`).join('; ')
     const manualSummary = manualEntries.map(e => summariseEntry(e)).join(' || ')
 
-    const totalCount = selected.length + manualEntries.length
+    const totalCount = selected.length + manualEntries.length + selectedAggregateRateIds.size
     const actionParts: string[] = []
     if (selected.length) actionParts.push(`${selected.length} DB rate(s)`)
+    if (selectedAggregateRateIds.size) actionParts.push(`${selectedAggregateRateIds.size} schedule rate(s)`)
     if (manualEntries.length) actionParts.push(`${manualEntries.length} manual rate(s)`)
 
-    // Patch the rate request created on mount: mark as given and record the summary/message
     const briefRemark = isProcurement
       ? [
-          `Rate brief sent to Sales for ${inquiry.id}.`,
+          `Rate brief sent to Sales for ${inquiry.inq_id}.`,
           actionParts.length ? `Rates: ${actionParts.join(' + ')}.` : '',
-          dbSummary ? `DB: ${dbSummary}.` : '',
           manualSummary ? `Manual: ${manualSummary}.` : '',
           formNote ? `Message: ${formNote}` : '',
         ].filter(Boolean).join(' ')
       : [
-          `CS/Sales rate check completed for ${inquiry.id}.`,
+          `CS/Sales rate check completed for ${inquiry.inq_id}.`,
           `${totalCount} rate(s) selected.`,
           dbSummary ? `Rates: ${dbSummary}.` : '',
+          selectedAggregateRateIds.size > 0 ? `${selectedAggregateRateIds.size} enriched schedule rate(s).` : '',
           formNote ? `Note: ${formNote}` : '',
         ].filter(Boolean).join(' ')
-    if (rateRequestId) {
-      apiPatchRateRequest(rateRequestId, { is_given: true, remark: briefRemark })
-        .catch(err => console.error('[RateCheck] rate request patch failed:', err))
-    } else {
-      apiCreateRateRequest({ inq_id: inquiry.inq_id, emp_id_requested: activeEmployee.id, is_given: true, remark: briefRemark })
-        .catch(err => console.error('[RateCheck] rate request create (fallback) failed:', err))
+
+    // Rate request option mapping
+    const RATE_TYPE_MAP: Record<string, string> = {
+      tariff: 'tariff_rates', nac: 'nac', contracted: 'contracted_rates',
+      vessel: 'vessel_by_vessel_rate', fak: 'fak_rates', special: 'special_rate',
     }
 
-    // Create rate request options for each DB-selected rate.
-    // DB rate IDs follow "type:numericId" (e.g. "vessel:123").
-    // Backend auto-advances workflow to quotation_prep when an option is added.
-    if (rateRequestId && hasDbSelections) {
-      const selectedRates = (isProcurement ? dbRates : visibleRates).filter(r => selectedIds.has(r.id))
-      for (const rate of selectedRates) {
-        const colonIdx = rate.id.indexOf(':')
-        if (colonIdx === -1) continue
-        const rateType = rate.id.slice(0, colonIdx)
-        const rateId = Number(rate.id.slice(colonIdx + 1))
-        if (!isNaN(rateId)) {
-          apiAddRateRequestOption(rateRequestId, { request_id: rateRequestId, rate_type: rateType, rate_id: rateId })
-            .catch(err => console.error('[RateCheck] add rate request option failed:', err))
+    // Collect all option-link promises so we can await them before navigating.
+    // Previously these were fire-and-forget, causing Workspace to fetch
+    // completedRateRequests before options were persisted.
+    const optionPromises: Promise<unknown>[] = []
+
+    if (isProcurement) {
+      // Procurement: PATCH the existing incoming rate request
+      if (rateRequestId) {
+        await apiPatchRateRequestProc(rateRequestId, { is_given: true, remark: briefRemark })
+          .catch(err => console.error('[RateCheck] rate request patch failed:', err))
+      }
+    } else {
+      // CS/Sales: create rate request now, then link enriched rate options
+      try {
+        const res = await createCsRateRequest(briefRemark, true)
+        const reqId = res?.request_id
+        if (reqId) {
+          // Link enriched schedule rate selections (key = "schedule_id:rate_type:rate_id")
+          for (const aggKey of selectedAggregateRateIds) {
+            const parts = aggKey.split(':')
+            if (parts.length < 3) continue
+            const scheduleId = Number(parts[0])
+            const rateType = parts.slice(1, -1).join(':')
+            const rateId = Number(parts[parts.length - 1])
+            if (!isNaN(rateId) && !isNaN(scheduleId)) {
+              optionPromises.push(
+                apiAddRateRequestOption(reqId, { request_id: reqId, rate_type: rateType, rate_id: rateId, schedule_id: scheduleId })
+                  .catch(err => console.error('[RateCheck] add enriched rate request option failed:', err))
+              )
+            }
+          }
+          // Also link DB-selected rates if any
+          if (hasDbSelections) {
+            const selectedRates = visibleRates.filter(r => selectedIds.has(r.id))
+            for (const rate of selectedRates) {
+              const colonIdx = rate.id.indexOf(':')
+              if (colonIdx === -1) continue
+              const prefix = rate.id.slice(0, colonIdx)
+              const rateType = RATE_TYPE_MAP[prefix] ?? prefix
+              const rateId = Number(rate.id.slice(colonIdx + 1))
+              if (!isNaN(rateId)) {
+                optionPromises.push(
+                  apiAddRateRequestOption(reqId, { request_id: reqId, rate_type: rateType, rate_id: rateId })
+                    .catch(err => console.error('[RateCheck] add rate request option failed:', err))
+                )
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[RateCheck] rate request create failed:', err)
+      }
+    }
+
+    // Procurement: link options using existing rateRequestId
+    if (isProcurement && rateRequestId) {
+      for (const mr of createdManualRateIds) {
+        optionPromises.push(
+          apiAddRateRequestOption(rateRequestId, { request_id: rateRequestId, rate_type: mr.rateType, rate_id: mr.rateId, schedule_id: mr.scheduleId })
+            .catch(err => console.error('[RateCheck] add manual rate request option failed:', err))
+        )
+      }
+      // Link aggregate schedule rate selections (key = "schedule_id:rate_type:rate_id")
+      for (const aggKey of selectedAggregateRateIds) {
+        const parts = aggKey.split(':')
+        if (parts.length < 3) continue
+        const scheduleId = Number(parts[0])
+        const rateType = parts.slice(1, -1).join(':')
+        const rateId = Number(parts[parts.length - 1])
+        if (!isNaN(rateId) && !isNaN(scheduleId)) {
+          optionPromises.push(
+            apiAddRateRequestOption(rateRequestId, { request_id: rateRequestId, rate_type: rateType, rate_id: rateId, schedule_id: scheduleId })
+              .catch(err => console.error('[RateCheck] add aggregate rate request option failed:', err))
+          )
         }
       }
+    }
+
+    // Wait for all options to be persisted before advancing workflow / navigating
+    if (optionPromises.length > 0) {
+      await Promise.all(optionPromises)
     }
 
     // Advance local state (backend may already have auto-advanced via options above — idempotent)
     onAdvanceWorkflow(inquiry.id, 'quotation-prep')
 
     const notesParts = [`Customer: ${inquiry.customer_name} (${custData?.tier ?? 'N/A'})`, `Route: ${inquiry.origin} → ${dest}`]
-    if (dbSummary) notesParts.push(`DB Rates: ${dbSummary}`)
+    if (selectedAggregateRateIds.size) notesParts.push(`Schedule Rates: ${selectedAggregateRateIds.size} selected`)
     if (manualSummary) notesParts.push(`Manual Rates: ${manualSummary}`)
 
     onLogActivity({
@@ -523,25 +1310,33 @@ export default function RateCheck({
   }
 
   // Direct escalation to procurement (cs-sales, always available)
-  const handleEscalate = () => {
-    if (rateRequestId) {
-      apiPatchRateRequest(rateRequestId, {
-        is_given: false,
-        remark: `Escalated to Procurement for rate sourcing. ${inquiry.id}: ${inquiry.origin} → ${dest ?? ''}. Customer: ${inquiry.customer_name}. ${formNote || ''}`.trim(),
-      }).catch(err => console.error('[RateCheck] rate request patch failed:', err))
+  const handleEscalate = async () => {
+    const schedPayloads = getEnrichedSchedulePayloads()
+    const schedCount = schedPayloads?.length ?? 0
+    const schedNote = schedCount > 0
+      ? `Escalated to Procurement with ${schedCount} selected schedule(s) for rate sourcing.`
+      : `Escalated to Procurement for rate sourcing.`
+    try {
+      const res = await createCsRateRequest(
+        `${schedNote} ${inquiry.inq_id}: ${inquiry.origin} → ${dest ?? ''}. Customer: ${inquiry.customer_name}. ${formNote || ''}`.trim(),
+        false,
+      )
+      console.log('[RateCheck] escalation rate request created:', res)
+    } catch (err) {
+      console.error('[RateCheck] rate request create failed:', err)
     }
     onAdvanceWorkflow(inquiry.id, 'procurement-request')
     onLogActivity({
       actor_role: activeRole,
       actor_id: activeEmployee.id,
-      action: `Escalated to Procurement for rate sourcing.`,
+      action: schedNote,
       ref_type: 'inquiry',
       ref_id: inquiry.id,
       customer_name: inquiry.customer_name,
       pushed_to: 'Procurement',
-      notes: formNote || `${inquiry.origin} → ${dest} — escalated to procurement`,
+      notes: formNote || `${inquiry.origin} → ${dest} — escalated to procurement${schedCount > 0 ? ` (${schedCount} schedules)` : ''}`,
     })
-    onFlash(`${inquiry.id} → Escalated to Procurement`)
+    onFlash(`${inquiry.id} → Escalated to Procurement${schedCount > 0 ? ` (${schedCount} schedules)` : ''}`)
     onGoBack()
   }
 
@@ -569,6 +1364,11 @@ export default function RateCheck({
           {e.liner}
           {e.tab === 'vessel-spot' && e.vesselName && <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 11 }}>{e.vesselName}{e.voyage ? ` / ${e.voyage}` : ''}</span>}
         </div>
+        {e.scheduleId != null && e.scheduleSummary && (
+          <div style={{ fontSize: 10, color: '#0f8fa8', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Ship size={9} /> Linked to: {e.scheduleSummary}
+          </div>
+        )}
         {e.containers.map((c, ci) => {
           const allIn = Number(c.rate) + surTotal
           return (
@@ -625,7 +1425,31 @@ export default function RateCheck({
   // ── Rate Brief Document (shared between edit preview and review screen) ──
   const renderRateBrief = () => {
     const selectedDbRates = hasDbSelections ? displayRates.filter(r => selectedIds.has(r.id)) : []
-    if (!hasDbSelections && !hasManualEntries) return null
+    if (!hasDbSelections && !hasManualEntries && !hasAggregateSelections) return null
+
+    // Collect selected aggregate rates with schedule info for the brief
+    const aggregateBriefItems: { scheduleName: string; rateType: string; rate: AggregateRate }[] = []
+    const briefDataSource = isProcurement ? aggregateData : enrichedData
+    if (hasAggregateSelections && briefDataSource) {
+      for (const [schId, entry] of Object.entries(briefDataSource)) {
+        const schLabel = entry.schedule.liner_name || entry.schedule.scac || '—'
+        const groups = [
+          { rateType: 'Tariff', rates: entry.tariff_rates, key: 'tariff_rates' },
+          { rateType: 'FAK', rates: entry.fak_rates, key: 'fak_rates' },
+          { rateType: 'Special', rates: entry.special_rate, key: 'special_rate' },
+          { rateType: 'Vessel by Vessel', rates: entry.vessel_by_vessel_rate, key: 'vessel_by_vessel_rate' },
+          ...(entry.nac?.length ? [{ rateType: 'NAC', rates: entry.nac, key: 'nac' }] : []),
+          ...(entry.contracted_rates?.length ? [{ rateType: 'Contracted', rates: entry.contracted_rates, key: 'contracted_rates' }] : []),
+        ]
+        for (const g of groups) {
+          for (const r of g.rates) {
+            if (selectedAggregateRateIds.has(`${schId}:${g.key}:${r.rate_id}`)) {
+              aggregateBriefItems.push({ scheduleName: schLabel, rateType: g.rateType, rate: r })
+            }
+          }
+        }
+      }
+    }
 
     return (
       <div className="ws-doc-preview">
@@ -674,6 +1498,26 @@ export default function RateCheck({
             {manualEntries.map(e => renderManualEntryBrief(e))}
           </>}
 
+          {/* Schedule-matched rates section */}
+          {aggregateBriefItems.length > 0 && <>
+            <div className="ws-doc-divider" />
+            <div className="ws-doc-section">Schedule Rates ({aggregateBriefItems.length})</div>
+            {aggregateBriefItems.map(item => (
+              <div key={`${item.rateType}:${item.rate.rate_id}`} style={{ padding: '6px 0', borderBottom: '1px dashed var(--border)' }}>
+                <div style={{ fontWeight: 700, fontSize: 12 }}>
+                  {item.scheduleName} <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({item.rateType})</span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                  ${item.rate.rate.toLocaleString()} {item.rate.currency} / {item.rate.container_type}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                  Valid: {item.rate.valid_from || '?'} → {item.rate.valid_to || '?'}
+                  {item.rate.transit && ` · Transit: ${item.rate.transit}`}
+                </div>
+              </div>
+            ))}
+          </>}
+
           <div className="ws-doc-divider" />
           <div className="ws-doc-row"><span>Prepared by:</span><strong>{activeEmployee.name} ({activeRole})</strong></div>
           <div className="ws-doc-row"><span>Date:</span><strong>{new Date().toISOString().slice(0, 10)}</strong></div>
@@ -684,11 +1528,26 @@ export default function RateCheck({
 
   // ── Resolve review action label & color ──
   const getReviewAction = () => {
+    const procTotalSelected = selectedAggregateRateIds.size + manualEntries.length
+    if (isProcurement && procTotalSelected > 0) {
+      return {
+        label: `Push to Sales (${procTotalSelected} rate${procTotalSelected !== 1 ? 's' : ''})`,
+        color: '#d97706',
+        icon: <Send size={12} />,
+      }
+    }
     if (hasDbSelections) {
       return {
-        label: isProcurement ? 'Push to Sales' : `Go to Quotation (${selectedIds.size} rate${selectedIds.size !== 1 ? 's' : ''})`,
-        color: isProcurement ? '#d97706' : '#0f8fa8',
-        icon: isProcurement ? <Send size={12} /> : <ChevronRight size={12} />,
+        label: `Go to Quotation (${selectedIds.size} rate${selectedIds.size !== 1 ? 's' : ''})`,
+        color: '#0f8fa8',
+        icon: <ChevronRight size={12} />,
+      }
+    }
+    if (!isProcurement && hasAggregateSelections) {
+      return {
+        label: `Go to Quotation (${selectedAggregateRateIds.size} rate${selectedAggregateRateIds.size !== 1 ? 's' : ''})`,
+        color: '#0f8fa8',
+        icon: <ChevronRight size={12} />,
       }
     }
     if (!isProcurement && skipProcurement) {
@@ -697,7 +1556,7 @@ export default function RateCheck({
     if (!isProcurement) {
       return { label: 'Escalate to Procurement', color: '#d97706', icon: <ChevronRight size={12} /> }
     }
-    // Procurement manual
+    // Procurement fallback
     return { label: 'Push to Sales', color: '#d97706', icon: <Send size={12} /> }
   }
 
@@ -713,7 +1572,7 @@ export default function RateCheck({
           className="lt-icon-btn"
           onClick={
             mode === 'review' ? () => setMode(hasManualEntries ? 'manual-entry' : 'db-select')
-            : mode === 'manual-entry' ? () => setMode('db-select')
+            : mode === 'manual-entry' ? () => { setMode('db-select'); setLinkedSchedule(null) }
             : onGoBack
           }
           title={
@@ -728,7 +1587,7 @@ export default function RateCheck({
         <div>
           <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
             <FileText size={18} />
-            {mode === 'manual-entry' ? 'Manual Rate Entry' : mode === 'review' ? 'Review Rate Brief' : 'Rate Check'}
+            {mode === 'manual-entry' ? (linkedSchedule ? 'Attach Rate to Schedule' : 'Manual Rate Entry') : mode === 'review' ? 'Review Rate Brief' : 'Rate Check'}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
             {inquiry.customer_name} · {inquiry.origin} → {dest}
@@ -769,19 +1628,41 @@ export default function RateCheck({
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{dest}</div>
               </div>
 
-              {/* Container */}
+              {/* Container(s) */}
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Container</div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{containerLabel || '—'}</div>
-                {(container?.commodityType || inquiry.commodity_type) && (
-                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>
-                    {container?.commodityType || inquiry.commodity_type}
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>
+                  {allContainers.length > 1 ? 'Containers' : 'Container'}
+                </div>
+                {inquiry.containers && inquiry.containers.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {inquiry.containers.map((c, ci) => (
+                      <div key={ci}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
+                          {c.quantity}x {c.containerType}
+                        </div>
+                        {c.commodityType && (
+                          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{c.commodityType}</div>
+                        )}
+                        {c.weight && (
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{c.weight} kg</div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                )}
-                {(container?.weight || inquiry.cargo_weight) && (
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-                    {container?.weight || inquiry.cargo_weight}
-                  </div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{containerLabel || '—'}</div>
+                    {(container?.commodityType || inquiry.commodity_type) && (
+                      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>
+                        {container?.commodityType || inquiry.commodity_type}
+                      </div>
+                    )}
+                    {(container?.weight || inquiry.cargo_weight) && (
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                        {container?.weight || inquiry.cargo_weight}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -856,207 +1737,178 @@ export default function RateCheck({
               <div style={{ padding: '10px 14px', background: isProcurement ? 'rgba(15,143,168,0.06)' : 'rgba(8,145,178,0.06)', border: `1px solid ${isProcurement ? 'rgba(15,143,168,0.18)' : 'rgba(8,145,178,0.18)'}`, borderRadius: 8, fontSize: 12, color: isProcurement ? '#0f8fa8' : '#0891b2', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <FileText size={14} />
                 {isProcurement
-                  ? <>Database rates for: <strong style={{ marginLeft: 4 }}>{inquiry.origin} → {dest}</strong>{contType && <span style={{ color: '#6366f1' }}> · {contType}</span>}</>
-                  : <>Multi-source rate check (AMS + Spot + INTTRA): <strong style={{ marginLeft: 4 }}>{inquiry.origin} → {dest}</strong>{container && <span style={{ marginLeft: 8, opacity: 0.8 }}>· {container.quantity}x {container.containerType}</span>}</>
+                  ? <>Schedule rates for: <strong style={{ marginLeft: 4 }}>{inquiry.origin} → {dest}</strong>{containerLabel && <span style={{ color: '#6366f1' }}> · {containerLabel}</span>}</>
+                  : <>Multi-source rate check (AMS + Spot + INTTRA): <strong style={{ marginLeft: 4 }}>{inquiry.origin} → {dest}</strong>{containerLabel && <span style={{ marginLeft: 8, opacity: 0.8 }}>· {containerLabel}</span>}</>
                 }
               </div>
 
-              {/* ---- Loading ---- */}
-              {dbLoading && (
-                <div style={{ textAlign: 'center', padding: 16, color: 'var(--text-muted)' }}>
-                  <Loader2 size={18} className="spin" style={{ marginBottom: 6 }} />
-                  <div style={{ fontSize: 12 }}>Searching rate tables...</div>
-                </div>
-              )}
-
-              {/* ---- No results ---- */}
-              {dbSearched && displayRates.length === 0 && (
-                isProcurement ? (
-                  <div style={{ padding: 10, background: 'rgba(100,116,139,0.04)', border: '1px solid rgba(100,116,139,0.15)', borderRadius: 8, fontSize: 12, color: 'var(--text-muted)' }}>
-                    No matching rates in contracted, spot, NAC, or special rate tables.
+              {/* ---- Enriched Schedule + Rates (CS/Sales only) ---- */}
+              {!isProcurement && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
+                    <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                    <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      SCHEDULES &amp; RATES
+                    </span>
+                    {selectedAggregateRateIds.size > 0 && (
+                      <span style={{ fontSize: 10, fontWeight: 600, color: '#16a34a' }}>{selectedAggregateRateIds.size} selected</span>
+                    )}
+                    <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
                   </div>
-                ) : (
-                  <div style={{ padding: 16, background: 'rgba(220,38,38,0.04)', border: '1px solid rgba(220,38,38,0.15)', borderRadius: 8 }}>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#dc2626', marginBottom: 4 }}>No rates found</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                        No matching rates in the database for this route. This inquiry will be escalated to Procurement for rate sourcing.
+
+                  {/* Loading */}
+                  {enrichedLoading && (
+                    <div style={{ textAlign: 'center', padding: 16, color: 'var(--text-muted)' }}>
+                      <Loader2 size={18} className="spin" style={{ marginBottom: 6 }} />
+                      <div style={{ fontSize: 12 }}>Loading schedule rates...</div>
+                    </div>
+                  )}
+
+                  {/* No results */}
+                  {!enrichedLoading && enrichedData && enrichedPivot.rows.length === 0 && (
+                    <div style={{ padding: 16, background: 'rgba(220,38,38,0.04)', border: '1px solid rgba(220,38,38,0.15)', borderRadius: 8 }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#dc2626', marginBottom: 4 }}>No rates found</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                          No matching schedule rates found for this route. This inquiry will be escalated to Procurement for rate sourcing.
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )
-              )}
+                  )}
 
-              {/* ---- Rate results (grouped by source type) ---- */}
-              {dbSearched && displayRates.length > 0 && (
-                <>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>
-                    {displayRates.length} rate(s) {isProcurement ? 'from database' : 'found'} — select {isProcurement ? 'rates to include' : 'one or more to proceed to quotation'}
-                    {!isProcurement && nacHidden > 0 && <span style={{ fontWeight: 400, color: 'var(--text-muted)', marginLeft: 6 }}>({nacHidden} NAC rate{nacHidden > 1 ? 's' : ''} restricted)</span>}
-                  </div>
-                  <div style={{ maxHeight: 460, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-                    {(isProcurement
-                      ? (['Contracted', 'Tariff Rate', 'NAC', 'FAK', 'Spot', 'Special'] as const)
-                      : (['FAK', 'Tariff Rate', 'Spot'] as const)
-                    ).map(groupType => {
-                      const groupRates = displayRates.filter(r => r.source_type === groupType)
-                      if (groupRates.length === 0) return null
-                      const groupColor = RATE_SOURCE_COLORS[groupType] || '#64748b'
-                      const groupLabel = (!isProcurement && groupType === 'Spot') ? 'Vessel by Vessel' : groupType
-                      return (
-                        <div key={groupType}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                            <span style={{
-                              fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
-                              background: `${groupColor}18`, color: groupColor, border: `1px solid ${groupColor}30`,
-                            }}>
-                              {groupLabel}
-                            </span>
-                            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                              {groupRates.length} rate{groupRates.length > 1 ? 's' : ''}
-                            </span>
-                            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                            {groupRates.map(rate => {
-                              const selected = selectedIds.has(rate.id)
-                              const crd = inquiry.cargo_ready_date || ''
-                              const expiresEarly = !!(crd && rate.valid_to && rate.valid_to < crd)
-                              return (
-                                <label
-                                  key={rate.id}
-                                  className="ws-rate-row"
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-                                    border: `1px solid ${selected ? (isProcurement ? '#0f8fa8' : 'var(--accent)') : expiresEarly ? 'rgba(217,119,6,0.4)' : 'var(--border)'}`,
-                                    borderRadius: 8, cursor: 'pointer',
-                                    background: selected ? 'rgba(15,143,168,0.04)' : expiresEarly ? 'rgba(217,119,6,0.03)' : 'transparent',
-                                  }}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={selected}
-                                    onChange={() => {
-                                      setSelectedIds(prev => {
-                                        const next = new Set(prev)
-                                        if (next.has(rate.id)) next.delete(rate.id)
-                                        else next.add(rate.id)
-                                        return next
-                                      })
-                                    }}
-                                  />
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                                      {rate.liner_name || 'N/A'}
-                                      <span style={{ fontWeight: 400, color: 'var(--text-secondary)', fontSize: 12 }}>
-                                        {rate.container_type || ''}
-                                      </span>
-                                    </div>
-                                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-                                      Valid: {rate.valid_from || '?'} → {rate.valid_to || '?'}
-                                      {rate.trade_lane && ` · ${rate.trade_lane}`}
-                                      {rate.vessel_name && ` · ${rate.vessel_name}`}
-                                      {rate.is_sold && ' · SOLD'}
-                                    </div>
-                                    {expiresEarly && (
-                                      <div style={{
-                                        display: 'inline-flex', alignItems: 'center', gap: 4,
-                                        marginTop: 4, padding: '2px 7px', borderRadius: 4,
-                                        background: 'rgba(217,119,6,0.1)', border: '1px solid rgba(217,119,6,0.3)',
-                                        fontSize: 10, fontWeight: 600, color: '#b45309',
-                                      }}>
-                                        ⚠ Expires before cargo ready date — may work if cargo ships early
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)', whiteSpace: 'nowrap' }}>
-                                    ${(rate.rate ?? 0).toLocaleString()} <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>{rate.currency}</span>
-                                  </div>
-                                </label>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      )
-                    })}
-                    {/* Procurement: any remaining types not in the explicit list */}
-                    {isProcurement && displayRates.filter(r => !['Contracted', 'Tariff Rate', 'NAC', 'FAK', 'Spot', 'Special'].includes(r.source_type)).map(rate => {
-                      const selected = selectedIds.has(rate.id)
-                      const badgeColor = RATE_SOURCE_COLORS[rate.source_type] || '#64748b'
-                      const crd = inquiry.cargo_ready_date || ''
-                      const expiresEarly = !!(crd && rate.valid_to && rate.valid_to < crd)
-                      return (
-                        <label
-                          key={rate.id}
-                          className="ws-rate-row"
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
-                            border: `1px solid ${selected ? '#0f8fa8' : expiresEarly ? 'rgba(217,119,6,0.4)' : 'var(--border)'}`,
-                            borderRadius: 8, cursor: 'pointer',
-                            background: selected ? 'rgba(15,143,168,0.04)' : expiresEarly ? 'rgba(217,119,6,0.03)' : 'transparent',
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => {
-                              setSelectedIds(prev => {
-                                const next = new Set(prev)
-                                if (next.has(rate.id)) next.delete(rate.id)
-                                else next.add(rate.id)
-                                return next
-                              })
-                            }}
-                          />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                              {rate.liner_name || 'N/A'}
-                              <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: `${badgeColor}18`, color: badgeColor, border: `1px solid ${badgeColor}30` }}>
-                                {rate.source_type}
-                              </span>
-                            </div>
-                            {expiresEarly && (
-                              <div style={{
-                                display: 'inline-flex', alignItems: 'center', gap: 4,
-                                marginTop: 4, padding: '2px 7px', borderRadius: 4,
-                                background: 'rgba(217,119,6,0.1)', border: '1px solid rgba(217,119,6,0.3)',
-                                fontSize: 10, fontWeight: 600, color: '#b45309',
-                              }}>
-                                ⚠ Expires before cargo ready date — may work if cargo ships early
-                              </div>
-                            )}
-                          </div>
-                          <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text)', whiteSpace: 'nowrap' }}>
-                            ${(rate.rate ?? 0).toLocaleString()} <span style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-muted)' }}>{rate.currency}</span>
-                          </div>
-                        </label>
-                      )
-                    })}
-                  </div>
+                  {/* Enriched pivot table */}
+                  {!enrichedLoading && enrichedPivot.rows.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>
+                        {countPivotRates(enrichedPivot)} rate(s) across {enrichedPivot.rows.length} schedule(s) — select one or more to proceed to quotation
+                      </div>
+                      <SelectablePivotRateTable
+                        pivot={enrichedPivot}
+                        selectedIds={selectedAggregateRateIds}
+                        selectedScheduleIds={selectedScheduleIds}
+                        onToggleGroup={handleToggleGroup}
+                        onToggleRow={handleToggleRow}
+                        onToggleSchedule={handleToggleSchedule}
+                      />
+                    </>
+                  )}
                 </>
               )}
 
-              {/* ---- INTTRA Coming Soon (procurement only) ---- */}
+              {/* ---- Aggregate Schedule + Rates table (procurement only) ---- */}
               {isProcurement && (
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
                     <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>INTTRA Live Rates</span>
+                    <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      SCHEDULES &amp; RATES FROM CS
+                    </span>
+                    {selectedAggregateRateIds.size > 0 && (
+                      <span style={{ fontSize: 10, fontWeight: 600, color: '#16a34a' }}>{selectedAggregateRateIds.size} selected</span>
+                    )}
                     <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
                   </div>
-                  <div style={{ padding: '20px 14px', background: 'rgba(217,119,6,0.06)', border: '1px solid rgba(217,119,6,0.18)', borderRadius: 8, textAlign: 'center' }}>
-                    <Globe size={20} style={{ color: '#d97706', marginBottom: 8 }} />
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#d97706' }}>COMING SOON — UNDER DEVELOPMENT</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>INTTRA live rate integration is currently being developed. Use database rates or enter rates manually below.</div>
-                  </div>
+
+                  {incomingRemark && (
+                    <div style={{ padding: '6px 10px', background: 'rgba(15,143,168,0.06)', border: '1px solid rgba(15,143,168,0.14)', borderRadius: 6, fontSize: 11, color: 'var(--text-secondary)' }}>
+                      <span style={{ fontWeight: 600 }}>CS Note:</span> {incomingRemark}
+                    </div>
+                  )}
+
+                  {/* Loading state */}
+                  {aggregateLoading && (
+                    <div style={{ textAlign: 'center', padding: 16, color: 'var(--text-muted)' }}>
+                      <Loader2 size={18} className="spin" style={{ marginBottom: 6 }} />
+                      <div style={{ fontSize: 12 }}>Loading schedule rates...</div>
+                    </div>
+                  )}
+
+                  {/* No schedules */}
+                  {!aggregateLoading && !aggregateData && incomingSchedules.length === 0 && (
+                    <div style={{ padding: '14px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, background: 'rgba(15,143,168,0.04)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                      No vessel schedules attached by CS.
+                    </div>
+                  )}
+
+                  {/* Aggregate pivot table */}
+                  {!aggregateLoading && aggregatePivot.rows.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>
+                        {countPivotRates(aggregatePivot)} rate(s) across {aggregatePivot.rows.length} schedule(s) — select rates to include in brief
+                      </div>
+                      <SelectablePivotRateTable
+                        pivot={aggregatePivot}
+                        selectedIds={selectedAggregateRateIds}
+                        selectedScheduleIds={selectedScheduleIds}
+                        onToggleGroup={handleToggleGroup}
+                        onToggleRow={handleToggleRow}
+                        onToggleSchedule={handleToggleSchedule}
+                        onAttachManualRate={handleAttachManualRate}
+                      />
+                    </>
+                  )}
+
+                  {/* No rates found for loaded schedules */}
+                  {!aggregateLoading && aggregateData && aggregatePivot.rows.length === 0 && (
+                    <div style={{ padding: '14px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, background: 'rgba(15,143,168,0.04)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                      No matching rates found for the attached schedules.
+                    </div>
+                  )}
+
+                  {/* Fallback: show flat schedule table if aggregate fetch failed but we have incoming schedules */}
+                  {!aggregateLoading && !aggregateData && incomingSchedules.length > 0 && (
+                    <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                      <div style={{
+                        display: 'grid', gridTemplateColumns: '1fr 100px 80px 80px 70px 90px',
+                        background: 'var(--bg-card)', borderBottom: '1px solid var(--border)',
+                        fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.3,
+                      }}>
+                        <div style={{ padding: '6px 10px' }}>Carrier / Vessel</div>
+                        <div style={{ padding: '6px 8px' }}>Route</div>
+                        <div style={{ padding: '6px 8px' }}>ETD</div>
+                        <div style={{ padding: '6px 8px' }}>ETA</div>
+                        <div style={{ padding: '6px 8px' }}>Transit</div>
+                        <div style={{ padding: '6px 8px' }}>Type</div>
+                      </div>
+                      {incomingSchedules.map(sch => {
+                        const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—'
+                        const transitDays = sch.total_duration != null ? `${Math.round(sch.total_duration / 24)}d` : '—'
+                        const isDirect = sch.schedule_type?.toUpperCase() === 'DIRECT'
+                        return (
+                          <div key={sch.schedule_id} style={{
+                            display: 'grid', gridTemplateColumns: '1fr 100px 80px 80px 70px 90px',
+                            borderBottom: '1px solid var(--border)', fontSize: 11, alignItems: 'center',
+                          }}>
+                            <div style={{ padding: '6px 10px' }}>
+                              <div style={{ fontWeight: 600, color: 'var(--text)' }}>{sch.liner_name || sch.scac || '—'}</div>
+                              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{sch.vessel_name}{sch.voyage_number ? ` / ${sch.voyage_number}` : ''}</div>
+                            </div>
+                            <div style={{ padding: '6px 8px', color: 'var(--text-secondary)' }}>{sch.origin_unloc} → {sch.destination_unloc}</div>
+                            <div style={{ padding: '6px 8px', color: 'var(--text-secondary)' }}>{fmtDate(sch.origin_departure_date)}</div>
+                            <div style={{ padding: '6px 8px', color: 'var(--text-secondary)' }}>{fmtDate(sch.destination_arrival_date)}</div>
+                            <div style={{ padding: '6px 8px', color: 'var(--text-secondary)' }}>{transitDays}</div>
+                            <div style={{ padding: '6px 8px' }}>
+                              <span style={{
+                                fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                                background: isDirect ? 'rgba(22,163,74,0.1)' : 'rgba(217,119,6,0.1)',
+                                color: isDirect ? '#16a34a' : '#d97706',
+                              }}>
+                                {isDirect ? 'DIRECT' : 'T/S'}
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </>
               )}
 
               {/* ---- Notes ---- */}
-              {dbSearched && (
+              {(isProcurement || dbSearched) && (
                 <div>
-                  <label className="lt-label">Notes (optional)</label>
-                  <input className="lt-input" style={{ width: '100%' }} value={formNote}
+                  <label style={FIELD_LABEL}>Notes (optional)</label>
+                  <input style={INPUT_STYLE} value={formNote}
                     onChange={e => setFormNote(e.target.value)}
                     placeholder={isProcurement ? 'Any notes for Sales...' : 'Any notes for the next team...'} />
                 </div>
@@ -1074,11 +1926,14 @@ export default function RateCheck({
                     }}
                     onClick={handleEscalate}
                   >
-                    <ChevronRight size={12} /> Escalate to Procurement
+                    <ChevronRight size={12} />
+                    {hasScheduleSelections
+                      ? `Request Rates (${selectedScheduleIds.size} schedule${selectedScheduleIds.size !== 1 ? 's' : ''})`
+                      : 'Escalate to Procurement'}
                   </button>
                 )}
                 <button className="db-btn" style={{ fontSize: 12 }} onClick={onGoBack}>Back to Workspace</button>
-                {isProcurement && dbSearched && (
+                {isProcurement && (
                   <button
                     className="db-btn primary"
                     style={{
@@ -1132,17 +1987,39 @@ export default function RateCheck({
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{dest}</div>
               </div>
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Container</div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{containerLabel || '—'}</div>
-                {(container?.commodityType || inquiry.commodity_type) && (
-                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>
-                    {container?.commodityType || inquiry.commodity_type}
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>
+                  {allContainers.length > 1 ? 'Containers' : 'Container'}
+                </div>
+                {inquiry.containers && inquiry.containers.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {inquiry.containers.map((c, ci) => (
+                      <div key={ci}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
+                          {c.quantity}x {c.containerType}
+                        </div>
+                        {c.commodityType && (
+                          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{c.commodityType}</div>
+                        )}
+                        {c.weight && (
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{c.weight} kg</div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                )}
-                {(container?.weight || inquiry.cargo_weight) && (
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-                    {container?.weight || inquiry.cargo_weight}
-                  </div>
+                ) : (
+                  <>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{containerLabel || '—'}</div>
+                    {(container?.commodityType || inquiry.commodity_type) && (
+                      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>
+                        {container?.commodityType || inquiry.commodity_type}
+                      </div>
+                    )}
+                    {(container?.weight || inquiry.cargo_weight) && (
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                        {container?.weight || inquiry.cargo_weight}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
               <div style={{ height: 1, background: 'var(--border)' }} />
@@ -1200,6 +2077,32 @@ export default function RateCheck({
             <div style={{ flex: 1, minWidth: 0, paddingRight: sidebarOpen ? 24 : 0 }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
+                {/* Schedule-linked banner (Path 3) */}
+                {linkedSchedule && (
+                  <div style={{
+                    padding: '8px 12px',
+                    background: 'rgba(15,143,168,0.06)',
+                    border: '1px solid rgba(15,143,168,0.18)',
+                    borderRadius: 8,
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  }}>
+                    <div style={{ fontSize: 12, color: '#0f8fa8', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Ship size={13} />
+                      <strong>Linked to Schedule:</strong>{' '}
+                      {linkedSchedule.linerName || '—'} / {linkedSchedule.vesselName || '—'}
+                      {linkedSchedule.voyageNumber ? ` V.${linkedSchedule.voyageNumber}` : ''}
+                      {' · '}ETD: {linkedSchedule.etd ? new Date(linkedSchedule.etd).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—'}
+                      {' · '}ETA: {linkedSchedule.eta ? new Date(linkedSchedule.eta).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—'}
+                    </div>
+                    <button
+                      onClick={() => setLinkedSchedule(null)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 11, textDecoration: 'underline' }}
+                    >
+                      Unlink
+                    </button>
+                  </div>
+                )}
+
                 {/* Rate type tabs — pill style */}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {(['vessel-spot', 'fak', 'special'] as ManualRateTab[]).map(tab => (
@@ -1247,11 +2150,12 @@ export default function RateCheck({
                     )}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
                       <div>
-                        <label className="lt-label">Liner <span style={{ color: '#dc2626' }}>*</span></label>
-                        {!mrLinerOther ? (
+                        <label style={FIELD_LABEL}>Liner <span style={{ color: '#dc2626' }}>*</span></label>
+                        {linkedSchedule ? (
+                          <input style={{ ...INPUT_STYLE, opacity: 0.7, background: 'var(--bg)' }} value={mrLiner} readOnly />
+                        ) : !mrLinerOther ? (
                           <select
-                            className="lt-input"
-                            style={{ width: '100%' }}
+                            style={INPUT_STYLE}
                             value={mrLiner}
                             onChange={e => {
                               if (e.target.value === '__other__') {
@@ -1263,15 +2167,16 @@ export default function RateCheck({
                             }}
                           >
                             <option value="">Select preferred liner</option>
-                            {(inquiry.preferred_liners || []).map(l => (
-                              <option key={l} value={l}>{l}</option>
-                            ))}
+                            {(inquiry.preferred_liners || []).map(name => {
+                              const lr = linerList.find(x => x.name === name)
+                              return <option key={name} value={name}>{lr ? linerDisplay(lr) : name}</option>
+                            })}
                             <option value="__other__">Other</option>
                           </select>
                         ) : (
                           <>
-                            <input list="mr-liners" className="lt-input" style={{ width: '100%' }} value={mrLiner} onChange={e => setMrLiner(e.target.value)} placeholder="Type to search liners..." />
-                            <datalist id="mr-liners">{linerList.map(l => <option key={l.lin_id} value={l.name} />)}</datalist>
+                            <input list="mr-liners" style={INPUT_STYLE} value={mrLiner} onChange={e => setMrLiner(e.target.value)} placeholder="Type to search liners..." />
+                            <datalist id="mr-liners">{linerList.map(l => <option key={l.lin_id} value={l.name}>{linerDisplay(l)}</option>)}</datalist>
                             {inquiry.preferred_liners?.length ? (
                               <button
                                 type="button"
@@ -1285,20 +2190,20 @@ export default function RateCheck({
                         )}
                       </div>
                       <div>
-                        <label className="lt-label">Trade Lane</label>
-                        <select className="lt-input" style={{ width: '100%' }} value={mrTradeLane} onChange={e => setMrTradeLane(e.target.value)}>
+                        <label style={FIELD_LABEL}>Trade Lane</label>
+                        <select style={INPUT_STYLE} value={mrTradeLane} onChange={e => setMrTradeLane(e.target.value)}>
                           <option value="">Select trade lane</option>
                           {tradeLaneList.map(t => <option key={t.trln_id} value={t.trln_name}>{t.trln_name}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="lt-label">Service Lane</label>
-                        <input list="mr-svc-lanes" className="lt-input" style={{ width: '100%' }} value={mrServiceLane} onChange={e => setMrServiceLane(e.target.value)} placeholder="Type to search..." />
+                        <label style={FIELD_LABEL}>Service Lane</label>
+                        <input list="mr-svc-lanes" style={INPUT_STYLE} value={mrServiceLane} onChange={e => setMrServiceLane(e.target.value)} placeholder="Type to search..." />
                         <datalist id="mr-svc-lanes">{tradeLaneList.map(t => <option key={t.trln_id} value={t.trln_name} />)}</datalist>
                       </div>
                       <div>
-                        <label className="lt-label">Sales Contact</label>
-                        <select className="lt-input" style={{ width: '100%' }} value={mrSalesperson} onChange={e => setMrSalesperson(e.target.value)}>
+                        <label style={FIELD_LABEL}>Sales Contact</label>
+                        <select style={INPUT_STYLE} value={mrSalesperson} onChange={e => setMrSalesperson(e.target.value)}>
                           <option value="">Select sales contact</option>
                           {employeeList.map(e => <option key={e.emp_id} value={e.name}>{e.name}</option>)}
                         </select>
@@ -1311,18 +2216,30 @@ export default function RateCheck({
                     <div style={sectionTitle}>Route &amp; free time</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.7fr', gap: '12px 16px' }}>
                       <div>
-                        <label className="lt-label">Origin <span style={{ color: '#dc2626' }}>*</span></label>
-                        <input list="mr-ports-o" className="lt-input" style={{ width: '100%' }} value={mrOrigin} onChange={e => setMrOrigin(e.target.value)} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />
-                        <datalist id="mr-ports-o">{portOptions(portList).map((o, i) => <option key={i} value={o.value} label={o.label} />)}</datalist>
+                        <label style={FIELD_LABEL}>Origin <span style={{ color: '#dc2626' }}>*</span></label>
+                        {linkedSchedule ? (
+                          <input style={{ ...INPUT_STYLE, opacity: 0.7, background: 'var(--bg)' }} value={mrOrigin} readOnly />
+                        ) : (
+                          <>
+                            <input list="mr-ports-o" style={INPUT_STYLE} value={mrOrigin} onChange={e => setMrOrigin(e.target.value)} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />
+                            <datalist id="mr-ports-o">{portOptions(portList).map((o, i) => <option key={i} value={o.value} label={o.label} />)}</datalist>
+                          </>
+                        )}
                       </div>
                       <div>
-                        <label className="lt-label">Destination <span style={{ color: '#dc2626' }}>*</span></label>
-                        <input list="mr-ports-d" className="lt-input" style={{ width: '100%' }} value={mrDestination} onChange={e => setMrDestination(e.target.value)} placeholder="e.g. Hamburg/Germany or DEHAM" />
-                        <datalist id="mr-ports-d">{portOptions(portList).map((o, i) => <option key={i} value={o.value} label={o.label} />)}</datalist>
+                        <label style={FIELD_LABEL}>Destination <span style={{ color: '#dc2626' }}>*</span></label>
+                        {linkedSchedule ? (
+                          <input style={{ ...INPUT_STYLE, opacity: 0.7, background: 'var(--bg)' }} value={mrDestination} readOnly />
+                        ) : (
+                          <>
+                            <input list="mr-ports-d" style={INPUT_STYLE} value={mrDestination} onChange={e => setMrDestination(e.target.value)} placeholder="e.g. Hamburg/Germany or DEHAM" />
+                            <datalist id="mr-ports-d">{portOptions(portList).map((o, i) => <option key={i} value={o.value} label={o.label} />)}</datalist>
+                          </>
+                        )}
                       </div>
                       <div>
-                        <label className="lt-label">Free Days</label>
-                        <input className="lt-input" style={{ width: '100%' }} value={mrFreeTime} onChange={e => setMrFreeTime(e.target.value)} placeholder="e.g. 14" />
+                        <label style={FIELD_LABEL}>Free Days</label>
+                        <input style={INPUT_STYLE} value={mrFreeTime} onChange={e => setMrFreeTime(e.target.value)} placeholder="e.g. 14" />
                       </div>
                     </div>
                   </div>
@@ -1333,31 +2250,31 @@ export default function RateCheck({
                       <div style={sectionTitle}>Vessel</div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', marginBottom: 14 }}>
                         <div>
-                          <label className="lt-label">Vessel Name <span style={{ color: '#dc2626' }}>*</span></label>
-                          <input className="lt-input" style={{ width: '100%' }} value={mrVesselName} onChange={e => setMrVesselName(e.target.value)} placeholder="e.g. Maersk Sealand" />
+                          <label style={FIELD_LABEL}>Vessel Name <span style={{ color: '#dc2626' }}>*</span></label>
+                          <input style={INPUT_STYLE} value={mrVesselName} onChange={e => setMrVesselName(e.target.value)} placeholder="e.g. Maersk Sealand" />
                         </div>
                         <div>
-                          <label className="lt-label">Voyage <span style={{ color: '#dc2626' }}>*</span></label>
-                          <input className="lt-input" style={{ width: '100%' }} value={mrVoyage} onChange={e => setMrVoyage(e.target.value)} placeholder="e.g. 2607E" />
+                          <label style={FIELD_LABEL}>Voyage <span style={{ color: '#dc2626' }}>*</span></label>
+                          <input style={INPUT_STYLE} value={mrVoyage} onChange={e => setMrVoyage(e.target.value)} placeholder="e.g. 2607E" />
                         </div>
                         <div>
-                          <label className="lt-label">Vessel ETD <span style={{ color: '#dc2626' }}>*</span></label>
-                          <input className="lt-input" style={{ width: '100%' }} type="date" value={mrVesselEtd} onChange={e => setMrVesselEtd(e.target.value)} />
+                          <label style={FIELD_LABEL}>Vessel ETD <span style={{ color: '#dc2626' }}>*</span></label>
+                          <input style={INPUT_STYLE} type="date" value={mrVesselEtd} onChange={e => setMrVesselEtd(e.target.value)} />
                         </div>
                         <div>
-                          <label className="lt-label">Vessel ETA <span style={{ color: '#dc2626' }}>*</span></label>
-                          <input className="lt-input" style={{ width: '100%' }} type="date" value={mrVesselEta} onChange={e => setMrVesselEta(e.target.value)} />
+                          <label style={FIELD_LABEL}>Vessel ETA <span style={{ color: '#dc2626' }}>*</span></label>
+                          <input style={INPUT_STYLE} type="date" value={mrVesselEta} onChange={e => setMrVesselEta(e.target.value)} />
                         </div>
                       </div>
-                      <label className="lt-label">FCL Opening <span style={{ color: '#dc2626' }}>*</span></label>
+                      <label style={FIELD_LABEL}>FCL Opening <span style={{ color: '#dc2626' }}>*</span></label>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', marginBottom: 14 }}>
-                        <input className="lt-input" type="date" value={mrFclOpenDate} onChange={e => setMrFclOpenDate(e.target.value)} />
-                        <input className="lt-input" type="time" value={mrFclOpenTime} onChange={e => setMrFclOpenTime(e.target.value)} />
+                        <input style={INPUT_STYLE} type="date" value={mrFclOpenDate} onChange={e => setMrFclOpenDate(e.target.value)} />
+                        <input style={INPUT_STYLE} type="time" value={mrFclOpenTime} onChange={e => setMrFclOpenTime(e.target.value)} />
                       </div>
-                      <label className="lt-label">FCL Cutoff <span style={{ color: '#dc2626' }}>*</span></label>
+                      <label style={FIELD_LABEL}>FCL Cutoff <span style={{ color: '#dc2626' }}>*</span></label>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
-                        <input className="lt-input" type="date" value={mrFclCutDate} onChange={e => setMrFclCutDate(e.target.value)} />
-                        <input className="lt-input" type="time" value={mrFclCutTime} onChange={e => setMrFclCutTime(e.target.value)} />
+                        <input style={INPUT_STYLE} type="date" value={mrFclCutDate} onChange={e => setMrFclCutDate(e.target.value)} />
+                        <input style={INPUT_STYLE} type="time" value={mrFclCutTime} onChange={e => setMrFclCutTime(e.target.value)} />
                       </div>
                     </div>
                   )}
@@ -1368,13 +2285,13 @@ export default function RateCheck({
                       <div style={sectionTitle}>Commodity</div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
                         <div>
-                          <label className="lt-label">Commodity Type</label>
-                          <input list="mr-commodity-types" className="lt-input" style={{ width: '100%' }} value={mrCommodityType} onChange={e => setMrCommodityType(e.target.value)} placeholder="Select or type..." />
+                          <label style={FIELD_LABEL}>Commodity Type</label>
+                          <input list="mr-commodity-types" style={INPUT_STYLE} value={mrCommodityType} onChange={e => setMrCommodityType(e.target.value)} placeholder="Select or type..." />
                           <datalist id="mr-commodity-types">{COMMODITY_TYPES.map(ct => <option key={ct} value={ct} />)}</datalist>
                         </div>
                         <div>
-                          <label className="lt-label">Commodity Name</label>
-                          <input className="lt-input" style={{ width: '100%' }} value={mrCommodityName} onChange={e => setMrCommodityName(e.target.value)} placeholder="e.g. Cotton T-shirts" />
+                          <label style={FIELD_LABEL}>Commodity Name</label>
+                          <input style={INPUT_STYLE} value={mrCommodityName} onChange={e => setMrCommodityName(e.target.value)} placeholder="e.g. Cotton T-shirts" />
                         </div>
                       </div>
                     </div>
@@ -1393,26 +2310,26 @@ export default function RateCheck({
                       {mrContainers.map((ct, idx) => (
                         <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.7fr 0.9fr 0.9fr 0.8fr 24px', gap: 8, alignItems: 'end' }}>
                           <div>
-                            {idx === 0 && <label className="lt-label">Container type</label>}
-                            <select className="lt-input" style={{ width: '100%' }} value={ct.containerType} onChange={e => updateMrContainer(idx, { containerType: e.target.value })}>
-                              {MR_VESSEL_CONTAINER_TYPES.map(c => <option key={c} value={c}>{c}</option>)}
+                            {idx === 0 && <label style={FIELD_LABEL}>Container type</label>}
+                            <select style={INPUT_STYLE} value={ct.containerType} onChange={e => updateMrContainer(idx, { containerType: e.target.value })}>
+                              {MR_VESSEL_CONTAINER_TYPES.map(c => <option key={c} value={c}>{CONTAINER_TYPE_LABELS[c as keyof typeof CONTAINER_TYPE_LABELS] ?? c}</option>)}
                             </select>
                           </div>
                           <div>
-                            {idx === 0 && <label className="lt-label">TUs</label>}
-                            <input className="lt-input" style={{ width: '100%' }} value={ct.tus} onChange={e => updateMrContainer(idx, { tus: e.target.value })} placeholder="10" />
+                            {idx === 0 && <label style={FIELD_LABEL}>TUs</label>}
+                            <input style={INPUT_STYLE} value={ct.tus} onChange={e => updateMrContainer(idx, { tus: e.target.value })} placeholder="10" />
                           </div>
                           <div>
-                            {idx === 0 && <label className="lt-label">Max weight</label>}
-                            <input className="lt-input" style={{ width: '100%' }} value={ct.maxWeight} onChange={e => updateMrContainer(idx, { maxWeight: e.target.value })} placeholder="28000 kg" />
+                            {idx === 0 && <label style={FIELD_LABEL}>Max weight</label>}
+                            <input style={INPUT_STYLE} value={ct.maxWeight} onChange={e => updateMrContainer(idx, { maxWeight: e.target.value })} placeholder="28000 kg" />
                           </div>
                           <div>
-                            {idx === 0 && <label className="lt-label">Rate <span style={{ color: '#dc2626' }}>*</span></label>}
-                            <input className="lt-input" style={{ width: '100%' }} type="number" value={ct.rate} onChange={e => updateMrContainer(idx, { rate: e.target.value })} placeholder="1650" min={0} />
+                            {idx === 0 && <label style={FIELD_LABEL}>Rate <span style={{ color: '#dc2626' }}>*</span></label>}
+                            <input style={INPUT_STYLE} type="number" value={ct.rate} onChange={e => updateMrContainer(idx, { rate: e.target.value })} placeholder="1650" min={0} />
                           </div>
                           <div>
-                            {idx === 0 && <label className="lt-label">Currency</label>}
-                            <select className="lt-input" style={{ width: '100%' }} value={ct.currency} onChange={e => updateMrContainer(idx, { currency: e.target.value })}>
+                            {idx === 0 && <label style={FIELD_LABEL}>Currency</label>}
+                            <select style={INPUT_STYLE} value={ct.currency} onChange={e => updateMrContainer(idx, { currency: e.target.value })}>
                               <option>USD</option><option>EUR</option><option>GBP</option><option>LKR</option><option>CNY</option><option>JPY</option><option>SGD</option>
                             </select>
                           </div>
@@ -1430,12 +2347,12 @@ export default function RateCheck({
                     <div style={sectionTitle}>Validity</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
                       <div>
-                        <label className="lt-label">Valid From {mrTab !== 'vessel-spot' && <span style={{ color: '#dc2626' }}>*</span>}</label>
-                        <input className="lt-input" style={{ width: '100%' }} type="date" value={mrValidFrom} onChange={e => setMrValidFrom(e.target.value)} />
+                        <label style={FIELD_LABEL}>Valid From {mrTab !== 'vessel-spot' && <span style={{ color: '#dc2626' }}>*</span>}</label>
+                        <input style={INPUT_STYLE} type="date" value={mrValidFrom} onChange={e => setMrValidFrom(e.target.value)} />
                       </div>
                       <div>
-                        <label className="lt-label">Valid To {mrTab !== 'vessel-spot' && <span style={{ color: '#dc2626' }}>*</span>}</label>
-                        <input className="lt-input" style={{ width: '100%' }} type="date" value={mrValidTo} onChange={e => setMrValidTo(e.target.value)} />
+                        <label style={FIELD_LABEL}>Valid To {mrTab !== 'vessel-spot' && <span style={{ color: '#dc2626' }}>*</span>}</label>
+                        <input style={INPUT_STYLE} type="date" value={mrValidTo} onChange={e => setMrValidTo(e.target.value)} />
                       </div>
                     </div>
                   </div>
@@ -1456,17 +2373,17 @@ export default function RateCheck({
                   {mrIsCancelled && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       <div>
-                        <label className="lt-label">Cancellation Reason</label>
-                        <input className="lt-input" style={{ width: '100%' }} value={mrCancelReason} onChange={e => setMrCancelReason(e.target.value)} placeholder="Reason for cancellation..." />
+                        <label style={FIELD_LABEL}>Cancellation Reason</label>
+                        <input style={INPUT_STYLE} value={mrCancelReason} onChange={e => setMrCancelReason(e.target.value)} placeholder="Reason for cancellation..." />
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.45fr', gap: 10 }}>
                         <div>
-                          <label className="lt-label">Cancellation Charge</label>
-                          <input className="lt-input" style={{ width: '100%' }} type="number" min={0} value={mrCancelCharge} onChange={e => setMrCancelCharge(e.target.value)} placeholder="e.g. 200" />
+                          <label style={FIELD_LABEL}>Cancellation Charge</label>
+                          <input style={INPUT_STYLE} type="number" min={0} value={mrCancelCharge} onChange={e => setMrCancelCharge(e.target.value)} placeholder="e.g. 200" />
                         </div>
                         <div>
-                          <label className="lt-label">Currency</label>
-                          <select className="lt-input" style={{ width: '100%' }} value={mrCancelChargeCurrency} onChange={e => setMrCancelChargeCurrency(e.target.value)}>
+                          <label style={FIELD_LABEL}>Currency</label>
+                          <select style={INPUT_STYLE} value={mrCancelChargeCurrency} onChange={e => setMrCancelChargeCurrency(e.target.value)}>
                             <option>USD</option><option>EUR</option><option>GBP</option><option>LKR</option><option>CNY</option>
                           </select>
                         </div>
@@ -1489,13 +2406,13 @@ export default function RateCheck({
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {mrSurcharges.map((sc, idx) => (
                         <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 0.8fr 24px', gap: 8, alignItems: 'flex-end' }}>
-                          <input list="mr-surcharge-types" className="lt-input" style={{ width: '100%' }} value={sc.type}
+                          <input list="mr-surcharge-types" style={INPUT_STYLE} value={sc.type}
                             onChange={e => { const v = e.target.value; setMrSurcharges(prev => prev.map((s, i) => i === idx ? { ...s, type: v } : s)) }}
                             placeholder="e.g. BAF" />
-                          <input className="lt-input" style={{ width: '100%' }} type="number" value={sc.amount}
+                          <input style={INPUT_STYLE} type="number" value={sc.amount}
                             onChange={e => { const v = e.target.value; setMrSurcharges(prev => prev.map((s, i) => i === idx ? { ...s, amount: v } : s)) }}
                             placeholder="Amount" min={0} />
-                          <select className="lt-input" style={{ width: '100%' }} value={sc.currency}
+                          <select style={INPUT_STYLE} value={sc.currency}
                             onChange={e => { const v = e.target.value; setMrSurcharges(prev => prev.map((s, i) => i === idx ? { ...s, currency: v } : s)) }}>
                             <option>USD</option><option>EUR</option><option>GBP</option><option>LKR</option><option>CNY</option>
                           </select>
@@ -1512,12 +2429,12 @@ export default function RateCheck({
                     <div style={sectionTitle}>Additional information</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                       <div>
-                        <label className="lt-label">Note</label>
-                        <input className="lt-input" style={{ width: '100%' }} value={mrNote} onChange={e => setMrNote(e.target.value)} placeholder="Any notes..." />
+                        <label style={FIELD_LABEL}>Note</label>
+                        <input style={INPUT_STYLE} value={mrNote} onChange={e => setMrNote(e.target.value)} placeholder="Any notes..." />
                       </div>
                       <div>
-                        <label className="lt-label">Analysis Note</label>
-                        <input className="lt-input" style={{ width: '100%' }} value={mrSpecialRemark} onChange={e => setMrSpecialRemark(e.target.value)} placeholder="Analysis notes..." />
+                        <label style={FIELD_LABEL}>Analysis Note</label>
+                        <input style={INPUT_STYLE} value={mrSpecialRemark} onChange={e => setMrSpecialRemark(e.target.value)} placeholder="Analysis notes..." />
                       </div>
                     </div>
                   </div>
@@ -1609,6 +2526,11 @@ export default function RateCheck({
                                     Inclusive of {entrySurNames.join(', ')}
                                   </div>
                                 )}
+                                {entry.scheduleId != null && entry.scheduleSummary && (
+                                  <div style={{ fontSize: 10, color: '#0f8fa8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 3 }}>
+                                    <Ship size={8} /> Linked: {entry.scheduleSummary}
+                                  </div>
+                                )}
                               </div>
                               <button className="lt-icon-btn" style={{ padding: 3, flexShrink: 0 }} onClick={() => removeEntry(idx)} title="Remove">
                                 <X size={12} />
@@ -1622,8 +2544,8 @@ export default function RateCheck({
 
                   {/* Notes */}
                   <div>
-                    <label className="lt-label">Notes (optional)</label>
-                    <input className="lt-input" style={{ width: '100%' }} value={formNote}
+                    <label style={FIELD_LABEL}>Notes (optional)</label>
+                    <input style={INPUT_STYLE} value={formNote}
                       onChange={e => setFormNote(e.target.value)}
                       placeholder="Any notes for Sales..." />
                   </div>
@@ -1665,7 +2587,7 @@ export default function RateCheck({
           /* ════════════════ REVIEW SCREEN ════════════════ */
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ padding: '10px 14px', background: 'rgba(217,119,6,0.06)', border: '1px solid rgba(217,119,6,0.18)', borderRadius: 8, fontSize: 12, color: '#d97706' }}>
-              {hasDbSelections
+              {(hasDbSelections || hasAggregateSelections)
                 ? <>Review the rate brief below. Click <strong>{reviewAction.label}</strong> to send, or go back to make changes.</>
                 : !isProcurement && skipProcurement
                   ? <>You chose to <strong>skip procurement escalation</strong>. The inquiry will be sent directly to Sales for quotation.</>
@@ -1678,7 +2600,7 @@ export default function RateCheck({
             {renderRateBrief()}
 
             {/* CS/Sales: escalation / skip info on review */}
-            {!isProcurement && !hasDbSelections && (
+            {!isProcurement && !hasDbSelections && !hasAggregateSelections && (
               <div style={{ padding: '14px', background: skipProcurement ? 'rgba(217,119,6,0.06)' : 'rgba(15,143,168,0.06)', border: `1px solid ${skipProcurement ? 'rgba(217,119,6,0.18)' : 'rgba(15,143,168,0.18)'}`, borderRadius: 8 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: skipProcurement ? '#d97706' : '#0f8fa8', marginBottom: 4 }}>
                   {skipProcurement ? 'Skip Procurement' : 'Escalate to Procurement'}

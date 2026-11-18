@@ -1,9 +1,10 @@
 import { useMemo } from 'react'
-import { Clock, CheckCircle2, Users as UsersIcon, AlertTriangle, ArrowRight, ShieldCheck, Target, Building2 } from 'lucide-react'
+import { Clock, CheckCircle2, Users as UsersIcon, AlertTriangle, ArrowRight, ShieldCheck, Target, Building2, LayoutDashboard } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import KPICard from '../shared/KPICard'
 import NLQBox from '../shared/NLQBox'
 import { EMPLOYEES, SBUS, isOverdue, type Inquiry, type Task, type Followup, type MissingItem, type KPIItem, type PageId, type SBU, type Quote } from '../../types'
+import { PAGE_WRAPPER, PAGE_TITLE_ROW, PAGE_TITLE_ICON, PAGE_TITLE_H2, CARD, SECTION_LABEL, TABLE_TH } from './pageStyles'
 
 interface DashboardProps {
   inquiries: Inquiry[]
@@ -122,19 +123,18 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
   const empName = (id: number) => EMPLOYEES.find(e => e.id === id)?.name ?? `EMP-${id}`
 
   return (
-    <div className="db-page-anim">
-      <div className="db-page-head">
-        <div className="db-page-head-row">
-          <div>
-            <h1 className="db-page-title">Dashboard</h1>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-              Operations snapshot, lifetime activity, and salesperson performance
-            </div>
-          </div>
-          <button className="db-btn primary" onClick={() => onGoTo('chat')}>
-            New Inquiry <ArrowRight size={12} style={{ marginLeft: 4 }} />
-          </button>
+    <div style={PAGE_WRAPPER}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={PAGE_TITLE_ROW}>
+          <LayoutDashboard size={18} style={PAGE_TITLE_ICON} />
+          <h2 style={PAGE_TITLE_H2}>Dashboard</h2>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+            Operations snapshot, lifetime activity, and salesperson performance
+          </span>
         </div>
+        <button className="db-btn primary" onClick={() => onGoTo('chat')}>
+          New Inquiry <ArrowRight size={12} style={{ marginLeft: 4 }} />
+        </button>
       </div>
 
       {/* Top KPI cards — operational right-now snapshot, plus approval queue placeholder */}
@@ -174,13 +174,13 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
 
       {/* Performance row — hit rate + SBU breakdown */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 }}>
-        <div className="db-chart-card">
-          <div className="db-chart-head">
+        <div style={CARD}>
+          <div style={{ marginBottom: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Target size={14} style={{ color: 'var(--accent-light)' }} />
+              <Target size={14} style={{ color: '#0f8fa8' }} />
               <div>
-                <div className="db-chart-title">Salesperson Hit Rate</div>
-                <div className="db-chart-sub">Inquiry → completion conversion</div>
+                <div style={SECTION_LABEL}>Salesperson Hit Rate</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>Inquiry → completion conversion</div>
               </div>
             </div>
           </div>
@@ -211,13 +211,13 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
           </div>
         </div>
 
-        <div className="db-chart-card">
-          <div className="db-chart-head">
+        <div style={CARD}>
+          <div style={{ marginBottom: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Building2 size={14} style={{ color: 'var(--accent-light)' }} />
+              <Building2 size={14} style={{ color: '#0f8fa8' }} />
               <div>
-                <div className="db-chart-title">SBU Breakdown</div>
-                <div className="db-chart-sub">Inquiries per Strategic Business Unit</div>
+                <div style={SECTION_LABEL}>SBU Breakdown</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>Inquiries per Strategic Business Unit</div>
               </div>
             </div>
           </div>
@@ -274,12 +274,10 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
 
       {/* Charts — pending vs completed per day, plus channel mix */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16, marginBottom: 18 }}>
-        <div className="db-chart-card">
-          <div className="db-chart-head">
-            <div>
-              <div className="db-chart-title">Inquiries per day</div>
-              <div className="db-chart-sub">Pending vs completed</div>
-            </div>
+        <div style={CARD}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={SECTION_LABEL}>Inquiries per day</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>Pending vs completed</div>
           </div>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={byDay} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
@@ -301,12 +299,10 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
           </div>
         </div>
 
-        <div className="db-chart-card">
-          <div className="db-chart-head">
-            <div>
-              <div className="db-chart-title">By Channel</div>
-              <div className="db-chart-sub">Where inquiries come from</div>
-            </div>
+        <div style={CARD}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={SECTION_LABEL}>By Channel</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>Where inquiries come from</div>
           </div>
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
@@ -331,11 +327,11 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
       </div>
 
       {/* Recent Activity */}
-      <div className="db-chart-card">
-        <div className="db-chart-head">
+      <div style={CARD}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <div>
-            <div className="db-chart-title">Recent Activity</div>
-            <div className="db-chart-sub">Latest 5 customer inquiries</div>
+            <div style={SECTION_LABEL}>Recent Activity</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>Latest 5 customer inquiries</div>
           </div>
           <button className="db-btn secondary" onClick={() => onGoTo('inquiry-list')}>
             View all
@@ -345,12 +341,12 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.06em' }}>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Customer</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Inquiry</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Status</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Employee</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Time</th>
+              <tr>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Customer</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Inquiry</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Status</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Employee</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Time</th>
               </tr>
             </thead>
             <tbody>

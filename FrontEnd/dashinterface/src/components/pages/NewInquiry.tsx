@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Plus, Save, X } from 'lucide-react'
 import {
-  SBUS, INQUIRY_PRIORITIES, COMMODITY_TYPES, CONTAINER_TYPES,
-  emptyContainerLine,
+  SBUS, INQUIRY_PRIORITIES, COMMODITY_TYPES, CONTAINER_TYPES, CONTAINER_TYPE_LABELS,
+  emptyContainerLine, linerDisplay,
   type Inquiry, type LinerRecord, type ContainerLine,
   type ClientRecord, type ContactPersonRecord,
   type SBU, type DeliveryType,
@@ -48,6 +48,11 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
   useEffect(() => {
     apiGetLiners().then(setLinerList).catch(() => {})
   }, [])
+
+  const formatLinerLabel = (name: string) => {
+    const l = linerList.find(x => x.name === name)
+    return l ? linerDisplay(l) : name
+  }
 
   const updateContainer = (idx: number, patch: Partial<ContainerLine>) => {
     setContainers(prev => prev.map((c, i) => i === idx ? { ...c, ...patch } : c))
@@ -109,8 +114,8 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
       ...(matchedCli ? { cli_id: matchedCli.cli_id } : {}),
       ...(matchedCp  ? { cpid:   matchedCp.cp_id   } : {}),
       request: autoRequest,
-      origin: niOrigin.trim() || 'TBD',
-      destination: firstContainer?.destination.trim() || 'TBD',
+      origin: niOrigin.trim() || undefined,
+      destination: firstContainer?.destination.trim() || undefined,
       delivery_type: niDelivery,
       sbu: niSbu,
       employee_id: activeEmployee.id,
@@ -139,18 +144,26 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
 
   const canSave = !!niCustomer.trim()
 
-  const selectStyle = { width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 } as const
+  // Style-guide tokens
+  const labelCell: React.CSSProperties = { padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }
+  const labelCellNarrow: React.CSSProperties = { ...labelCell, padding: '8px 8px' }
+  const valCell: React.CSSProperties = { padding: '4px 8px' }
+  const valCellBR: React.CSSProperties = { ...valCell, borderRight: '1px solid var(--border)' }
+  const inputStyle: React.CSSProperties = { width: '100%', border: 'none', background: 'transparent', padding: '4px 0' }
+  const rowBorder: React.CSSProperties = { borderBottom: '1px solid var(--border)' }
+
+  const channelLabel = niChannel === 'Email' ? 'Email Address' : niChannel === 'WhatsApp' ? 'WhatsApp Number' : niChannel === 'Phone' ? 'Phone Number' : 'WeChat ID'
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <button className="lt-icon-btn" onClick={onGoBack} title="Back to Workspace" style={{ padding: 6 }}>
           <ArrowLeft size={18} />
         </button>
         <div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Plus size={18} /> New Inquiry
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Plus size={18} style={{ color: '#0f8fa8' }} /> New Inquiry
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
             Log a new shipping inquiry — it enters the workflow at Rate Check immediately. Save to submit and add another.
@@ -158,223 +171,299 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
         </div>
       </div>
 
-      {/* Form */}
-      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
-        {/* Inquiry-level fields */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          {/* Customer name — searchable dropdown from DB client list. Silently routes to case 2/3 on match. */}
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label className="lt-label">
-              Customer <span style={{ color: '#dc2626' }}>*</span>
-              {matchedCli && <span style={{ marginLeft: 8, fontSize: 11, color: '#16a34a', fontWeight: 500 }}>✓ existing client</span>}
-            </label>
-            <SearchCombobox
-              value={niCustomer}
-              onChange={val => { setNiCustomer(val); setNiContactPerson('') }}
-              items={clientList.map(cl => ({ label: cl.name, sublabel: cl.city ?? undefined }))}
-              placeholder="Type or select customer name"
-              autoFocus
-            />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* ═══════════════ INQUIRY DETAILS ═══════════════ */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          {/* Header bar */}
+          <div style={{ padding: '8px 14px', background: 'var(--accent)', borderRadius: '8px 8px 0 0', marginBottom: 1 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>INQUIRY DETAILS</span>
           </div>
 
-          {/* Contact person — filtered to the matched client's contacts */}
-          <div>
-            <label className="lt-label">
-              Contact Person
-              {matchedCp && <span style={{ marginLeft: 8, fontSize: 11, color: '#16a34a', fontWeight: 500 }}>✓ existing contact</span>}
-            </label>
-            <SearchCombobox
-              value={niContactPerson}
-              onChange={setNiContactPerson}
-              items={(matchedCli
-                ? contactPersonList.filter(cp => cp.cli_id === matchedCli.cli_id)
-                : contactPersonList
-              ).map(cp => ({ label: cp.name ?? '', sublabel: cp.email ?? undefined }))}
-              placeholder="Name of the person making the inquiry"
-            />
-          </div>
+          {/* Fields table */}
+          <div style={{ border: '1px solid var(--border)', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
+            {/* Customer — full width */}
+            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', ...rowBorder }}>
+              <div style={labelCell}>
+                Customer <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span>
+                {matchedCli && <span style={{ marginLeft: 6, fontSize: 10, color: '#16a34a', fontWeight: 500 }}>✓ existing</span>}
+              </div>
+              <div style={valCell}>
+                <SearchCombobox
+                  value={niCustomer}
+                  onChange={val => { setNiCustomer(val); setNiContactPerson('') }}
+                  items={clientList.map(cl => ({ label: cl.name, sublabel: cl.city ?? undefined }))}
+                  placeholder="Type or select customer name"
+                  autoFocus
+                />
+              </div>
+            </div>
 
-          {/* Designation / channel — hidden when contact already exists in DB (case 3) */}
-          {!matchedCp && (<>
-          <div>
-            <label className="lt-label">Designation</label>
-            <input className="lt-input" style={{ width: '100%' }} value={niContactDesignation} onChange={e => setNiContactDesignation(e.target.value)} placeholder="e.g. Logistics Manager" />
-          </div>
-          <div>
-            <label className="lt-label">Channel <span style={{ color: '#dc2626' }}>*</span></label>
-            <select className="lt-select" style={selectStyle} value={niChannel} onChange={e => { setNiChannel(e.target.value as 'WhatsApp' | 'Email' | 'Phone' | 'WeChat'); setNiContactChannelId('') }}>
-              <option>Email</option><option>WhatsApp</option><option>Phone</option><option>WeChat</option>
-            </select>
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label className="lt-label">{niChannel === 'Email' ? 'Email Address' : niChannel === 'WhatsApp' ? 'WhatsApp Number' : niChannel === 'Phone' ? 'Phone Number' : 'WeChat ID'}</label>
-            <input
-              className="lt-input" style={{ width: '100%' }}
-              type={niChannel === 'Email' ? 'email' : niChannel === 'WeChat' ? 'text' : 'tel'}
-              value={niContactChannelId}
-              onChange={e => setNiContactChannelId(e.target.value)}
-              placeholder={niChannel === 'Email' ? 'e.g. john@acme.com' : niChannel === 'WhatsApp' ? 'e.g. +94 77 123 4567' : niChannel === 'Phone' ? 'e.g. +94 11 234 5678' : 'e.g. john_doe'}
-            />
-          </div>
-          </>)}
-          <div>
-            <label className="lt-label">Origin <span style={{ color: '#dc2626' }}>*</span></label>
-            <PortCombobox
-              value={niOrigin}
-              onChange={setNiOrigin}
-              placeholder="e.g. Colombo/Sri Lanka"
-            />
-          </div>
-          <div>
-            <label className="lt-label">Priority <span style={{ color: '#dc2626' }}>*</span></label>
-            <select className="lt-select" style={selectStyle} value={niPriority} onChange={e => setNiPriority(e.target.value as InquiryPriority)}>
-              {INQUIRY_PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="lt-label">SBU <span style={{ color: '#dc2626' }}>*</span></label>
-            <select className="lt-select" style={selectStyle} value={niSbu} onChange={e => setNiSbu(e.target.value as SBU)}>
-              {SBUS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="lt-label">Delivery Type <span style={{ color: '#dc2626' }}>*</span></label>
-            <select className="lt-select" style={selectStyle} value={niDelivery} onChange={e => setNiDelivery(e.target.value as DeliveryType)}>
-              <option value="port-to-port">Port to Port</option>
-              <option value="door-to-door">Door to Door</option>
-              <option value="port-to-door">Port to Door</option>
-              <option value="door-to-port">Door to Port</option>
-            </select>
-          </div>
-          <div>
-            <label className="lt-label">Incoterm</label>
-            <input className="lt-input" style={{ width: '100%' }} value={niIncoterm} onChange={e => setNiIncoterm(e.target.value)} placeholder="e.g. FOB, CIF, EXW, DDP" />
-          </div>
-          <div>
-            <label className="lt-label">Cargo Ready Date</label>
-            <input className="lt-input" type="date" style={{ width: '100%' }} value={niCargoReadyDate} onChange={e => setNiCargoReadyDate(e.target.value)} />
-          </div>
-          <div>
-            <label className="lt-label">Preferred Rate (USD)</label>
-            <input className="lt-input" type="number" style={{ width: '100%' }} value={niPreferredRate} onChange={e => setNiPreferredRate(e.target.value === '' ? '' : Number(e.target.value))} min={0} placeholder="e.g. 1200" />
-          </div>
-          <div>
-            <label className="lt-label">Preferred Liners</label>
-            <TagInput
-              values={niPreferredLiners}
-              onChange={setNiPreferredLiners}
-              suggestions={linerList.map(l => l.name)}
-              placeholder="Type to add liners..."
-            />
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label className="lt-label">Remarks</label>
-            <input className="lt-input" style={{ width: '100%' }} value={niRemark} onChange={e => setNiRemark(e.target.value)} placeholder="Any special instructions or notes" />
+            {/* Contact Person + Designation (hidden when matchedCp) */}
+            {!matchedCp ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
+                <div style={labelCell}>
+                  Contact Person
+                </div>
+                <div style={valCellBR}>
+                  <SearchCombobox
+                    value={niContactPerson}
+                    onChange={setNiContactPerson}
+                    items={(matchedCli
+                      ? contactPersonList.filter(cp => cp.cli_id === matchedCli.cli_id)
+                      : contactPersonList
+                    ).map(cp => ({ label: cp.name ?? '', sublabel: cp.email ?? undefined }))}
+                    placeholder="Name of the person making the inquiry"
+                  />
+                </div>
+                <div style={labelCellNarrow}>Designation</div>
+                <div style={valCell}>
+                  <input className="lt-input" style={inputStyle} value={niContactDesignation} onChange={e => setNiContactDesignation(e.target.value)} placeholder="e.g. Logistics Manager" />
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', ...rowBorder }}>
+                <div style={labelCell}>
+                  Contact Person
+                  <span style={{ marginLeft: 6, fontSize: 10, color: '#16a34a', fontWeight: 500 }}>✓ existing</span>
+                </div>
+                <div style={valCell}>
+                  <SearchCombobox
+                    value={niContactPerson}
+                    onChange={setNiContactPerson}
+                    items={(matchedCli
+                      ? contactPersonList.filter(cp => cp.cli_id === matchedCli.cli_id)
+                      : contactPersonList
+                    ).map(cp => ({ label: cp.name ?? '', sublabel: cp.email ?? undefined }))}
+                    placeholder="Name of the person making the inquiry"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Channel + Channel ID — hidden when matchedCp */}
+            {!matchedCp && (
+              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
+                <div style={labelCell}>Channel <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
+                <div style={valCellBR}>
+                  <select className="lt-input" style={inputStyle} value={niChannel} onChange={e => { setNiChannel(e.target.value as 'WhatsApp' | 'Email' | 'Phone' | 'WeChat'); setNiContactChannelId('') }}>
+                    <option>Email</option><option>WhatsApp</option><option>Phone</option><option>WeChat</option>
+                  </select>
+                </div>
+                <div style={labelCellNarrow}>{channelLabel}</div>
+                <div style={valCell}>
+                  <input className="lt-input" style={inputStyle}
+                    type={niChannel === 'Email' ? 'email' : niChannel === 'WeChat' ? 'text' : 'tel'}
+                    value={niContactChannelId} onChange={e => setNiContactChannelId(e.target.value)}
+                    placeholder={niChannel === 'Email' ? 'e.g. john@acme.com' : niChannel === 'WhatsApp' ? 'e.g. +94 77 123 4567' : niChannel === 'Phone' ? 'e.g. +94 11 234 5678' : 'e.g. john_doe'}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ─── ROUTING divider ─── */}
+            <div style={{ padding: '7px 12px', background: 'rgba(15,143,168,0.12)', ...rowBorder }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: 0.4 }}>ROUTING</span>
+            </div>
+
+            {/* Origin + Priority */}
+            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
+              <div style={labelCell}>Origin <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
+              <div style={valCellBR}>
+                <PortCombobox value={niOrigin} onChange={setNiOrigin} placeholder="e.g. Colombo/Sri Lanka" />
+              </div>
+              <div style={labelCellNarrow}>Priority <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
+              <div style={valCell}>
+                <select className="lt-input" style={inputStyle} value={niPriority} onChange={e => setNiPriority(e.target.value as InquiryPriority)}>
+                  {INQUIRY_PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* SBU + Delivery Type */}
+            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
+              <div style={labelCell}>SBU <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
+              <div style={valCellBR}>
+                <select className="lt-input" style={inputStyle} value={niSbu} onChange={e => setNiSbu(e.target.value as SBU)}>
+                  {SBUS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div style={labelCellNarrow}>Delivery Type <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
+              <div style={valCell}>
+                <select className="lt-input" style={inputStyle} value={niDelivery} onChange={e => setNiDelivery(e.target.value as DeliveryType)}>
+                  <option value="port-to-port">Port to Port</option>
+                  <option value="door-to-door">Door to Door</option>
+                  <option value="port-to-door">Port to Door</option>
+                  <option value="door-to-port">Door to Port</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Incoterm + Cargo Ready Date */}
+            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
+              <div style={labelCell}>Incoterm</div>
+              <div style={valCellBR}>
+                <input className="lt-input" style={inputStyle} value={niIncoterm} onChange={e => setNiIncoterm(e.target.value)} placeholder="e.g. FOB, CIF, EXW, DDP" />
+              </div>
+              <div style={labelCellNarrow}>Cargo Ready</div>
+              <div style={valCell}>
+                <input className="lt-input" type="date" style={inputStyle} value={niCargoReadyDate} onChange={e => setNiCargoReadyDate(e.target.value)} />
+              </div>
+            </div>
+
+            {/* Preferred Rate + Preferred Liners */}
+            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
+              <div style={labelCell}>Preferred Rate</div>
+              <div style={valCellBR}>
+                <input className="lt-input" type="number" style={inputStyle} value={niPreferredRate} onChange={e => setNiPreferredRate(e.target.value === '' ? '' : Number(e.target.value))} min={0} placeholder="e.g. 1200 USD" />
+              </div>
+              <div style={labelCellNarrow}>Pref. Liners</div>
+              <div style={valCell}>
+                <TagInput values={niPreferredLiners} onChange={setNiPreferredLiners} suggestions={linerList.map(l => l.name)} placeholder="Type to add liners..." formatLabel={formatLinerLabel} />
+              </div>
+            </div>
+
+            {/* Remarks — full width, last row */}
+            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr' }}>
+              <div style={labelCell}>Remarks</div>
+              <div style={valCell}>
+                <input className="lt-input" style={inputStyle} value={niRemark} onChange={e => setNiRemark(e.target.value)} placeholder="Any special instructions or notes" />
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Containers section */}
-        <div style={{ marginTop: 20, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 12 }}>Containers</div>
+        {/* ═══════════════ CONTAINER SECTIONS ═══════════════ */}
+        {containers.map((c, idx) => (
+          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {/* Container header bar */}
+            <div style={{ padding: '8px 14px', background: 'var(--accent)', borderRadius: '8px 8px 0 0', marginBottom: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>CONTAINER {idx + 1}</span>
+              {containers.length > 1 && (
+                <button type="button" onClick={() => removeContainer(idx)} title="Remove container"
+                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.7)', fontSize: 14, padding: '0 2px', lineHeight: 1 }}>
+                  ×
+                </button>
+              )}
+            </div>
 
-          {containers.map((c, idx) => (
-            <div key={idx} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 16, marginBottom: 10, background: 'var(--bg)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)' }}>Container {idx + 1}</span>
-                {containers.length > 1 && (
-                  <button className="lt-icon-btn" onClick={() => removeContainer(idx)} title="Remove container" style={{ padding: 4 }}>
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
-                <div>
-                  <label className="lt-label">Commodity Type <span style={{ color: '#dc2626' }}>*</span></label>
-                  <select className="lt-select" style={selectStyle} value={c.commodityType} onChange={e => updateContainer(idx, { commodityType: e.target.value as CommodityType })}>
+            {/* Container fields table */}
+            <div style={{ border: '1px solid var(--border)', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
+              {/* Commodity Type + Commodity Name */}
+              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
+                <div style={labelCell}>Commodity Type <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
+                <div style={valCellBR}>
+                  <select className="lt-input" style={inputStyle} value={c.commodityType} onChange={e => updateContainer(idx, { commodityType: e.target.value as CommodityType })}>
                     {COMMODITY_TYPES.map(ct => <option key={ct} value={ct}>{ct}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="lt-label">Commodity Name</label>
-                  <input className="lt-input" style={{ width: '100%' }} value={c.commodityName} onChange={e => updateContainer(idx, { commodityName: e.target.value })} placeholder="e.g. Cotton T-shirts" />
+                <div style={labelCellNarrow}>Commodity</div>
+                <div style={valCell}>
+                  <input className="lt-input" style={inputStyle} value={c.commodityName} onChange={e => updateContainer(idx, { commodityName: e.target.value })} placeholder="e.g. Cotton T-shirts" />
                 </div>
-                <div>
-                  <label className="lt-label">Destination <span style={{ color: '#dc2626' }}>*</span></label>
-                  <PortCombobox
-                    value={c.destination}
-                    onChange={dest => updateContainer(idx, { destination: dest })}
-                    placeholder="e.g. Hamburg/Germany"
-                  />
+              </div>
+
+              {/* Destination + Container Type */}
+              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
+                <div style={labelCell}>Destination <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
+                <div style={valCellBR}>
+                  <PortCombobox value={c.destination} onChange={dest => updateContainer(idx, { destination: dest })} placeholder="e.g. Hamburg/Germany" />
                 </div>
-                <div>
-                  <label className="lt-label">Container Type <span style={{ color: '#dc2626' }}>*</span></label>
-                  <select className="lt-select" style={selectStyle} value={c.containerType} onChange={e => updateContainer(idx, { containerType: e.target.value as ContainerType })}>
-                    {CONTAINER_TYPES.map(ct => <option key={ct} value={ct}>{ct}</option>)}
+                <div style={labelCellNarrow}>Container <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
+                <div style={valCell}>
+                  <select className="lt-input" style={inputStyle} value={c.containerType} onChange={e => updateContainer(idx, { containerType: e.target.value as ContainerType })}>
+                    {CONTAINER_TYPES.map(ct => <option key={ct} value={ct}>{CONTAINER_TYPE_LABELS[ct]}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="lt-label">Qty <span style={{ color: '#dc2626' }}>*</span></label>
-                  <input className="lt-input" type="number" style={{ width: '100%' }} value={c.quantity} onChange={e => updateContainer(idx, { quantity: Math.max(1, Number(e.target.value)) })} min={1} />
+              </div>
+
+              {/* Qty + Weight */}
+              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
+                <div style={labelCell}>Qty <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
+                <div style={valCellBR}>
+                  <input className="lt-input" type="number" style={inputStyle} value={c.quantity} onChange={e => updateContainer(idx, { quantity: Math.max(1, Number(e.target.value)) })} min={1} />
                 </div>
-                <div>
-                  <label className="lt-label">Weight (kg)</label>
-                  <input className="lt-input" type="number" style={{ width: '100%' }} value={c.weight} onChange={e => updateContainer(idx, { weight: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 18000" />
+                <div style={labelCellNarrow}>Weight (kg)</div>
+                <div style={valCell}>
+                  <input className="lt-input" type="number" style={inputStyle} value={c.weight} onChange={e => updateContainer(idx, { weight: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 18000" />
                 </div>
-                <div>
-                  <label className="lt-label">FCL / LCL <span style={{ color: '#dc2626' }}>*</span></label>
-                  <select className="lt-select" style={selectStyle} value={c.isFcl ? 'FCL' : 'LCL'} onChange={e => updateContainer(idx, { isFcl: e.target.value === 'FCL' })}>
+              </div>
+
+              {/* FCL/LCL + Zip Code */}
+              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
+                <div style={labelCell}>FCL / LCL <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
+                <div style={valCellBR}>
+                  <select className="lt-input" style={inputStyle} value={c.isFcl ? 'FCL' : 'LCL'} onChange={e => updateContainer(idx, { isFcl: e.target.value === 'FCL' })}>
                     <option value="FCL">FCL</option>
                     <option value="LCL">LCL</option>
                   </select>
                 </div>
-                <div>
-                  <label className="lt-label">Zip Code</label>
-                  <input className="lt-input" style={{ width: '100%' }} value={c.zipCode} onChange={e => updateContainer(idx, { zipCode: e.target.value })} placeholder="e.g. 20095" />
+                <div style={labelCellNarrow}>Zip Code</div>
+                <div style={valCell}>
+                  <input className="lt-input" style={inputStyle} value={c.zipCode} onChange={e => updateContainer(idx, { zipCode: e.target.value })} placeholder="e.g. 20095" />
                 </div>
-                <div>
-                  <label className="lt-label">Free Time (days)</label>
-                  <input className="lt-input" type="number" style={{ width: '100%' }} value={c.freeTime} onChange={e => updateContainer(idx, { freeTime: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 14" />
+              </div>
+
+              {/* Free Time + Temperature */}
+              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
+                <div style={labelCell}>Free Time (days)</div>
+                <div style={valCellBR}>
+                  <input className="lt-input" type="number" style={inputStyle} value={c.freeTime} onChange={e => updateContainer(idx, { freeTime: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 14" />
                 </div>
-                <div>
-                  <label className="lt-label">Temperature (°C)</label>
-                  <input className="lt-input" type="number" style={{ width: '100%' }} value={c.temperature ?? ''} onChange={e => updateContainer(idx, { temperature: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="e.g. -18 (reefer only)" />
+                <div style={labelCellNarrow}>Temp. (°C)</div>
+                <div style={valCell}>
+                  <input className="lt-input" type="number" style={inputStyle} value={c.temperature ?? ''} onChange={e => updateContainer(idx, { temperature: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="e.g. -18" />
                 </div>
-                <div>
-                  <label className="lt-label">HS Code</label>
-                  <input className="lt-input" style={{ width: '100%' }} value={c.hs_code ?? ''} onChange={e => updateContainer(idx, { hs_code: e.target.value || undefined })} placeholder="e.g. 6109.10" />
+              </div>
+
+              {/* HS Code — single value */}
+              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', ...rowBorder }}>
+                <div style={labelCell}>HS Code</div>
+                <div style={valCell}>
+                  <input className="lt-input" style={inputStyle} value={c.hs_code ?? ''} onChange={e => updateContainer(idx, { hs_code: e.target.value || undefined })} placeholder="e.g. 6109.10" />
                 </div>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label className="lt-label">Commodity Description</label>
-                  <input className="lt-input" style={{ width: '100%' }} value={c.description ?? ''} onChange={e => updateContainer(idx, { description: e.target.value || undefined })} placeholder="Brief description of the goods" />
+              </div>
+
+              {/* ─── ADDITIONAL DETAILS divider ─── */}
+              <div style={{ padding: '7px 12px', background: 'rgba(15,143,168,0.12)', ...rowBorder }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: 0.4 }}>ADDITIONAL DETAILS</span>
+              </div>
+
+              {/* Description — full width */}
+              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', ...rowBorder }}>
+                <div style={labelCell}>Description</div>
+                <div style={valCell}>
+                  <input className="lt-input" style={inputStyle} value={c.description ?? ''} onChange={e => updateContainer(idx, { description: e.target.value || undefined })} placeholder="Brief description of the goods" />
                 </div>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label className="lt-label">Delivery Address</label>
-                  <input className="lt-input" style={{ width: '100%' }} value={c.address ?? ''} onChange={e => updateContainer(idx, { address: e.target.value || undefined })} placeholder="Door delivery address (door-to-door only)" />
+              </div>
+
+              {/* Delivery Address — full width */}
+              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', ...rowBorder }}>
+                <div style={labelCell}>Delivery Address</div>
+                <div style={valCell}>
+                  <input className="lt-input" style={inputStyle} value={c.address ?? ''} onChange={e => updateContainer(idx, { address: e.target.value || undefined })} placeholder="Door delivery address (door-to-door only)" />
                 </div>
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <label className="lt-label">Door Agent</label>
-                  <TagInput
-                    values={c.doorAgents}
-                    onChange={doorAgents => updateContainer(idx, { doorAgents })}
-                    suggestions={linerList.map(l => l.name)}
-                    placeholder="Type to add door agents..."
-                  />
+              </div>
+
+              {/* Door Agent — full width, last row (no borderBottom) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr' }}>
+                <div style={labelCell}>Door Agent</div>
+                <div style={valCell}>
+                  <TagInput values={c.doorAgents} onChange={doorAgents => updateContainer(idx, { doorAgents })} suggestions={linerList.map(l => l.name)} placeholder="Type to add door agents..." formatLabel={formatLinerLabel} />
                 </div>
               </div>
             </div>
-          ))}
+          </div>
+        ))}
 
-          <button
-            className="db-btn"
-            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, marginTop: 4 }}
-            onClick={addContainer}
-          >
-            <Plus size={12} /> Add Container
-          </button>
-        </div>
+        {/* Add Container button */}
+        <button type="button" onClick={addContainer}
+          style={{ border: '1px dashed var(--border)', borderRadius: 4, background: 'transparent', cursor: 'pointer', padding: '6px 12px', fontSize: 11, color: 'var(--accent)', fontWeight: 600, alignSelf: 'flex-start' }}>
+          + Add Container
+        </button>
 
-        {/* Actions */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 16 }}>
+        {/* Submit area */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
           <button className="db-btn" style={{ fontSize: 12 }} onClick={onGoBack}>Back to Workspace</button>
           <button
             className="db-btn primary"
@@ -385,6 +474,7 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
             <Save size={12} /> Save Inquiry
           </button>
         </div>
+
       </div>
     </div>
   )

@@ -1,17 +1,17 @@
 import React from 'react'
 import {
   ChevronRight, AlertTriangle, Check, FileText, ShieldCheck, X,
-  User, Mail, Loader2, MessageCircle, Edit3, Copy, ClipboardCheck,
+  User, Mail, Loader2, MessageCircle, Edit3,
   Ship, ChevronDown,
 } from 'lucide-react'
 import {
   ROLE_LABELS,
   type Inquiry, type Customer, type LinerRecord, type ContainerLine,
+  type CompletedRateRequest,
 } from '../../../types'
-import type { CompletedRateRequest, CompletedRateOption } from '../../../types'
 import type { KycRequestRecord } from '../../../api'
 import type { WorkspaceItem } from './types'
-import { empName, openMailto, buildRateSection } from './utils'
+import { empName, openMailto, generateQuotationPdf, openOutlookWithQuotation } from './utils'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -40,6 +40,8 @@ export interface ModalStepFormsProps {
   setSelectedRateOptionIds: React.Dispatch<React.SetStateAction<Set<number>>>
   bestRateOptionId: number | null
   setBestRateOptionId: (v: number | null) => void
+  optionOverrides: Record<number, import('./types').QuotationOptionOverride>
+  setOptionOverrides: React.Dispatch<React.SetStateAction<Record<number, import('./types').QuotationOptionOverride>>>
 
   // Send-to-customer
   sendMethod: 'email' | 'whatsapp'
@@ -109,6 +111,7 @@ export default function ModalStepForms(props: ModalStepFormsProps) {
     formVessel, setFormVessel, formVoyage, setFormVoyage,
     quotationContent, setQuotationContent, quoteCopied, setQuoteCopied,
     selectedRateOptionIds, setSelectedRateOptionIds, bestRateOptionId, setBestRateOptionId,
+    optionOverrides,
     sendMethod, setSendMethod, waConfirmed, setWaConfirmed, emailConfirmed, setEmailConfirmed,
     draftCollapsed, setDraftCollapsed, customerContactEmail, setCustomerContactEmail,
     customerContactPhone, setCustomerContactPhone,
@@ -128,7 +131,9 @@ export default function ModalStepForms(props: ModalStepFormsProps) {
   if (!actionModal) return null
   // These action kinds are rendered in other components (inline step forms)
   const excludedKinds = [
-    'send-kyc', 'customer-response', 'booking-request', 'review-booking-request',
+    'send-kyc', 'customer-response', 'prepare-quotation',
+    'send-to-customer',
+    'booking-request', 'review-booking-request',
     'confirm-liner-booking', 'attach-release-order', 'release-booking',
     'send-draft-bl', 'generate-si', 'create-hbl', 'create-bl',
     'record-cutoff', 'request-si', 'submit-si', 'send-pre-advice',
@@ -236,247 +241,39 @@ export default function ModalStepForms(props: ModalStepFormsProps) {
       )
     })()}
 
-    {/* Prepare Quotation (Sales) */}
-    {actionModal.actionKind === 'prepare-quotation' && (() => {
-      const ctx = actionModal.previousContext
-      const modalRr = actionModal.sourceData?.rateRequest as CompletedRateRequest | undefined
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <div style={{ padding: '10px 14px', background: 'rgba(15,143,168,0.06)', border: '1px solid rgba(15,143,168,0.18)', borderRadius: 8, fontSize: 12, color: '#0f8fa8', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Edit3 size={14} />
-            Review and edit the quotation below, then click <strong>Save Quotation</strong>. The quotation will appear in the Send Quote step for delivery.
-          </div>
-
-          {/* Saved rate options from backend — selectable */}
-          {modalRr && modalRr.options.length > 0 && (() => {
-            const validOpts = modalRr.options.filter(o => o.rate)
-
-            // Helper: rebuild quotation text after selection or best-option changes
-            const rebuildQuotation = (nextSelected: Set<number>, nextBest: number | null) => {
-              const { inquiry: qInq2, container: qCont2 } = actionModal.sourceData as { inquiry: Inquiry; container: ContainerLine }
-              const qCust2 = customers.find(c => c.name.toLowerCase() === qInq2.customer_name.toLowerCase())
-              const dest2 = qCont2?.destination || qInq2.destination
-              const cLabel = qCont2 ? `${qCont2.quantity}x ${qCont2.containerType}` : ''
-              const comLabel = qCont2?.commodityType ? ` · ${qCont2.commodityType}` : qInq2.commodity_type ? ` · ${qInq2.commodity_type}` : ''
-              const procRemark = modalRr.remark ?? ''
-              const td = new Date().toISOString().slice(0, 10)
-              const rs = buildRateSection(modalRr, [...nextSelected], nextBest, linerList, actionModal.previousContext)
-              setQuotationContent(
-`FREIGHT QUOTATION
-
-To: ${qInq2.customer_name}${qCust2?.tier ? ` (${qCust2.tier})` : ''}
-Date: ${td}
-Reference: ${qInq2.id}
-
-Dear ${qInq2.customer_name},
-
-Thank you for your freight enquiry. We are pleased to offer the following:
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-SHIPMENT DETAILS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Route:       ${qInq2.origin} → ${dest2}
-Cargo:       ${cLabel}${comLabel}
-Service:     ${qInq2.delivery_type === 'door-to-door' ? 'Door-to-Door' : 'Port-to-Port'}${qInq2.incoterm ? ` (${qInq2.incoterm})` : ''}${qInq2.cargo_ready_date ? `\nCargo Ready: ${qInq2.cargo_ready_date}` : ''}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-RATE OPTIONS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${rs}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-TERMS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-• Validity: 14 days from date of this quotation
-• Rates subject to space and equipment availability
-• Port surcharges, customs, and inland haulage quoted separately unless stated above
-${procRemark ? `\nNOTES: ${procRemark}` : ''}
-Please confirm your preferred option at your earliest convenience.
-
-Best regards,
-${activeEmployee.name}
-ABC Logistics (Pvt) Ltd`
-              )
-            }
-
-            const toggleOption = (optId: number) => {
-              setSelectedRateOptionIds(prev => {
-                const next = new Set(prev)
-                if (next.has(optId)) {
-                  next.delete(optId)
-                  // If we removed the best, clear best or pick next selected
-                  if (bestRateOptionId === optId) {
-                    const remaining = [...next]
-                    const nextBest = remaining.length > 0 ? remaining[0] : null
-                    setBestRateOptionId(nextBest)
-                    rebuildQuotation(next, nextBest)
-                    return next
-                  }
-                } else {
-                  next.add(optId)
-                }
-                rebuildQuotation(next, bestRateOptionId)
-                return next
-              })
-            }
-
-            const pickBest = (optId: number) => {
-              // Selecting as best also ensures it's included
-              setSelectedRateOptionIds(prev => {
-                const next = new Set(prev)
-                next.add(optId)
-                setBestRateOptionId(optId)
-                rebuildQuotation(next, optId)
-                return next
-              })
-            }
-
-            return (
-              <div className="ws-context-card" style={{ marginTop: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <FileText size={11} style={{ color: '#0f8fa8' }} />
-                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
-                      Rate Options ({validOpts.length})
-                    </span>
-                  </div>
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                    {selectedRateOptionIds.size} included · tick best option
-                  </span>
-                </div>
-                {validOpts.map((opt: CompletedRateOption) => {
-                  const r = opt.rate!
-                  const isSelected = selectedRateOptionIds.has(opt.option_id)
-                  const isBest = bestRateOptionId === opt.option_id
-                  const linerName = r.lin_id ? (linerList.find(l => l.lin_id === r.lin_id)?.name ?? `Liner #${r.lin_id}`) : null
-                  const typeLabel = opt.rate_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-                  const freeTime = r.free_time ?? r.free_days
-                  return (
-                    <div
-                      key={opt.option_id}
-                      style={{
-                        padding: '8px 10px',
-                        background: isBest ? 'rgba(15,143,168,0.08)' : isSelected ? 'rgba(15,143,168,0.03)' : 'var(--bg-card)',
-                        border: `1.5px solid ${isBest ? '#0f8fa8' : isSelected ? 'rgba(15,143,168,0.18)' : 'var(--border)'}`,
-                        borderRadius: 6, marginBottom: 6, fontSize: 11,
-                        opacity: isSelected ? 1 : 0.5,
-                        transition: 'all 0.15s',
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {/* Include checkbox */}
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleOption(opt.option_id)}
-                          style={{ accentColor: '#0f8fa8', cursor: 'pointer', margin: 0 }}
-                        />
-                        {/* Rate details */}
-                        <div style={{ flex: 1 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontWeight: 600, color: 'var(--text)' }}>
-                              {linerName ? `${linerName} — ` : ''}{r.rate ?? '—'} {r.currency ?? 'USD'}
-                            </span>
-                            <span style={{ fontSize: 10, padding: '2px 6px', background: 'rgba(15,143,168,0.1)', borderRadius: 4, color: '#0f8fa8' }}>
-                              {typeLabel}
-                            </span>
-                          </div>
-                          <div style={{ color: 'var(--text-muted)', marginTop: 3 }}>
-                            {r.origin && r.destination ? `${r.origin} → ${r.destination}` : ''}
-                            {r.container_type ? ` · ${r.container_type}` : ''}
-                            {r.transit ? ` · ${r.transit}d transit` : ''}
-                            {freeTime ? ` · ${freeTime}d free` : ''}
-                            {r.valid_from && r.valid_to ? ` · valid ${r.valid_from} – ${r.valid_to}` : ''}
-                          </div>
-                        </div>
-                        {/* Best option radio */}
-                        <button
-                          type="button"
-                          title={isBest ? 'Recommended option' : 'Mark as recommended'}
-                          onClick={() => pickBest(opt.option_id)}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 4,
-                            fontSize: 10, padding: '3px 8px', borderRadius: 4, cursor: 'pointer',
-                            border: `1px solid ${isBest ? '#0f8fa8' : 'var(--border)'}`,
-                            background: isBest ? '#0f8fa8' : 'transparent',
-                            color: isBest ? '#fff' : 'var(--text-muted)',
-                            fontWeight: isBest ? 600 : 400,
-                            transition: 'all 0.15s',
-                          }}
-                        >
-                          <Check size={10} />
-                          Best
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-                {modalRr.remark && (
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>
-                    Note: {modalRr.remark}
-                  </div>
-                )}
-              </div>
-            )
-          })()}
-
-          {/* Fallback: activity log context (when no saved rate request) */}
-          {!modalRr && ctx && (
-            <div className="ws-context-card" style={{ marginTop: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <User size={11} style={{ color: 'var(--text-muted)' }} />
-                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
-                  Rate brief from {empName(ctx.actor_id)} ({ROLE_LABELS[ctx.actor_role]})
-                </span>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{ctx.action}</div>
-              {ctx.notes && (
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, fontStyle: 'italic', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {ctx.notes.split('|').filter((s: string) => /rates?:/i.test(s)).map((s: string) => s.trim()).join(' · ') || ctx.notes.split('|').slice(0, 3).map((s: string) => s.trim()).join(' · ')}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <label className="lt-label" style={{ margin: 0 }}>Quotation Message</label>
-              <button
-                type="button"
-                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, padding: '4px 10px', borderRadius: 6, border: `1px solid ${quoteCopied ? 'rgba(22,163,74,0.4)' : 'rgba(15,143,168,0.3)'}`, background: quoteCopied ? 'rgba(22,163,74,0.08)' : 'rgba(15,143,168,0.06)', color: quoteCopied ? '#16a34a' : '#0f8fa8', cursor: 'pointer', transition: 'all 0.2s' }}
-                onClick={() => {
-                  navigator.clipboard.writeText(quotationContent).then(() => {
-                    setQuoteCopied(true)
-                    setTimeout(() => setQuoteCopied(false), 2500)
-                  })
-                }}
-              >
-                {quoteCopied ? <><ClipboardCheck size={11} /> Copied!</> : <><Copy size={11} /> Copy to Clipboard</>}
-              </button>
-            </div>
-            <textarea
-              className="lt-input"
-              style={{ width: '100%', minHeight: 320, fontFamily: 'monospace', fontSize: 11.5, lineHeight: 1.6, resize: 'vertical' }}
-              value={quotationContent}
-              onChange={e => setQuotationContent(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="lt-label">Notes for CS (optional)</label>
-            <input className="lt-input" style={{ width: '100%' }} value={formNote}
-              onChange={e => setFormNote(e.target.value)}
-              placeholder="Any delivery instructions for CS..." />
-          </div>
-        </div>
-      )
-    })()}
+    {/* Prepare Quotation — now rendered inline via InlineStepForms */}
 
     {/* Send to Customer (CS) */}
     {actionModal.actionKind === 'send-to-customer' && (() => {
       const ctx = actionModal.previousContext
-      // Extract quotation text from previous activity log
-      const quotationText = ctx?.notes?.match(/Quotation:\n([\s\S]+)/)?.[1] ?? ''
+      // Use live quotationContent state (persists from step 4), fallback to activity log
+      const quotationFromLog = ctx?.notes?.match(/Quotation:\n([\s\S]+)/)?.[1] ?? ''
+      const quotationText = quotationContent || quotationFromLog
+      // Rate request data for generating the quotation attachment
+      const stcInquiry = actionModal.sourceData.inquiry as Inquiry
+      const stcContainer = actionModal.sourceData.container as ContainerLine | undefined
+      const stcRr = actionModal.sourceData.rateRequest as CompletedRateRequest | undefined
+      const stcOptions = stcRr?.options?.filter(o => o.rate && selectedRateOptionIds.has(o.option_id)) ?? []
+      const canAttachQuotation = stcOptions.length > 0
+      const computeFinal = (optId: number, baseRate: number) => {
+        const ovr = optionOverrides[optId]
+        if (!ovr) return baseRate
+        return ovr.isPercentage ? baseRate * (1 + ovr.margin / 100) : baseRate + ovr.margin
+      }
+      const emailSubject = `Quotation for ${stcInquiry.customer_name} — ${stcInquiry.id}`
+      const handleOpenOutlook = () => {
+        if (canAttachQuotation) {
+          // Generate .eml file with quotation HTML pre-attached
+          openOutlookWithQuotation(customerContactEmail, emailSubject, quotationText, stcInquiry, stcContainer, stcRr!.options, selectedRateOptionIds, bestRateOptionId, optionOverrides, linerList, activeEmployee.name, computeFinal)
+        } else {
+          // Fallback: plain mailto with quotation text in body
+          openMailto(customerContactEmail, emailSubject, quotationText)
+        }
+      }
+      const handlePreviewPdf = () => {
+        if (!canAttachQuotation) return
+        generateQuotationPdf(stcInquiry, stcContainer, stcRr!.options, selectedRateOptionIds, bestRateOptionId, optionOverrides, linerList, activeEmployee.name, computeFinal)
+      }
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {ctx && (
@@ -541,18 +338,31 @@ ABC Logistics (Pvt) Ltd`
               </div>
               {customerContactEmail.includes('@') && (
                 <>
-                  <button className="db-btn" type="button"
-                    onClick={() => openMailto(customerContactEmail, `Quotation for ${actionModal.sourceData.inquiry.customer_name} — ${actionModal.sourceData.inquiry.id}`, quotationText)}
+                  {/* Preview quotation PDF (optional) */}
+                  {canAttachQuotation && (
+                    <button className="db-btn" type="button" onClick={handlePreviewPdf}
+                      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)', width: '100%' }}>
+                      <FileText size={13} style={{ marginRight: 6 }} /> Preview Quotation
+                    </button>
+                  )}
+                  {/* Open in Outlook — downloads .eml with quotation attached */}
+                  <button className="db-btn" type="button" onClick={handleOpenOutlook}
                     style={{ background: '#0078d4', borderColor: '#0078d4', color: '#fff', width: '100%' }}>
-                    <Mail size={13} style={{ marginRight: 6 }} /> Open in Outlook
+                    <Mail size={13} style={{ marginRight: 6 }} /> Open in Outlook{canAttachQuotation ? ' with Quotation Attached' : ''}
                   </button>
+                  {canAttachQuotation && (
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', padding: '0 2px', lineHeight: 1.4 }}>
+                      An .eml file will download — double-click it to open in Outlook with the quotation pre-attached.
+                    </div>
+                  )}
+                  {/* Confirm sent */}
                   <div style={{ padding: '10px 14px', background: 'rgba(0,120,212,0.06)', border: '1px solid rgba(0,120,212,0.2)', borderRadius: 8 }}>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)' }}>
                       <input type="checkbox" checked={emailConfirmed} onChange={e => setEmailConfirmed(e.target.checked)} style={{ marginTop: 2 }} />
                       <span>
                         I confirm that I have sent this quotation to the customer via email.
                         <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                          Click "Open in Outlook" above, send the email, then check this box.
+                          Open the .eml in Outlook, verify the attachment, send it, then check this box.
                         </span>
                       </span>
                     </label>
@@ -996,7 +806,6 @@ ABC Logistics (Pvt) Ltd`
       <button
         className="db-btn primary"
         disabled={
-          (actionModal.actionKind === 'prepare-quotation' && !quotationContent.trim()) ||
           (actionModal.actionKind === 'send-to-customer' && sendMethod === 'email' && (!customerContactEmail.trim() || !customerContactEmail.includes('@') || !emailConfirmed)) ||
           (actionModal.actionKind === 'send-to-customer' && sendMethod === 'whatsapp' && !waConfirmed) ||
           (actionModal.actionKind === 'confirm-booking' && !formVessel.trim()) ||
@@ -1016,10 +825,9 @@ ABC Logistics (Pvt) Ltd`
           actionModal.actionKind === 'verify-kyc' && formDecision === 'reject' ? { background: '#dc2626', borderColor: '#dc2626' } :
           actionModal.actionKind === 'verify-kyc' ? { background: '#16a34a', borderColor: '#16a34a' } :
           actionModal.actionKind === 'approve-quote' && formDecision === 'reject' ? { background: '#dc2626', borderColor: '#dc2626' } :
-          actionModal.actionKind === 'prepare-quotation' ? { background: '#0f8fa8', borderColor: '#0f8fa8' } :
           actionModal.actionKind === 'send-to-customer' && sendMethod === 'whatsapp' && waConfirmed ? { background: '#25d366', borderColor: '#25d366' } :
           actionModal.actionKind === 'send-to-customer' && sendMethod === 'email' && customerContactEmail.includes('@') && emailConfirmed ? {} :
-          actionModal.actionKind === 'booking-request' ? { background: '#0f8fa8', borderColor: '#0f8fa8' } :
+          actionModal.actionKind === 'booking-request' ? {} :
           actionModal.actionKind === 'confirm-booking' && formVessel.trim() ? { background: '#d97706', borderColor: '#d97706' } :
           actionModal.actionKind === 'confirm-booking' ? { opacity: 0.4, cursor: 'not-allowed' } :
           actionModal.actionKind === 'release-booking' && sendMethod === 'whatsapp' && waConfirmed ? { background: '#25d366', borderColor: '#25d366' } :
@@ -1039,7 +847,6 @@ ABC Logistics (Pvt) Ltd`
           (actionModal.actionKind === 'create-hbl') ? { background: '#d97706', borderColor: '#d97706' } :
           (actionModal.actionKind === 'create-bl' && (!mblField('shipperName').trim() || !mblField('consigneeName').trim())) ? { opacity: 0.4, cursor: 'not-allowed' } :
           (actionModal.actionKind === 'create-bl') ? { background: '#0d9488', borderColor: '#0d9488' } :
-          (actionModal.actionKind === 'prepare-quotation' && !quotationContent.trim()) ? { opacity: 0.4, cursor: 'not-allowed' } :
           (actionModal.actionKind === 'send-to-customer' && ((sendMethod === 'email' && (!customerContactEmail.trim() || !customerContactEmail.includes('@') || !emailConfirmed)) || (sendMethod === 'whatsapp' && !waConfirmed))) ? { opacity: 0.4, cursor: 'not-allowed' } :
           {}
         }
@@ -1049,7 +856,6 @@ ABC Logistics (Pvt) Ltd`
          quotationSending ? <><Loader2 size={12} className="spin" /> Sending...</> :
          actionModal.actionKind === 'verify-kyc' && formDecision === 'reject' ? 'Flag & Return to CS' :
          actionModal.actionKind === 'verify-kyc' ? <><ShieldCheck size={12} /> Verify &amp; Push</> :
-         actionModal.actionKind === 'prepare-quotation' ? <><ClipboardCheck size={12} /> Save Quotation</> :
          actionModal.actionKind === 'send-to-customer' && sendMethod === 'email' ? <><Mail size={12} /> Send via Email</> :
          actionModal.actionKind === 'send-to-customer' && sendMethod === 'whatsapp' ? <><MessageCircle size={12} /> Confirm WhatsApp Sent</> :
          actionModal.actionKind === 'booking-request' ? <><Ship size={12} /> Create Booking &amp; Send to Procurement</> :

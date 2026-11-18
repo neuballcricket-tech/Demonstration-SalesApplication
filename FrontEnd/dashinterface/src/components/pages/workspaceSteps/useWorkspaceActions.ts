@@ -17,14 +17,39 @@ import type { CompletedRateRequest } from '../../../types'
 import {
   apiCreateKycRequest, apiCreateQuotation, apiPatchQuotation,
   apiMarkQuotationSent, apiFetchQuotation, apiRecordQuotationResponse,
-  apiUpdateKycStage,
+  apiUpdateKycStage, apiUploadQuotationDocument,
   type KycPendingClient, type KycRequestRecord,
   type QuotationOptionPayload, type QuotationOptionRow,
 } from '../../../api'
-import type { WorkspaceItem, StepDef, BlContainerRow, MblContainerRow } from './types'
-import { buildRateSection, generateReleaseOrderDraft, openMailto, empName } from './utils'
+import type { WorkspaceItem, StepDef, BlContainerRow, MblContainerRow, QuotationOptionOverride } from './types'
+import { buildRateSection, buildQuotationHtml, generateQuotationPdfBlob, generateReleaseOrderDraft, openMailto, empName } from './utils'
 import { NVOCC_LINES } from './constants'
 
+// ---------------------------------------------------------------------------
+// Module-scope cache: inq_id → quote_id
+// Survives React re-renders and Workspace remounts (but not full page refresh).
+// Backed by sessionStorage for page-refresh survival.
+// ---------------------------------------------------------------------------
+const QUOTE_CACHE_KEY = 'ws_inq_quote_map'
+
+function saveQuotationId(inqId: number, quoteId: number) {
+  try {
+    const raw = sessionStorage.getItem(QUOTE_CACHE_KEY)
+    const map: Record<string, number> = raw ? JSON.parse(raw) : {}
+    map[String(inqId)] = quoteId
+    sessionStorage.setItem(QUOTE_CACHE_KEY, JSON.stringify(map))
+  } catch { /* storage unavailable */ }
+}
+
+export function lookupQuotationId(inqId: number | undefined): number | null {
+  if (!inqId) return null
+  try {
+    const raw = sessionStorage.getItem(QUOTE_CACHE_KEY)
+    if (!raw) return null
+    const map: Record<string, number> = JSON.parse(raw)
+    return map[String(inqId)] ?? null
+  } catch { return null }
+}
 
 // ---------------------------------------------------------------------------
 // Params interface
@@ -51,6 +76,7 @@ export interface UseWorkspaceActionsParams {
   quotationContent: string
   selectedRateOptionIds: Set<number>
   bestRateOptionId: number | null
+  optionOverrides: Record<number, QuotationOptionOverride>
   sendMethod: 'email' | 'whatsapp'
   customerContactEmail: string
   customerContactPhone: string
@@ -161,6 +187,7 @@ export interface UseWorkspaceActionsParams {
   setQuoteCopied: React.Dispatch<React.SetStateAction<boolean>>
   setSelectedRateOptionIds: React.Dispatch<React.SetStateAction<Set<number>>>
   setBestRateOptionId: React.Dispatch<React.SetStateAction<number | null>>
+  setOptionOverrides: React.Dispatch<React.SetStateAction<Record<number, QuotationOptionOverride>>>
   setSendMethod: React.Dispatch<React.SetStateAction<'email' | 'whatsapp'>>
   setWaConfirmed: React.Dispatch<React.SetStateAction<boolean>>
   setEmailConfirmed: React.Dispatch<React.SetStateAction<boolean>>
@@ -267,6 +294,7 @@ export interface UseWorkspaceActionsParams {
     contract_no?: string; ra_number?: string; specific_routing?: string;
     booking_type?: string; reefer_temp?: string; delivery_agent?: string;
     vessel?: string; voyage?: string; rate_remark?: string;
+    containers?: { type: string; qty: number }[];
   }) => string
   onSetBookingSiCutoff: (bookingId: string, date: string) => void
   onSetBookingBlCutoff: (bookingId: string, date: string) => void
@@ -304,6 +332,7 @@ export function useWorkspaceActions(p: UseWorkspaceActionsParams) {
     roleSteps, actionModal, selectedItem, pendingVesselForBooking,
     formVessel, formVoyage, formNote, formDecision,
     lastQuotationId, quotationContent, selectedRateOptionIds, bestRateOptionId,
+    optionOverrides,
     sendMethod, customerContactEmail, customerContactPhone,
     customerDecision, linerBooked, selectedOptionRateId,
     bkShippingLine, bkContainerType, bkQuantity, bkContainers,
@@ -331,6 +360,7 @@ export function useWorkspaceActions(p: UseWorkspaceActionsParams) {
     setKycAirImports, setKycAirExports, setKycGeneralCargo, setKycDangerousGoods, setKycPerishableGoods,
     setKycDocBrForm, setKycDocVatCert, setKycDocSvatCert, setKycDocTinCert, setKycDocForm20,
     setQuotationContent, setQuoteCopied, setSelectedRateOptionIds, setBestRateOptionId,
+    setOptionOverrides,
     setSendMethod, setWaConfirmed, setEmailConfirmed, setDraftCollapsed,
     setCustomerContactEmail, setCustomerContactPhone, setQuotationSending,
     setCustomerDecision, setLinerBooked,
@@ -452,23 +482,32 @@ export function useWorkspaceActions(p: UseWorkspaceActionsParams) {
 
         const qCust = customers.find(c => c.name.toLowerCase() === qInq.customer_name.toLowerCase())
 
+        // Initialize per-option overrides from customer's min_margin_pct
+        const defaultMargin = qCust?.min_margin_pct ?? 0
+        const overrides: Record<number, QuotationOptionOverride> = {}
+        if (rr) {
+          for (const opt of rr.options) {
+            if (!opt.rate) continue
+            overrides[opt.option_id] = {
+              margin: defaultMargin,
+              isPercentage: true,
+              remark: opt.rate.note ?? opt.rate.special_remark ?? '',
+            }
+          }
+        }
+        setOptionOverrides(overrides)
+
         // Build rate section text from selected saved rate options
         const allOptionIds = rr?.options.filter(o => o.rate).map(o => o.option_id) ?? []
         const firstBest = allOptionIds[0] ?? null
         const rateSection = buildRateSection(rr, allOptionIds, firstBest, linerList, item.previousContext)
-
-        // Pull Procurement's remark from the rate request, or fall back to activity log
-        const procNote = rr?.remark ?? (() => {
-          const ctx = item.previousContext
-          const match = ctx?.notes?.match(/^(.+?) \| Customer:/i)
-          return match?.[1]?.trim() ?? ''
-        })()
 
         // Container / route details
         const dest = qCont?.destination || qInq.destination
         const containerLabel = qCont ? `${qCont.quantity}× ${qCont.containerType}` : ''
         const commodityLabel = qCont?.commodityType ? ` · ${qCont.commodityType}` : qInq.commodity_type ? ` · ${qInq.commodity_type}` : ''
         const today = new Date().toISOString().slice(0, 10)
+
         setQuotationContent(
 `FREIGHT QUOTATION
 
@@ -484,8 +523,7 @@ Thank you for your freight enquiry. We are pleased to offer the following:
 SHIPMENT DETAILS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Route:       ${qInq.origin} → ${dest}
-Cargo:       ${containerLabel}${commodityLabel}
-Service:     ${qInq.delivery_type === 'door-to-door' ? 'Door-to-Door' : 'Port-to-Port'}${qInq.incoterm ? ` (${qInq.incoterm})` : ''}${qInq.cargo_ready_date ? `\nCargo Ready: ${qInq.cargo_ready_date}` : ''}
+Cargo:       ${containerLabel}${commodityLabel}${qInq.incoterm ? `\nIncoterm:    ${qInq.incoterm}` : ''}${qInq.cargo_ready_date ? `\nCargo Ready: ${qInq.cargo_ready_date}` : ''}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 RATE OPTIONS
@@ -498,12 +536,12 @@ TERMS
 • Validity: 14 days from date of this quotation
 • Rates subject to space and equipment availability
 • Port surcharges, customs, and inland haulage quoted separately unless stated above
-${procNote ? `\nNOTES: ${procNote}` : ''}
+
 Please confirm your preferred option at your earliest convenience.
 
 Best regards,
 ${activeEmployee.name}
-ABC Logistics (Pvt) Ltd`
+CLSynergy (Pvt) Ltd`
         )
         setQuoteCopied(false)
         setFormNote('')
@@ -519,8 +557,77 @@ ABC Logistics (Pvt) Ltd`
         setSendMethod(sendCust?.contact_email ? 'email' : 'whatsapp')
         setWaConfirmed(false)
         setEmailConfirmed(false)
-        setDraftCollapsed(true)
+        setDraftCollapsed(false)   // start expanded so email/quotation preview is visible
         setQuotationSending(false)
+
+        // Auto-hydrate rate option selections if not already set
+        // (handles direct navigation to step 5 or page refresh)
+        const stcRr = item.sourceData.rateRequest as CompletedRateRequest | undefined
+        if (stcRr?.options && selectedRateOptionIds.size === 0) {
+          const allIds = new Set(stcRr.options.filter(o => o.rate).map(o => o.option_id))
+          setSelectedRateOptionIds(allIds)
+          if (bestRateOptionId === null && allIds.size > 0) {
+            setBestRateOptionId([...allIds][0])
+          }
+          // Initialize per-option margin overrides
+          if (Object.keys(optionOverrides).length === 0) {
+            const defaultMargin = sendCust?.min_margin_pct ?? 0
+            const ovr: Record<number, QuotationOptionOverride> = {}
+            for (const opt of stcRr.options) {
+              if (!opt.rate) continue
+              ovr[opt.option_id] = { margin: defaultMargin, isPercentage: true, remark: opt.rate.note ?? opt.rate.special_remark ?? '' }
+            }
+            setOptionOverrides(ovr)
+          }
+        }
+
+        // Rebuild quotation preview text if empty (page refresh / direct navigation)
+        if (!quotationContent && stcRr) {
+          const qInq = item.sourceData.inquiry as Inquiry
+          const qCont = item.sourceData.container as ContainerLine | undefined
+          const allOptIds = stcRr.options.filter(o => o.rate).map(o => o.option_id)
+          const rateSection = buildRateSection(stcRr, allOptIds, allOptIds[0] ?? null, linerList, item.previousContext)
+          const dest = qCont?.destination || qInq.destination
+          const containerLabel = qCont ? `${qCont.quantity}× ${qCont.containerType}` : ''
+          const commodityLabel = qCont?.commodityType ? ` · ${qCont.commodityType}` : qInq.commodity_type ? ` · ${qInq.commodity_type}` : ''
+          const today = new Date().toISOString().slice(0, 10)
+          setQuotationContent(
+`FREIGHT QUOTATION
+
+To: ${qInq.customer_name}${sendCust?.tier ? ` (${sendCust.tier})` : ''}
+Date: ${today}
+Reference: ${qInq.id}
+
+Dear ${qInq.customer_name},
+
+Thank you for your freight enquiry. We are pleased to offer the following:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+SHIPMENT DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Route:       ${qInq.origin} → ${dest}
+Cargo:       ${containerLabel}${commodityLabel}${qInq.incoterm ? `\nIncoterm:    ${qInq.incoterm}` : ''}${qInq.cargo_ready_date ? `\nCargo Ready: ${qInq.cargo_ready_date}` : ''}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RATE OPTIONS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${rateSection}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TERMS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Validity: 14 days from date of this quotation
+• Rates subject to space and equipment availability
+• Port surcharges, customs, and inland haulage quoted separately unless stated above
+
+Please confirm your preferred option at your earliest convenience.
+
+Best regards,
+${activeEmployee.name}
+CLSynergy (Pvt) Ltd`
+          )
+        }
+
         setActionModal(item)
         break
       }
@@ -530,83 +637,109 @@ ABC Logistics (Pvt) Ltd`
         setQuotationOptions([])
         setSelectedOptionRateId(null)
         setQuotationOptionsLoading(false)
-        // Load quotation options from backend
-        const crInquiry = item.sourceData?.inquiry
-        const crQuoteId = lastQuotationId ?? crInquiry?.quotation_id
-        if (crQuoteId) {
-          setQuotationOptionsLoading(true)
-          apiFetchQuotation(crQuoteId)
-            .then(rows => {
-              // Filter to rows that actually have an option (LEFT JOIN may return null option_id)
-              const opts = rows.filter(r => r.option_id != null)
-              setQuotationOptions(opts)
-              if (opts.length === 1) setSelectedOptionRateId(opts[0].rate_id)
-            })
-            .catch(err => console.error('[Workspace] Failed to load quotation options:', err))
-            .finally(() => setQuotationOptionsLoading(false))
+        // Use pre-loaded options from sentQuotations (passed via sourceData)
+        const sentOpts = item.sourceData?.sentOptions as Array<{ option_id: number | null; rate_id: number | null; vessel: string | null; voyage: string | null; amt: number | null; remark: string | null; margin: number | null; is_percentage: boolean | null; final_amt: number | null; option_currency: string | null }> | undefined
+        if (sentOpts && sentOpts.length > 0) {
+          // Map sentQuotation rows into the shape expected by quotationOptions
+          const opts = sentOpts
+            .filter(o => o.option_id != null)
+            .map(o => ({
+              option_id: o.option_id!,
+              rate_id: o.rate_id,
+              vessel: o.vessel,
+              voyage: o.voyage,
+              amt: o.amt,
+              remark: o.remark,
+              margin: o.margin,
+              is_percentage: o.is_percentage,
+              final_amt: o.final_amt,
+              currency: o.option_currency,
+            }))
+          setQuotationOptions(opts as any)
+          if (opts.length === 1) setSelectedOptionRateId(opts[0].rate_id)
         }
         setActionModal(item)
         break
       }
       case 'booking-request': {
-        // Pre-fill from inquiry data + activity log rate context
-        const { inquiry: brInq } = item.sourceData
+        // Pre-fill from accepted quotation data (GET /quotations/accepted)
+        const { inquiry: brInq, acceptedQuotation: aq } = item.sourceData
         setFormNote('')
 
-        // Scan all activity log entries for this inquiry to extract rate/liner data
-        const allCtx = activityLog.filter(a => a.ref_id === brInq.id)
-        let liner = ''
-        let container = ''
-        let qty = ''
-        for (const entry of allCtx) {
-          const n = entry.notes ?? ''
-          // From InttraAPI/Database rates: "Maersk $1200 20'GP ..."
-          const rateMatch = n.match(/Selected rates?:\s*(\w[\w\s-]*?)\s+\$/i)
-          if (rateMatch && !liner) liner = rateMatch[1].trim()
-          // From manual rate: "Custom $800 20'GP ..." or "Maersk Line $800 ..."
-          const manualMatch = n.match(/Manual Rate:\s*(\w[\w\s-]*?)\s+\$/i)
-          if (manualMatch && !liner) liner = manualMatch[1].trim()
-          // Container from rate notes: "20'GP" or "40'HC"
-          const cMatch = n.match(/(\d{2}['']?\s*(?:GP|HC|OT|FR|RF))/i)
-          if (cMatch && !container) container = cMatch[1].replace(/\s/g, '')
-          // Quantity from booking notes or inquiry text
-          const qMatch = n.match(/(\d+)\s*x\s*\d{2}['']?\s*(?:GP|HC|OT|FR|RF)/i)
-          if (qMatch && !qty) qty = qMatch[1]
-        }
+        // Use accepted quotation data for structured pre-fill when available
+        if (aq) {
+          // Resolve liner name from lin_id
+          const resolvedLiner = aq.lin_id ? linerList.find((l: any) => l.lin_id === aq.lin_id)?.name ?? '' : ''
+          const ctFmt = (ct: string) => ct.replace(/\s+/g, '').replace(/(\d{2})(.*)/,(_, sz: string, tp: string) => `${sz}'${tp}`)
+          const fmtContainer = ctFmt(aq.container_type || "20GP")
 
-        // Fallback to inquiry request text
-        if (!container) container = brInq.request?.match(/(\d{2}['']?\s*(?:GP|HC|OT|FR|RF))/i)?.[1]?.replace(/\s/g, '') ?? ''
-        if (!qty) qty = brInq.request?.match(/(\d+)/)?.[1] ?? '1'
-        // Fallback: use first preferred liner if rate-context scan found nothing
-        if (!liner && brInq.preferred_liners?.length) liner = brInq.preferred_liners[0]
-
-        setBkShippingLine(liner)
-        setBkContainerType(container || "20'GP")
-        setBkQuantity(parseInt(qty, 10) || 1)
-        // Prefill container list from inquiry containers
-        const ctFmt = (ct: string) => ct.replace(/\s+/g, '').replace(/(\d{2})(.*)/,(_, sz, tp) => `${sz}'${tp}`)
-        if (brInq.containers && brInq.containers.length > 0) {
-          setBkContainers(brInq.containers.map((c: { containerType: string; quantity: number }) => ({ type: ctFmt(c.containerType), qty: c.quantity })))
+          setBkShippingLine(resolvedLiner)
+          setBkContainerType(fmtContainer)
+          setBkQuantity(aq.qty || 1)
+          setBkContainers([{ type: fmtContainer, qty: aq.qty || 1 }])
+          setBkCommodity(brInq?.containers?.[0]?.commodityName ?? '')
+          setBkCargoReadyDate(aq.cargo_ready_date ?? brInq?.cargo_ready_date ?? '')
+          setBkDeliveryTerm(aq.delivery_term ?? brInq?.incoterm ?? '')
+          setBkHsCode(aq.hs_code ?? brInq?.containers?.[0]?.hs_code ?? '')
+          setBkVessel(aq.vessel ?? '')
+          setBkVesselEtd(aq.vessel_etd ? aq.vessel_etd.split('T')[0] : '')
+          setBkVoyage(aq.voyage ?? '')
+          setBkPod(aq.destination ?? brInq?.destination ?? '')
+          setBkAgreedRate(aq.agreed_rate != null ? String(aq.agreed_rate) : '')
+          setBkRateRemark(aq.rate_remark ?? '')
+          setBkContractNo('')
+          setBkBlType('')
+          setBkBookingType('')
+          setBkReeferTemp('')
+          setBkDeliveryAgent('')
+          setBkSpecificRouting('')
         } else {
-          setBkContainers([{ type: container || "20'GP", qty: parseInt(qty, 10) || 1 }])
+          // Fallback: legacy pre-fill from inquiry data + activity log
+          const allCtx = activityLog.filter(a => a.ref_id === brInq.id)
+          let liner = ''
+          let container = ''
+          let qty = ''
+          for (const entry of allCtx) {
+            const n = entry.notes ?? ''
+            const rateMatch = n.match(/Selected rates?:\s*(\w[\w\s-]*?)\s+\$/i)
+            if (rateMatch && !liner) liner = rateMatch[1].trim()
+            const manualMatch = n.match(/Manual Rate:\s*(\w[\w\s-]*?)\s+\$/i)
+            if (manualMatch && !liner) liner = manualMatch[1].trim()
+            const cMatch = n.match(/(\d{2}['']?\s*(?:GP|HC|OT|FR|RF))/i)
+            if (cMatch && !container) container = cMatch[1].replace(/\s/g, '')
+            const qMatch = n.match(/(\d+)\s*x\s*\d{2}['']?\s*(?:GP|HC|OT|FR|RF)/i)
+            if (qMatch && !qty) qty = qMatch[1]
+          }
+          if (!container) container = brInq.request?.match(/(\d{2}['']?\s*(?:GP|HC|OT|FR|RF))/i)?.[1]?.replace(/\s/g, '') ?? ''
+          if (!qty) qty = brInq.request?.match(/(\d+)/)?.[1] ?? '1'
+          if (!liner && brInq.preferred_liners?.length) liner = brInq.preferred_liners[0]
+
+          setBkShippingLine(liner)
+          setBkContainerType(container || "20'GP")
+          setBkQuantity(parseInt(qty, 10) || 1)
+          const ctFmt = (ct: string) => ct.replace(/\s+/g, '').replace(/(\d{2})(.*)/,(_, sz: string, tp: string) => `${sz}'${tp}`)
+          if (brInq.containers && brInq.containers.length > 0) {
+            setBkContainers(brInq.containers.map((c: { containerType: string; quantity: number }) => ({ type: ctFmt(c.containerType), qty: c.quantity })))
+          } else {
+            setBkContainers([{ type: container || "20'GP", qty: parseInt(qty, 10) || 1 }])
+          }
+          setBkCommodity(brInq.containers?.[0]?.commodityName ?? '')
+          setBkCargoReadyDate(brInq.cargo_ready_date ?? '')
+          setBkDeliveryTerm(brInq.incoterm ?? '')
+          setBkHsCode(brInq.containers?.[0]?.hs_code ?? '')
+          setBkVessel('')
+          setBkVesselEtd('')
+          setBkVoyage('')
+          setBkPod(brInq.destination ?? '')
+          setBkContractNo('')
+          setBkAgreedRate('')
+          setBkRateRemark('')
+          setBkBlType('')
+          setBkBookingType('')
+          setBkReeferTemp('')
+          setBkDeliveryAgent('')
+          setBkSpecificRouting('')
         }
-        // Prefill structured fields directly from inquiry data
-        setBkCommodity(brInq.containers?.[0]?.commodityName ?? '')
-        setBkCargoReadyDate(brInq.cargo_ready_date ?? '')
-        setBkDeliveryTerm(brInq.incoterm ?? '')
-        setBkHsCode(brInq.containers?.[0]?.hs_code ?? '')
-        setBkVessel('')
-        setBkVesselEtd('')
-        setBkVoyage('')
-        setBkPod(brInq.destination ?? '')
-        setBkContractNo('')
-        setBkAgreedRate('')
-        setBkRateRemark('')
-        setBkBlType('')
-        setBkBookingType('')
-        setBkReeferTemp('')
-        setBkDeliveryAgent('')
-        setBkSpecificRouting('')
         setActionModal(item)
         break
       }
@@ -1279,8 +1412,8 @@ ABC Logistics (Pvt) Ltd`
             await apiCreateKycRequest(cli_id, {
               br_number: kycBrNumber,
               parent_organization: kycParentOrg || undefined,
-              emp_id_sales: activeRole === 'Sales' ? activeEmployee.id : undefined,
-              emp_id_cs:    activeRole === 'CS'    ? activeEmployee.id : undefined,
+              emp_id_sales: activeRole === 'Sales' ? 6 : undefined,
+              emp_id_cs:    activeRole === 'CS'    ? 6 : undefined,
               document_submission_deadline: kycDeadline,
               cli_type: kycCliType,
               currency: kycCurrency,
@@ -1391,8 +1524,8 @@ ABC Logistics (Pvt) Ltd`
         break
       }
       case 'prepare-quotation': {
-        const { inquiry, rateRequest: saveRr } = actionModal.sourceData as {
-          inquiry: Inquiry; rateRequest?: CompletedRateRequest
+        const { inquiry, rateRequest: saveRr, container: pqContainer } = actionModal.sourceData as {
+          inquiry: Inquiry; rateRequest?: CompletedRateRequest; container?: ContainerLine
         }
         // Create quotation record in backend (status = in_prep).
         // Do NOT mark as sent here — that happens in the send-to-customer step.
@@ -1402,29 +1535,62 @@ ABC Logistics (Pvt) Ltd`
 
           // Build quotation options from the selected rate request options
           const quotationOptions: QuotationOptionPayload[] = []
+          const pqComputeFinal = (optId: number, baseRate: number) => {
+            const ovr = optionOverrides[optId]
+            if (!ovr) return baseRate
+            return ovr.isPercentage ? baseRate * (1 + ovr.margin / 100) : baseRate + ovr.margin
+          }
           if (saveRr) {
             for (const opt of saveRr.options) {
               if (!opt.rate || !selectedRateOptionIds.has(opt.option_id)) continue
+              const ovr = optionOverrides[opt.option_id] ?? { margin: 0, isPercentage: true, remark: '' }
+              const baseAmt = opt.rate.rate ?? 0
+              const finalAmt = ovr.isPercentage
+                ? baseAmt * (1 + ovr.margin / 100)
+                : baseAmt + ovr.margin
               quotationOptions.push({
                 inq_id: inquiry.inq_id,
                 rate_id: opt.rate_id,
                 option_id: opt.option_id,
-                amt: opt.rate.rate ?? 0,
+                amt: baseAmt,
                 currency: opt.rate.currency ?? 'USD',
+                vessel: opt.rate.vessel_name ?? opt.vessel_name ?? undefined,
+                voyage: opt.rate.voyage ?? opt.voyage_number ?? undefined,
+                remark: ovr.remark || undefined,
+                margin: ovr.margin,
+                is_percentage: ovr.isPercentage,
+                final_amt: Math.round(finalAmt * 100) / 100,
               })
             }
           }
+
+          // Build quotation HTML for the document upload
+          const pqBodyHtml = saveRr
+            ? buildQuotationHtml(inquiry, pqContainer, saveRr.options, selectedRateOptionIds, bestRateOptionId, optionOverrides, linerList, activeEmployee.name, pqComputeFinal)
+            : undefined
 
           apiCreateQuotation({
             inq_id: inquiry.inq_id,
             quote_date: today,
             sent_via: 'email',           // placeholder — updated to actual method in send step
             options: quotationOptions,
-            acceptance_deadline: deadline,
+            acceptence_deadline: deadline,
           })
             .then(created => {
               if (created.quote_id) {
                 setLastQuotationId(created.quote_id)
+                saveQuotationId(inquiry.inq_id, created.quote_id)
+
+                // Generate PDF and upload document to backend
+                if (saveRr) {
+                  generateQuotationPdfBlob(inquiry, pqContainer, saveRr.options, selectedRateOptionIds, bestRateOptionId, optionOverrides, linerList, activeEmployee.name, pqComputeFinal)
+                    .then(pdfBlob => {
+                      const fileName = `Quotation_${inquiry.id.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`
+                      return apiUploadQuotationDocument(created.quote_id, pdfBlob, fileName, pqBodyHtml, { quotation_options: quotationOptions })
+                    })
+                    .then(docRes => console.log('[Workspace] Quotation document uploaded:', docRes.s3_url))
+                    .catch(err => console.error('[Workspace] quotation document upload failed:', err))
+                }
               }
             })
             .catch(err => console.error('[Workspace] create quotation failed:', err))
@@ -1450,7 +1616,7 @@ ABC Logistics (Pvt) Ltd`
         const { inquiry } = actionModal.sourceData
         // Update sent_via on the quotation record, then mark as sent.
         // PATCH must happen before marking sent (backend blocks PATCH once status = 'sent').
-        const sendQuoteId = lastQuotationId ?? inquiry.quotation_id
+        const sendQuoteId = lastQuotationId ?? lookupQuotationId(inquiry.inq_id) ?? inquiry.quotation_id
         if (sendQuoteId) {
           const actualSentVia = sendMethod === 'email' ? 'email' : 'whatsapp'
           apiPatchQuotation(sendQuoteId, { sent_via: actualSentVia })
@@ -1482,8 +1648,8 @@ ABC Logistics (Pvt) Ltd`
       case 'customer-response': {
         const { inquiry } = actionModal.sourceData
         // Record customer response in backend quotation record
-        // Backend auto-advances workflow to customer_response; we then advance further below
-        const quoteId = lastQuotationId ?? inquiry.quotation_id
+        // Use quoteId from sentQuotations (sourceData) if available; fall back to legacy lookup
+        const quoteId = actionModal.sourceData.quoteId ?? lastQuotationId ?? lookupQuotationId(inquiry.inq_id) ?? inquiry.quotation_id
         if (quoteId && customerDecision === 'accepted' && selectedOptionRateId != null) {
           apiRecordQuotationResponse(quoteId, 'accepted', selectedOptionRateId)
             .catch(err => console.error('[Workspace] record quotation response failed:', err))
@@ -1518,14 +1684,14 @@ ABC Logistics (Pvt) Ltd`
         break
       }
       case 'booking-request': {
-        const { inquiry } = actionModal.sourceData
+        const { inquiry, acceptedQuotation: aqSubmit } = actionModal.sourceData
         const ctnSummary = bkContainers.map(c => `${c.qty}x${c.type}`).join(', ')
-        // Resolve liner ID from name for backend API
-        const resolvedLinId = linerList.find(l => l.name.toLowerCase() === bkShippingLine.toLowerCase())?.lin_id
-        const resolvedCommodityId = inquiry.com_ids?.[0]
+        // Resolve liner ID: prefer accepted quotation's lin_id, fallback to name lookup
+        const resolvedLinId = aqSubmit?.lin_id ?? linerList.find(l => l.name.toLowerCase() === bkShippingLine.toLowerCase())?.lin_id
+        const resolvedCommodityId = aqSubmit?.commodity ?? inquiry.com_ids?.[0]
 
         const bookingId = onCreateBooking({
-          customer_name: inquiry.customer_name,
+          customer_name: aqSubmit?.client_name ?? inquiry.customer_name,
           quote_id: inquiry.id,
           shipping_line: bkShippingLine,
           container_type: bkContainers[0]?.type ?? bkContainerType,
@@ -1533,7 +1699,7 @@ ABC Logistics (Pvt) Ltd`
           origin: inquiry.origin,
           destination: bkPod || inquiry.destination,
           is_urgent: false,
-          booked_by: activeEmployee.id,
+          booked_by: 6,
           notes: [
             `Containers: ${ctnSummary}`,
             bkCommodity && `Commodity: ${bkCommodity}`,
@@ -1552,10 +1718,10 @@ ABC Logistics (Pvt) Ltd`
             bkVoyage && `Voyage: ${bkVoyage}`,
             bkRaNumber && `RA No: ${bkRaNumber}`,
           ].filter(Boolean).join(' | ') || `Booking for ${inquiry.customer_name}: ${inquiry.request}`,
-          delivery_type: inquiry.delivery_type,
+          delivery_type: aqSubmit?.delivery_type ?? inquiry.delivery_type,
           // Backend integration fields
-          inq_id: inquiry.inq_id,
-          cli_id: inquiry.cli_id,
+          inq_id: aqSubmit?.inq_id ?? inquiry.inq_id,
+          cli_id: aqSubmit?.cli_id ?? inquiry.cli_id,
           lin_id: resolvedLinId,
           commodity_id: resolvedCommodityId,
           vessel_etd: bkVesselEtd || undefined,
@@ -1573,6 +1739,7 @@ ABC Logistics (Pvt) Ltd`
           vessel: bkVessel || undefined,
           voyage: bkVoyage || undefined,
           rate_remark: bkRateRemark || undefined,
+          containers: bkContainers,
         })
         // Workflow auto-advances via POST /booking-requests; skip manual API call if backend IDs present
         onAdvanceWorkflow(inquiry.id, 'completed', !!(inquiry.inq_id && resolvedLinId))

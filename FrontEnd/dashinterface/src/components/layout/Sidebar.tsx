@@ -4,8 +4,8 @@ import {
   Users, FileText, Ship, LogOut, ShieldCheck, HelpCircle, X,
   UserPlus, PackagePlus, MessageSquarePlus,
   ListPlus, FileSpreadsheet, Search, ShieldAlert, CreditCard,
-  ArrowUpDown, Zap, Lock, Anchor, PackageCheck, AlertTriangle, Inbox, DollarSign,
-  PanelLeftClose, PanelLeftOpen,
+  ArrowUpDown, Zap, Lock, Anchor, PackageCheck, AlertTriangle, Inbox, DollarSign, Calendar,
+  PanelLeftClose, PanelLeftOpen, Radar,
 } from 'lucide-react'
 import {
   ROLE_PAGE_ACCESS, ROLE_QUICK_COMMANDS, ROLE_ACTIONS, ROLE_COLORS,
@@ -33,13 +33,15 @@ const NAV_ITEMS: { id: PageId; label: string; icon: typeof MessageSquare }[] = [
   { id: 'followups', label: 'Operations', icon: ClipboardList },
   { id: 'customers', label: 'Customers', icon: Users },
   { id: 'kyc', label: 'KYC Form', icon: ShieldCheck },
+  { id: 'schedules', label: 'Schedules', icon: Calendar },
+  { id: 'tracking', label: 'Track & Trace', icon: Radar },
 ]
 
 const ROLE_NAV_VISIBLE: Partial<Record<UserRole, PageId[]>> = {
-  CS: ['workspace', 'inquiry-list', 'rfq-new', 'rate-list', 'booking-list', 'customers'],
-  Sales: ['workspace', 'inquiry-list', 'rfq-new', 'rate-list', 'customers'],
-  Procurement: ['workspace', 'inquiry-list', 'rate-list', 'booking-list'],
-  Finance: ['workspace'],
+  CS: ['workspace', 'inquiry-list', 'rfq-new', 'rate-list', 'booking-list', 'customers', 'schedules', 'tracking'],
+  Sales: ['workspace', 'inquiry-list', 'rfq-new', 'rate-list', 'customers', 'schedules', 'tracking'],
+  Procurement: ['workspace', 'inquiry-list', 'rate-list', 'booking-list', 'schedules', 'tracking'],
+  Finance: ['workspace', 'schedules', 'tracking'],
 }
 
 export default function Sidebar({ current, onNav, activeRole, collapsed, onToggleCollapse }: SidebarProps) {

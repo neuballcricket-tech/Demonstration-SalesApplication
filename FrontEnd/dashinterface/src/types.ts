@@ -15,6 +15,8 @@ export type PageId =
   | 'followups'
   | 'customers'
   | 'kyc'
+  | 'schedules'
+  | 'tracking'
   | 'profile'
 
 export const PAGE_LABELS: Record<PageId, string> = {
@@ -33,6 +35,8 @@ export const PAGE_LABELS: Record<PageId, string> = {
   followups: 'Operations',
   customers: 'Customers',
   kyc: 'KYC Form',
+  schedules: 'Schedules',
+  tracking: 'Track & Trace',
   profile: 'Profile',
 }
 
@@ -49,19 +53,19 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 }
 
 export const ROLE_COLORS: Record<UserRole, string> = {
-  CS:          '#0891b2',
-  Sales:       '#2c2c82',
-  Finance:     '#16a34a',
-  Procurement: '#d97706',
-  Admin:       '#7c3aed',
+  CS:          '#0f8fa8',
+  Sales:       '#0f8fa8',
+  Finance:     '#0f8fa8',
+  Procurement: '#0f8fa8',
+  Admin:       '#0f8fa8',
 }
 
 export const ROLE_PAGE_ACCESS: Record<UserRole, PageId[]> = {
-  CS:          ['dashboard', 'chat', 'workspace', 'new-inquiry', 'rfq-new', 'inquiry-list', 'rate-list', 'booking-list', 'followups', 'customers', 'kyc', 'profile'],
-  Sales:       ['dashboard', 'chat', 'workspace', 'new-inquiry', 'rfq-new', 'inquiry-list', 'rate-list', 'followups', 'customers', 'profile'],
-  Finance:     ['dashboard', 'chat', 'workspace', 'customers', 'kyc', 'profile'],
-  Procurement: ['dashboard', 'chat', 'workspace', 'inquiry-list', 'record-rate', 'rate-check', 'rate-list', 'booking-list', 'followups', 'profile'],
-  Admin:       ['dashboard', 'chat', 'workspace', 'new-inquiry', 'rfq-new', 'record-rate', 'rate-check', 'inquiry-list', 'rate-list', 'booking-list', 'shipments', 'followups', 'customers', 'kyc', 'profile'],
+  CS:          ['dashboard', 'chat', 'workspace', 'new-inquiry', 'rfq-new', 'inquiry-list', 'rate-list', 'booking-list', 'followups', 'customers', 'kyc', 'schedules', 'tracking', 'profile'],
+  Sales:       ['dashboard', 'chat', 'workspace', 'new-inquiry', 'rfq-new', 'inquiry-list', 'rate-list', 'followups', 'customers', 'schedules', 'tracking', 'profile'],
+  Finance:     ['dashboard', 'chat', 'workspace', 'customers', 'kyc', 'schedules', 'tracking', 'profile'],
+  Procurement: ['dashboard', 'chat', 'workspace', 'inquiry-list', 'record-rate', 'rate-check', 'rate-list', 'booking-list', 'followups', 'schedules', 'tracking', 'profile'],
+  Admin:       ['dashboard', 'chat', 'workspace', 'new-inquiry', 'rfq-new', 'record-rate', 'rate-check', 'inquiry-list', 'rate-list', 'booking-list', 'shipments', 'followups', 'customers', 'kyc', 'schedules', 'tracking', 'profile'],
 }
 
 export const ROLE_QUICK_COMMANDS: Record<UserRole, string[]> = {
@@ -247,9 +251,17 @@ export const COMMODITY_TYPES: CommodityType[] = [
   'Works of art, collectors\' pieces, antiques',
 ]
 
-// Container types — structured field instead of free text.
-export type ContainerType = '20 GP' | '40 GP' | '20 OPEN TOP' | '40 OPEN TOP' | '40 HC' | '20 REEFER' | '40 REEFER' | '20 FLAT RACK' | '40 FLAT RACK' | 'TANKER'
-export const CONTAINER_TYPES: ContainerType[] = ['20 GP', '40 GP', '20 OPEN TOP', '40 OPEN TOP', '40 HC', '20 REEFER', '40 REEFER', '20 FLAT RACK', '40 FLAT RACK', 'TANKER']
+// Container types — backend Literal codes.
+export type ContainerType = '20GP' | '40GP' | '20OT' | '40OT' | '40HC' | '20RF' | '40RF' | '20FR' | '40FR' | 'TANKER'
+export const CONTAINER_TYPES: ContainerType[] = ['20GP', '40GP', '20OT', '40OT', '40HC', '20RF', '40RF', '20FR', '40FR', 'TANKER']
+/** Human-readable labels for container types (UI display only). */
+export const CONTAINER_TYPE_LABELS: Record<ContainerType, string> = {
+  '20GP': '20 GP', '40GP': '40 GP', '40HC': '40 HC',
+  '20RF': '20 Reefer', '40RF': '40 Reefer',
+  '20OT': '20 Open Top', '40OT': '40 Open Top',
+  '20FR': '20 Flat Rack', '40FR': '40 Flat Rack',
+  'TANKER': 'Tanker',
+}
 
 // Container line — one entry per container in a multi-container inquiry.
 export interface ContainerLine {
@@ -273,7 +285,7 @@ export interface ContainerLine {
 }
 
 export const emptyContainerLine = (): ContainerLine => ({
-  containerType: '20 GP',
+  containerType: '20GP',
   quantity: 1,
   weight: '',
   commodityType: 'Miscellaneous manufactured articles — furniture, toys',
@@ -464,6 +476,14 @@ export interface CompletedRateOption {
   rate_type: RateTableType
   rate_id: number
   rate: RateOptionDetail | null
+  // Schedule fields — populated when the option was sourced from an aggregate schedule
+  service_name?: string | null
+  vessel_name?: string | null
+  voyage_number?: string | null
+  etd_pol?: string | null
+  eta_pod?: string | null
+  bk_cutoff?: string | null
+  schedule_id?: number | null
 }
 
 export interface CompletedRateRequest {
@@ -472,11 +492,182 @@ export interface CompletedRateRequest {
   remark: string | null
   created_at: string
   options: CompletedRateOption[]
+  schedules?: number[]
+  schedule_details?: OceanSchedule[]
 }
 
 export interface CompletedRateRequestsResponse {
   requests: CompletedRateRequest[]
 }
+
+// ==================== OCEAN SCHEDULE (INTTRA) ====================
+
+export interface OceanSchedule {
+  scac: string | null
+  carrierName: string | null
+  serviceName: string | null
+  vesselName: string | null
+  voyageNumber: string | null
+  imoNumber: string | null
+  originUnloc: string | null
+  originCountry: string | null
+  originCityName: string | null
+  originSubdivision: string | null
+  originTerminal: string | null
+  destinationUnloc: string | null
+  destinationCountry: string | null
+  destinationCityName: string | null
+  destinationSubdivision: string | null
+  destinationTerminal: string | null
+  originDepartureDate: string | null
+  destinationArrivalDate: string | null
+  estimatedTerminalCutoff: string | null
+  terminalCutoff: string | null
+  bkCutoff: string | null
+  siCutoff: string | null
+  hazBkCutoff: string | null
+  vgmCutoff: string | null
+  reeferCutoff: string | null
+  totalDuration: number | null
+  scheduleType: string | null          // 'direct' | 'transshipment'
+  allowsRORO: boolean | null
+  allowsBreakbulk: boolean | null
+  scheduleSource: string | null
+  createdDate: string | null
+  legs: unknown[] | null
+  // Liner FK — present in search results when matched to a known liner
+  linId?: number | null
+  // DB primary key — present when fetched from our DB (completed-for-quoting), absent from live search
+  sch_id?: number
+}
+
+/** Snake-case payload shape for POST /rate-requests selected_schedules */
+export interface SchedulePayload {
+  scac: string | null
+  lin_id?: number | null
+  service_name: string | null
+  vessel_name: string | null
+  voyage_number: string | null
+  origin_unloc: string | null
+  origin_city_name: string | null
+  destination_unloc: string | null
+  destination_city_name: string | null
+  origin_departure_date: string | null
+  destination_arrival_date: string | null
+  terminal_cutoff: string | null
+  bk_cutoff: string | null
+  si_cutoff: string | null
+  vgm_cutoff: string | null
+  total_duration: number | null
+  schedule_type: string | null
+  legs: unknown[] | null
+}
+
+export function toSchedulePayload(s: OceanSchedule): SchedulePayload {
+  return {
+    scac: s.scac,
+    lin_id: s.linId ?? 1,
+    service_name: s.serviceName,
+    vessel_name: s.vesselName,
+    voyage_number: s.voyageNumber,
+    origin_unloc: s.originUnloc,
+    origin_city_name: s.originCityName,
+    destination_unloc: s.destinationUnloc,
+    destination_city_name: s.destinationCityName,
+    origin_departure_date: s.originDepartureDate,
+    destination_arrival_date: s.destinationArrivalDate,
+    terminal_cutoff: s.terminalCutoff,
+    bk_cutoff: s.bkCutoff,
+    si_cutoff: s.siCutoff,
+    vgm_cutoff: s.vgmCutoff,
+    total_duration: s.totalDuration,
+    schedule_type: s.scheduleType,
+    legs: s.legs,
+  }
+}
+
+// ==================== INCOMING RATE REQUEST (Procurement view) ====================
+
+/** Schedule detail as returned by GET /rate-requests/incoming (snake_case from DB). */
+export interface IncomingScheduleDetail {
+  schedule_id: number
+  scac: string | null
+  lin_id: number | null
+  liner_name: string | null
+  vessel_name: string | null
+  voyage_number: string | null
+  origin_unloc: string | null
+  destination_unloc: string | null
+  origin_departure_date: string | null
+  destination_arrival_date: string | null
+  total_duration: number | null
+  schedule_type: string | null
+}
+
+export interface IncomingRateRequest {
+  request_id: number
+  inq_id: number
+  emp_id_requested: number
+  emp_id_requester: number
+  is_given: boolean
+  remark: string | null
+  schedules: number[]
+  created_at: string
+  schedule_details: IncomingScheduleDetail[]
+}
+
+// ==================== AGGREGATE SCHEDULE + RATES (Procurement view) ====================
+
+/** A single rate row from the aggregate endpoint (snake_case from DB). */
+export interface AggregateRate {
+  rate_id: number
+  lin_id: number
+  origin: string
+  destination: string
+  container_type: string
+  rate: number
+  currency: string
+  valid_from: string
+  valid_to: string
+  transit: string | null
+  free_time: string | null
+  max_weight: number | null
+  note: string | null
+  special_remark: string | null
+}
+
+/** Schedule + matched rates for a single schedule_id. */
+export interface AggregateScheduleEntry {
+  schedule: IncomingScheduleDetail & {
+    service_name?: string | null
+    origin_country?: string | null
+    origin_city_name?: string | null
+    destination_country?: string | null
+    destination_city_name?: string | null
+    terminal_cutoff?: string | null
+    bk_cutoff?: string | null
+    si_cutoff?: string | null
+    haz_bk_cutoff?: string | null
+    vgm_cutoff?: string | null
+    reefer_cutoff?: string | null
+    estimated_terminal_cutoff?: string | null
+    imo_number?: string | null
+    allows_roro?: boolean | null
+    allows_breakbulk?: boolean | null
+    schedule_source?: string | null
+    created_date?: string | null
+    legs?: unknown[] | null
+  }
+  tariff_rates: AggregateRate[]
+  fak_rates: AggregateRate[]
+  special_rate: AggregateRate[]
+  vessel_by_vessel_rate: AggregateRate[]
+  nac: AggregateRate[]
+  contracted_rates: AggregateRate[]
+}
+
+/** Response from GET /inquiries/schedules/aggregate-rates — keyed by schedule_id string. */
+export type AggregateScheduleRatesResponse = Record<string, AggregateScheduleEntry>
 
 // ==================== UNIFIED RATE (from all DB rate tables) ====================
 export type RateSourceType = 'Contracted' | 'FAK' | 'Spot' | 'Tariff Rate' | 'NAC' | 'Special'
@@ -545,8 +736,14 @@ export function portOptions(ports: PortRecord[]): { value: string; label?: strin
 export interface LinerRecord {
   lin_id: number
   name: string
+  scac?: string | null
   is_on_inttra: boolean
   has_portal: boolean
+}
+
+/** Display helper: "Name – SCAC" when SCAC is available, otherwise just name. */
+export function linerDisplay(l: LinerRecord): string {
+  return l.scac ? `${l.name} – ${l.scac}` : l.name
 }
 
 export interface TradeLaneRecord {
@@ -1354,4 +1551,68 @@ function resolveRelativeDate(token: string): string {
   }
   d.setDate(d.getDate() + 1)
   return d.toISOString().slice(0, 10)
+}
+
+// ==================== TRACKING EVENTS (Track & Trace) ====================
+
+export interface TrackingEventDateTime {
+  dateValue: string        // e.g. "202611032000" (CCYYMMDDHHMM)
+  dateFormat: string       // e.g. "CCYYMMDDHHMM"
+}
+
+export interface TrackingEventLocation {
+  locationName: string | null
+  countryName: string | null
+  unLocode: string | null
+  countryCode: string | null
+}
+
+export interface TrackingTransportationDate {
+  transportationDateType: string    // "ActualDepartureDate" | "EstimatedArrivalDate" | "EstimatedDepartureDate" etc.
+  transportationDateTime: TrackingEventDateTime
+}
+
+export interface TrackingTransportationDetail {
+  transportationLocationType: string    // "PortOfLoad" | "PortOfDischarge"
+  transportationLocationCode: string | null
+  transportationDates: TrackingTransportationDate[]
+}
+
+export interface TrackingEvent {
+  carrierScac: string | null
+  carrierBookingReference: string | null
+  billOfLadingNumber: string | null
+  inttraBookingReference: string | null
+  equipmentReference: string | null
+  equipmentSizeTypeCode: string | null
+  equipmentSizeTypeDescription: string | null
+  sealNumber: string | null
+  eventTypeCode: string                    // "VD" | "AE" | "I" | "EE" etc.
+  eventTypeDescription: string             // "Vessel Departure" | "Vessel Load" | "Gate In" | "Gate Out (Empty)"
+  eventDateTime: TrackingEventDateTime
+  eventLocation: TrackingEventLocation
+  eventClassifierCode: string | null       // "ACT" = actual, "EST" = estimated
+  emptyIndicatorCode: string | null        // "L" = loaded, "E" = empty
+  emptyIndicatorCodeDescription: string | null  // "Full" | "Empty"
+  vesselName: string | null
+  vesselIMONumber: string | null
+  voyageNumber: string | null
+  lastKnownCoordinates: unknown | null
+  transportationDetails: TrackingTransportationDetail[]
+  comments: string | null
+}
+
+export interface TrackingContainer {
+  events: TrackingEvent[]
+  carrierScac: string | null
+  billOfLadingNumber: string | null
+  carrierBookingReference: string | null
+  inttraBookingReference: string | null
+  equipmentReference: string | null
+  equipmentSizeTypeCode: string | null
+  equipmentSizeTypeDescription: string | null
+  sealNumber: string | null
+  latestEventLocationCode: string | null
+  latestEventLocation: TrackingEventLocation | null
+  latestEventDateTime: TrackingEventDateTime | null
 }

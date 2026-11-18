@@ -7,18 +7,18 @@
 /* ============ TOPBAR ============ */
 .db-topbar {
   height: var(--topbar-height);
-  background: var(--topbar-bg);
-  border-bottom: 2px solid #3f4b5e;
+  background: #000;
   display: flex;
   align-items: center;
-  padding: 0 22px;
-  gap: 14px;
   flex-shrink: 0;
   z-index: 100;
 }
 .db-topbar-brand {
   display: flex; align-items: baseline; gap: 1px;
   font-weight: 800; font-size: 19px; letter-spacing: -0.01em;
+  background: #000;
+  height: 100%; padding: 0 22px;
+  align-items: center;
 }
 .db-topbar-brand-cyan {
   color: var(--brand-cyan);
@@ -26,9 +26,9 @@
 .db-topbar-brand-white {
   color: #fff;
 }
-.db-topbar-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.18); }
-.db-topbar-breadcrumb { font-size: 13px; color: var(--topbar-text); font-weight: 500; }
-.db-topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.db-topbar-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.18); margin: 0 14px; }
+.db-topbar-breadcrumb { font-size: 13px; color: rgba(255,255,255,0.6); font-weight: 500; }
+.db-topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; padding-right: 22px; }
 .db-topbar-ai-badge {
   background: rgba(15,143,168,0.15); border: 1px solid rgba(15,143,168,0.3);
   color: var(--brand-cyan); padding: 3px 10px; border-radius: 20px;
@@ -47,12 +47,12 @@
 }
 .db-topbar-period:hover { border-color: rgba(255,255,255,0.3); color: #fff; }
 .db-topbar-icon-btn {
-  width: 32px; height: 32px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);
-  background: transparent; color: #8f8fc0; cursor: pointer;
+  width: 32px; height: 32px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12);
+  background: transparent; color: rgba(255,255,255,0.5); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: all 0.15s;
 }
-.db-topbar-icon-btn:hover { background: rgba(255,255,255,0.08); color: #fff; border-color: rgba(255,255,255,0.3); }
+.db-topbar-icon-btn:hover { background: rgba(255,255,255,0.08); color: #fff; border-color: rgba(255,255,255,0.25); }
 .db-topbar-user {
   display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 4px;
   border-radius: 8px; cursor: pointer; transition: background 0.15s;
@@ -64,7 +64,7 @@
   font-size: 11px; font-weight: 700; color: white;
 }
 .db-topbar-username { font-size: 13px; font-weight: 600; color: #fff; }
-.db-topbar-role { font-size: 10px; color: #8f8fc0; }
+.db-topbar-role { font-size: 10px; color: rgba(255,255,255,0.45); }
 
 /* ============ SIDEBAR ============ */
 .db-sidebar {
@@ -266,8 +266,8 @@
   border-radius: 9px; font-size: 13px; font-weight: 600; cursor: pointer;
   transition: all 0.15s; border: 1px solid transparent; font-family: var(--font);
 }
-.db-btn.primary { background: var(--accent); color: white; }
-.db-btn.primary:hover { background: var(--accent-light); }
+.db-btn.primary { background: #000; color: white; }
+.db-btn.primary:hover { background: #1a1a1a; }
 .db-btn.secondary { background: transparent; border-color: var(--border); color: var(--text-secondary); }
 .db-btn.secondary:hover { border-color: var(--border-hover); color: var(--text); background: rgba(0,0,0,0.03); }
 .db-btn-row { display: flex; gap: 8px; flex-shrink: 0; }
@@ -1849,7 +1849,7 @@
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: linear-gradient(135deg, #2c2c82 0%, #1a1a5e 50%, #0f0f3d 100%);
+  background: #000;
 }
 
 .login-card {

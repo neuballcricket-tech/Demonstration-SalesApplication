@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { ShieldAlert, AlertTriangle, Edit3 } from 'lucide-react'
+import { Users, ShieldAlert, AlertTriangle, Edit3 } from 'lucide-react'
 import { EMPLOYEES, type Inquiry, type Customer, type CustomerTier, type CustomerType } from '../../types'
 import CustomerEditModal from '../shared/CustomerEditModal'
+import { PAGE_WRAPPER, PAGE_TITLE_ROW, PAGE_TITLE_ICON, PAGE_TITLE_H2, CARD, TABLE_TH } from './pageStyles'
 
 const CTYPE_BADGE: Record<CustomerType, string> = {
   'Shipper': 'db-badge accent',
@@ -67,16 +68,13 @@ export default function Customers({ inquiries, customers, onUpdateCustomer, onFl
   const creditHoldCount = customers.filter(c => c.credit_hold).length
 
   return (
-    <div className="db-page-anim">
-      <div className="db-page-head">
-        <div className="db-page-head-row">
-          <div>
-            <h1 className="db-page-title">Customers</h1>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-              {customers.length} customers · {blacklistedCount} blacklisted · {creditHoldCount} on credit hold
-            </div>
-          </div>
-        </div>
+    <div style={PAGE_WRAPPER}>
+      <div style={PAGE_TITLE_ROW}>
+        <Users size={18} style={PAGE_TITLE_ICON} />
+        <h2 style={PAGE_TITLE_H2}>Customers</h2>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+          {customers.length} customers · {blacklistedCount} blacklisted · {creditHoldCount} on credit hold
+        </span>
       </div>
 
       {/* Phase 7.3 — Customer Portal placeholder. Per the meeting, low-volume customers
@@ -106,22 +104,22 @@ export default function Customers({ inquiries, customers, onUpdateCustomer, onFl
         </button>
       </div>
 
-      <div className="db-chart-card">
+      <div style={CARD}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.06em' }}>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Customer</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Type</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Location</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Tier</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Payment</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Min Margin</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Status</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Salesperson</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Inquiries</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Last Contact</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Actions</th>
+              <tr>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Customer</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Type</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Location</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Tier</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Payment</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Min Margin</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Status</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Salesperson</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Inquiries</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Last Contact</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Actions</th>
               </tr>
             </thead>
             <tbody>

@@ -28,7 +28,7 @@ export default function TopBar({ currentPageLabel, activeEmployee, activeRole, o
       <span className="db-topbar-breadcrumb">{currentPageLabel}</span>
 
       <div className="db-topbar-right">
-        <span style={{ fontSize: 12, color: '#8f8fc0' }}>{today}</span>
+        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>{today}</span>
 
         {/* Role badge */}
         <span

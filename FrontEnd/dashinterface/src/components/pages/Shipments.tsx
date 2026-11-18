@@ -5,6 +5,7 @@ import {
   type Shipment, type ShipmentStatus, type ShipmentLeg, type Booking, type BookingStatus,
 } from '../../types'
 import { useRole } from '../../RoleContext'
+import { PAGE_WRAPPER, PAGE_TITLE_ROW, PAGE_TITLE_ICON, PAGE_TITLE_H2, CARD, SECTION_LABEL, FIELD_LABEL, INPUT_STYLE } from './pageStyles'
 
 interface ShipmentsProps {
   shipments: Shipment[]
@@ -64,30 +65,24 @@ export default function Shipments({ shipments, bookings, onAdvanceLeg, onRecordP
   const stuckAtTransshipment = shipments.filter(s => s.status === 'At Transshipment')
 
   return (
-    <div className="db-page-anim">
-      <div className="db-page-head">
-        <div className="db-page-head-row">
-          <div>
-            <h1 className="db-page-title">Shipments</h1>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-              Track every confirmed booking from origin to POD · {shipments.length} active · {counts['Delivered'] ?? 0} delivered · {counts['At Transshipment'] ?? 0} at transshipment
-            </div>
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: 'rgba(15,143,168,0.03)', border: '1px solid rgba(15,143,168,0.12)', borderRadius: 8 }}>
-            🛰️ Mock Inttra / Freightify integration · live tracking stubbed
-          </div>
-        </div>
+    <div style={PAGE_WRAPPER}>
+      <div style={{ ...PAGE_TITLE_ROW, flexWrap: 'wrap' }}>
+        <Ship size={18} style={PAGE_TITLE_ICON} />
+        <h2 style={PAGE_TITLE_H2}>Shipments</h2>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+          {shipments.length} active · {counts['Delivered'] ?? 0} delivered · {counts['At Transshipment'] ?? 0} at transshipment
+        </span>
       </div>
 
       {/* Critical-watch banner — meeting flagged transshipment monitoring as a key gap */}
       {stuckAtTransshipment.length > 0 && (
-        <div className="db-chart-card" style={{ marginBottom: 18, borderColor: 'rgba(217,119,6,0.25)' }}>
-          <div className="db-chart-head">
+        <div style={{ ...CARD, marginBottom: 18, borderColor: 'rgba(217,119,6,0.25)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Clock size={15} style={{ color: '#d97706' }} />
               <div>
-                <div className="db-chart-title">Critical Watch — At Transshipment</div>
-                <div className="db-chart-sub">Verify connection to onward leg · we're liable until POD</div>
+                <div style={SECTION_LABEL}>Critical Watch — At Transshipment</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Verify connection to onward leg · we're liable until POD</div>
               </div>
             </div>
             <span className="lt-pill due-today">{stuckAtTransshipment.length} shipment{stuckAtTransshipment.length === 1 ? '' : 's'}</span>
@@ -111,11 +106,10 @@ export default function Shipments({ shipments, bookings, onAdvanceLeg, onRecordP
 
       {/* Bookings Pipeline */}
       {bookings.length > 0 && (
-        <div className="db-chart-card" style={{ marginBottom: 18 }}>
-          <div className="db-chart-head">
-            <div>
-              <div className="db-chart-title">Bookings Pipeline</div>
-              <div className="db-chart-sub">
+        <div style={{ ...CARD, marginBottom: 18 }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={SECTION_LABEL}>Bookings Pipeline</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                 {bookings.filter(b => b.status === 'Pending Liner').length} pending liner
                 {' · '}{bookings.filter(b => b.status === 'Liner Confirmed').length} confirmed
                 {' · '}{bookings.filter(b => b.status === 'Released').length} released
@@ -125,7 +119,6 @@ export default function Shipments({ shipments, bookings, onAdvanceLeg, onRecordP
                   </span>
                 )}
               </div>
-            </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {bookings.map(b => {
@@ -208,25 +201,23 @@ export default function Shipments({ shipments, bookings, onAdvanceLeg, onRecordP
       )}
 
       {/* Filters */}
-      <div className="db-chart-card" style={{ marginBottom: 18 }}>
+      <div style={{ ...CARD, marginBottom: 18 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
-            <label className="lt-label">By Customer</label>
+            <label style={FIELD_LABEL}>By Customer</label>
             <input
               value={customerFilter}
               onChange={e => setCustomerFilter(e.target.value)}
               placeholder="Search customer name..."
-              className="lt-input"
-              style={{ width: '100%' }}
+              style={INPUT_STYLE}
             />
           </div>
           <div>
-            <label className="lt-label">By Status</label>
+            <label style={FIELD_LABEL}>By Status</label>
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value as ShipmentStatus | 'all')}
-              className="lt-select"
-              style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+              style={INPUT_STYLE}
             >
               <option value="all">All</option>
               {(['Booked', 'In Transit', 'At Transshipment', 'Out for Delivery', 'Delivered', 'Delayed'] as ShipmentStatus[]).map(s =>
@@ -240,7 +231,7 @@ export default function Shipments({ shipments, bookings, onAdvanceLeg, onRecordP
       {/* Shipment cards with timeline */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {filtered.map(s => (
-          <div key={s.id} className="db-chart-card">
+          <div key={s.id} style={CARD}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, gap: 12 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>

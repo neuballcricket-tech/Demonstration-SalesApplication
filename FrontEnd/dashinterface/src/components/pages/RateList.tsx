@@ -1,12 +1,13 @@
 import { useMemo, useState, useEffect, useRef, Fragment, type ReactNode } from 'react'
-import { Eye, Pencil, MessageSquarePlus, X, RefreshCw, Loader2, Save, Send } from 'lucide-react'
+import { Eye, Pencil, MessageSquarePlus, X, RefreshCw, Loader2, Save, Send, DollarSign } from 'lucide-react'
 import {
-  RATE_SOURCE_COLORS,
+  RATE_SOURCE_COLORS, linerDisplay,
   type UnifiedRate, type RateSourceType,
   type LinerRecord, type TradeLaneRecord,
 } from '../../types'
 import { apiFetchAllRates, apiUpdateRate, apiGetLiners, apiGetTradeLanes } from '../../api'
 import { useRole } from '../../RoleContext'
+import { PAGE_WRAPPER, PAGE_TITLE_ROW, PAGE_TITLE_ICON, PAGE_TITLE_H2, CARD, SECTION_LABEL, FIELD_LABEL, INPUT_STYLE } from './pageStyles'
 
 // Rate types visible to CS and Sales (read-only, no record access)
 const CS_SALES_ALLOWED: RateSourceType[] = ['FAK', 'Tariff Rate', 'Spot']
@@ -383,37 +384,34 @@ export default function RateList() {
   const colCount = columns.length + 1 // +1 for Actions column
 
   return (
-    <div className="db-page-anim">
-      <div className="db-page-head">
-        <div className="db-page-head-row">
-          <div>
-            <h1 className="db-page-title">Rate List</h1>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-              View, filter and manage all freight rates across all rate tables
-            </div>
-          </div>
-          <button
-            className="db-btn primary"
-            style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}
-            onClick={() => { setLoaded(false); loadRates() }}
-            disabled={loading}
-          >
-            {loading ? <Loader2 size={13} className="spin" /> : <RefreshCw size={13} />}
-            Refresh
-          </button>
-        </div>
+    <div style={PAGE_WRAPPER}>
+      <div style={PAGE_TITLE_ROW}>
+        <DollarSign size={18} style={PAGE_TITLE_ICON} />
+        <h2 style={PAGE_TITLE_H2}>Rates</h2>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+          View, filter and manage all freight rates across all rate tables
+        </span>
+        <span style={{ flex: 1 }} />
+        <button
+          className="db-btn primary"
+          style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}
+          onClick={() => { setLoaded(false); loadRates() }}
+          disabled={loading}
+        >
+          {loading ? <Loader2 size={13} className="spin" /> : <RefreshCw size={13} />}
+          Refresh
+        </button>
       </div>
 
       {/* Filters */}
-      <div className="db-chart-card" style={{ marginBottom: 18 }}>
+      <div style={{ ...CARD, marginBottom: 18 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
           <div>
-            <label className="lt-label">By Rate Type</label>
+            <label style={FIELD_LABEL}>By Rate Type</label>
             <select
               value={sourceFilter}
               onChange={e => setSourceFilter(e.target.value as SourceFilter)}
-              className="lt-select"
-              style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+              style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
             >
               <option value="all">All Types</option>
               {(isRestrictedRole ? CS_SALES_ALLOWED : SOURCE_OPTIONS).map(s => (
@@ -422,26 +420,24 @@ export default function RateList() {
             </select>
           </div>
           <div>
-            <label className="lt-label">By Liner</label>
+            <label style={FIELD_LABEL}>By Liner</label>
             <select
               value={linerFilter}
               onChange={e => setLinerFilter(e.target.value)}
-              className="lt-select"
-              style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+              style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
             >
               <option value="all">All</option>
               {liners.map(l => (
-                <option key={l.lin_id} value={l.name}>{l.name}</option>
+                <option key={l.lin_id} value={l.name}>{linerDisplay(l)}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="lt-label">By Trade Lane</label>
+            <label style={FIELD_LABEL}>By Trade Lane</label>
             <select
               value={laneFilter}
               onChange={e => setLaneFilter(e.target.value)}
-              className="lt-select"
-              style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+              style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
             >
               <option value="all">All</option>
               {tradeLanes.map(tl => (
@@ -450,50 +446,45 @@ export default function RateList() {
             </select>
           </div>
           <div>
-            <label className="lt-label">Origin</label>
+            <label style={FIELD_LABEL}>Origin</label>
             <input
               value={originFilter}
               onChange={e => setOriginFilter(e.target.value)}
               placeholder="Search origin..."
-              className="lt-input"
-              style={{ width: '100%' }}
+              style={INPUT_STYLE}
             />
           </div>
           <div>
-            <label className="lt-label">Destination</label>
+            <label style={FIELD_LABEL}>Destination</label>
             <input
               value={destFilter}
               onChange={e => setDestFilter(e.target.value)}
               placeholder="Search destination..."
-              className="lt-input"
-              style={{ width: '100%' }}
+              style={INPUT_STYLE}
             />
           </div>
           <div>
-            <label className="lt-label">Container Type</label>
+            <label style={FIELD_LABEL}>Container Type</label>
             <input
               value={containerFilter}
               onChange={e => setContainerFilter(e.target.value)}
               placeholder="e.g. 40'HC..."
-              className="lt-input"
-              style={{ width: '100%' }}
+              style={INPUT_STYLE}
             />
           </div>
         </div>
       </div>
 
       {/* Table */}
-      <div className="db-chart-card">
-        <div className="db-chart-head">
-          <div>
-            <div className="db-chart-title">
-              {sourceFilter === 'all' ? 'All Rates' : `${sourceFilter} Rates`}
-            </div>
-            <div className="db-chart-sub">
-              {loaded
-                ? `Showing ${filtered.length} of ${rates.length}`
-                : loading ? 'Loading...' : 'Click Refresh to load rates'}
-            </div>
+      <div style={CARD}>
+        <div style={{ marginBottom: 14 }}>
+          <div style={SECTION_LABEL}>
+            {sourceFilter === 'all' ? 'All Rates' : `${sourceFilter} Rates`}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            {loaded
+              ? `Showing ${filtered.length} of ${rates.length}`
+              : loading ? 'Loading...' : 'Click Refresh to load rates'}
           </div>
         </div>
 
@@ -600,8 +591,7 @@ export default function RateList() {
               </div>
               <textarea
                 ref={remarkRef}
-                className="lt-input"
-                style={{ width: '100%', minHeight: 60, resize: 'vertical', marginBottom: 8, fontSize: 12 }}
+                style={{ ...INPUT_STYLE, minHeight: 60, resize: 'vertical', marginBottom: 8, fontSize: 12 }}
                 placeholder="Write a note..."
                 value={remarkText}
                 onChange={e => setRemarkText(e.target.value)}
@@ -647,15 +637,15 @@ export default function RateList() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               {/* Rate */}
               <div>
-                <label className="lt-label">Rate *</label>
-                <input className="lt-input" type="number" style={{ width: '100%' }} min={0}
+                <label style={FIELD_LABEL}>Rate *</label>
+                <input style={INPUT_STYLE} type="number" min={0}
                   value={ef('rate')} onChange={e => setEf('rate', e.target.value === '' ? '' : Number(e.target.value))}
                   placeholder="e.g. 2450.00" />
               </div>
               {/* Currency */}
               <div>
-                <label className="lt-label">Currency</label>
-                <input className="lt-input" style={{ width: '100%' }}
+                <label style={FIELD_LABEL}>Currency</label>
+                <input style={INPUT_STYLE}
                   value={ef('currency')} onChange={e => setEf('currency', e.target.value)}
                   placeholder="USD" />
               </div>
@@ -663,8 +653,8 @@ export default function RateList() {
               {/* Container Type — Contracted/FAK/Spot/Tariff Rate */}
               {['Contracted', 'FAK', 'Spot', 'Tariff Rate'].includes(editing.source_type) && (
                 <div>
-                  <label className="lt-label">Container Type</label>
-                  <input className="lt-input" style={{ width: '100%' }}
+                  <label style={FIELD_LABEL}>Container Type</label>
+                  <input style={INPUT_STYLE}
                     value={ef('container_type')} onChange={e => setEf('container_type', e.target.value)}
                     placeholder="e.g. 40'HC" />
                 </div>
@@ -684,8 +674,8 @@ export default function RateList() {
               {/* Departure Date — Spot only */}
               {editing.source_type === 'Spot' && (
                 <div>
-                  <label className="lt-label">Departure Date</label>
-                  <input className="lt-input" type="date" style={{ width: '100%' }}
+                  <label style={FIELD_LABEL}>Departure Date</label>
+                  <input style={INPUT_STYLE} type="date"
                     value={ef('departure_date')} onChange={e => setEf('departure_date', e.target.value)} />
                 </div>
               )}
@@ -694,13 +684,13 @@ export default function RateList() {
               {editing.source_type === 'NAC' && (
                 <>
                   <div>
-                    <label className="lt-label">Origin</label>
-                    <input className="lt-input" style={{ width: '100%' }}
+                    <label style={FIELD_LABEL}>Origin</label>
+                    <input style={INPUT_STYLE}
                       value={ef('origin')} onChange={e => setEf('origin', e.target.value)} />
                   </div>
                   <div>
-                    <label className="lt-label">Destination</label>
-                    <input className="lt-input" style={{ width: '100%' }}
+                    <label style={FIELD_LABEL}>Destination</label>
+                    <input style={INPUT_STYLE}
                       value={ef('destination')} onChange={e => setEf('destination', e.target.value)} />
                   </div>
                 </>
@@ -708,20 +698,20 @@ export default function RateList() {
 
               {/* Valid From / To */}
               <div>
-                <label className="lt-label">Valid From</label>
-                <input className="lt-input" type="date" style={{ width: '100%' }}
+                <label style={FIELD_LABEL}>Valid From</label>
+                <input style={INPUT_STYLE} type="date"
                   value={ef('valid_from')} onChange={e => setEf('valid_from', e.target.value)} />
               </div>
               <div>
-                <label className="lt-label">Valid To</label>
-                <input className="lt-input" type="date" style={{ width: '100%' }}
+                <label style={FIELD_LABEL}>Valid To</label>
+                <input style={INPUT_STYLE} type="date"
                   value={ef('valid_to')} onChange={e => setEf('valid_to', e.target.value)} />
               </div>
 
               {/* Remark — full width */}
               <div style={{ gridColumn: '1 / -1' }}>
-                <label className="lt-label">Remark</label>
-                <textarea className="lt-input" style={{ width: '100%', minHeight: 60, resize: 'vertical' }}
+                <label style={FIELD_LABEL}>Remark</label>
+                <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: 'vertical' }}
                   value={ef('remark')} onChange={e => setEf('remark', e.target.value)}
                   placeholder="Add a remark..." />
               </div>

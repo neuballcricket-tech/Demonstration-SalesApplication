@@ -10,7 +10,7 @@ import {
   type ReleaseOrderFields,
 } from '../../types'
 import { useRole } from '../../RoleContext'
-import { apiGetLiners, apiFetchCompletedRateRequests, type KycPendingClient, type KycRequestRecord, type QuotationOptionRow } from '../../api'
+import { apiGetLiners, apiFetchCompletedRateRequests, apiGetUnsentQuotations, apiGetSentQuotations, apiGetAcceptedQuotations, type KycPendingClient, type KycRequestRecord, type QuotationOptionRow, type UnsentQuotation, type SentQuotationRow, type AcceptedQuotationRow } from '../../api'
 import type { CompletedRateRequest } from '../../types'
 import InlineStepForms from './workspaceSteps/InlineStepForms'
 import ModalStepForms from './workspaceSteps/ModalStepForms'
@@ -47,6 +47,7 @@ interface WorkspaceProps {
     contract_no?: string; ra_number?: string; specific_routing?: string;
     booking_type?: string; reefer_temp?: string; delivery_agent?: string;
     vessel?: string; voyage?: string; rate_remark?: string;
+    containers?: { type: string; qty: number }[];
   }) => string
   onSetBookingSiCutoff: (bookingId: string, date: string) => void
   onSetBookingBlCutoff: (bookingId: string, date: string) => void
@@ -138,13 +139,18 @@ const CS_STEPS: StepDef[] = [
   { key: 'cs-record-si',   label: 'Record SI',         actionKinds: ['submit-si'],        stepNumber: 10, group: 'post-cutoff' },
 
   { key: 'cs-generate-si', label: 'Generate SI',       actionKinds: ['generate-si'],          stepNumber: 10, group: 'post-cutoff' },
-  { key: 'cs-bl-vessel',   label: 'Vessel',            actionKinds: ['save-vessel-schedule'], stepNumber: 11 },
-  { key: 'cs-bl-booking',  label: 'Booking Creation', actionKinds: ['create-vessel-booking'], stepNumber: 12 },
-  { key: 'cs-draft-bl',    label: 'Draft BL',          actionKinds: ['save-draft-bl'],        stepNumber: 13 },
-  { key: 'cs-create-hbl',  label: 'Create HBL',        actionKinds: ['create-hbl'],           stepNumber: 14 },
-  { key: 'cs-create-bl',   label: 'Create MBL',        actionKinds: ['create-bl'],            stepNumber: 15 },
-  { key: 'cs-pre-advice',  label: 'Pre-Advice',        actionKinds: ['send-pre-advice'],      stepNumber: 16 },
-  { key: 'cs-pre-alert',   label: 'Pre-Alert',         actionKinds: ['send-pre-alert'],       stepNumber: 17 },
+
+  // --- Steps 11–17: BL processing pipeline — reserved for future release ---
+  // These steps cover the full BL lifecycle (vessel schedule → vessel booking →
+  // draft BL → HBL → MBL → pre-advice → pre-alert) and will be enabled once
+  // the BL module is production-ready.
+  // { key: 'cs-bl-vessel',   label: 'Vessel',           actionKinds: ['save-vessel-schedule'],  stepNumber: 11 },
+  // { key: 'cs-bl-booking',  label: 'Booking Creation', actionKinds: ['create-vessel-booking'], stepNumber: 12 },
+  // { key: 'cs-draft-bl',    label: 'Draft BL',         actionKinds: ['save-draft-bl'],         stepNumber: 13 },
+  // { key: 'cs-create-hbl',  label: 'Create HBL',       actionKinds: ['create-hbl'],            stepNumber: 14 },
+  // { key: 'cs-create-bl',   label: 'Create MBL',       actionKinds: ['create-bl'],             stepNumber: 15 },
+  // { key: 'cs-pre-advice',  label: 'Pre-Advice',       actionKinds: ['send-pre-advice'],       stepNumber: 16 },
+  // { key: 'cs-pre-alert',   label: 'Pre-Alert',        actionKinds: ['send-pre-alert'],        stepNumber: 17 },
 ]
 
 const FINANCE_STEPS: StepDef[] = [
@@ -271,6 +277,8 @@ export default function Workspace({
   const [customerContactEmail, setCustomerContactEmail] = useState('')
   const [customerContactPhone, setCustomerContactPhone] = useState('')
   const [quotationSending, setQuotationSending] = useState(false)
+  // Per-option margin/remark overrides for the prepare-quotation step
+  const [optionOverrides, setOptionOverrides] = useState<Record<number, import('./workspaceSteps/types').QuotationOptionOverride>>({})
   // Customer response state (accept / reject)
   const [customerDecision, setCustomerDecision] = useState<'accepted' | 'rejected'>('accepted')
   // Liner booking confirmation state (Procurement Booking step)
@@ -330,14 +338,41 @@ export default function Workspace({
   useEffect(() => { apiGetLiners().then(setLinerList).catch(() => {}) }, [])
 
   // Completed rate requests for quotation prep (Step 4)
+  // Re-fetch whenever the number of inquiries at quotation-prep/quotation-sent changes
+  // (i.e. when a rate check completes and the inquiry transitions to quotation-prep)
+  const quotPrepSignal = inquiries.filter(i => i.workflow_stage === 'quotation-prep' || i.workflow_stage === 'quotation-sent').length
   const [completedRateRequests, setCompletedRateRequests] = useState<CompletedRateRequest[]>([])
+  const [unsentQuotations, setUnsentQuotations] = useState<UnsentQuotation[]>([])
+  const [sentQuotations, setSentQuotations] = useState<SentQuotationRow[]>([])
+  const [acceptedQuotations, setAcceptedQuotations] = useState<AcceptedQuotationRow[]>([])
   useEffect(() => {
     if (activeRole === 'CS' || activeRole === 'Sales' || activeRole === 'Admin') {
       apiFetchCompletedRateRequests()
-        .then(res => setCompletedRateRequests(res.requests))
-        .catch(() => {})
+        .then(res => {
+          console.log('[Workspace] Loaded completed rate requests:', res.requests.length, res.requests)
+          setCompletedRateRequests(res.requests)
+        })
+        .catch(err => console.warn('[Workspace] Failed to fetch completed rate requests:', err))
+      apiGetUnsentQuotations()
+        .then(res => {
+          console.log('[Workspace] Loaded unsent quotations:', res.length)
+          setUnsentQuotations(res)
+        })
+        .catch(err => console.warn('[Workspace] Failed to fetch unsent quotations:', err))
+      apiGetSentQuotations()
+        .then(res => {
+          console.log('[Workspace] Loaded sent quotations:', res.length)
+          setSentQuotations(res)
+        })
+        .catch(err => console.warn('[Workspace] Failed to fetch sent quotations:', err))
+      apiGetAcceptedQuotations()
+        .then(res => {
+          console.log('[Workspace] Loaded accepted quotations:', res.length)
+          setAcceptedQuotations(res)
+        })
+        .catch(err => console.warn('[Workspace] Failed to fetch accepted quotations:', err))
     }
-  }, [activeRole])
+  }, [activeRole, quotPrepSignal])
   const [cutoffNotes, setCutoffNotes] = useState('')
   const [cutoffSiDate, setCutoffSiDate] = useState('')
   const [cutoffBlDate, setCutoffBlDate] = useState('')
@@ -444,6 +479,7 @@ export default function Workspace({
     // Multi-container inquiries are split: one work item per container.
     for (const inq of inquiries) {
       if (inq.status === 'completed' || !inq.workflow_stage) continue
+      if (!inq.inq_id) continue // skip locally-created inquiries not yet persisted to the backend
       const stage = WORKFLOW_STAGES.find(s => s.id === inq.workflow_stage)
       if (!stage) continue
       if (role && !stage.roles.includes(role)) continue
@@ -462,7 +498,7 @@ export default function Workspace({
           ? inq.containers.map((c, ci) => ({ container: c, containerIdx: ci }))
           : [{
               container: {
-                containerType: inq.container_type ?? '20 GP',
+                containerType: inq.container_type ?? '20GP',
                 quantity: inq.container_qty ?? 1,
                 weight: inq.cargo_weight ?? '',
                 commodityType: inq.commodity_type ?? 'Miscellaneous manufactured articles — furniture, toys',
@@ -507,15 +543,9 @@ export default function Workspace({
             actionLabel = 'Send to Customer'
             break
           case 'customer-response':
-            title = `Awaiting response from ${inq.customer_name}`
-            actionKind = 'customer-response'
-            actionLabel = 'Record Response'
-            break
+            continue // customer-response items are built from GET /quotations/sent below
           case 'booking-request':
-            title = `Create booking for ${inq.customer_name} · ${containerLabel}`
-            actionKind = 'booking-request'
-            actionLabel = 'Create Booking'
-            break
+            continue // booking-request items are built from GET /quotations/accepted below
           default:                    title = `${stage.label} — ${inq.customer_name}`
         }
 
@@ -523,6 +553,10 @@ export default function Workspace({
         const rateRequest = inq.workflow_stage === 'quotation-prep' && inq.inq_id
           ? completedRateRequests.find(rr => rr.inq_id === inq.inq_id)
           : undefined
+
+        // Only show quotation-prep items that have a completed rate request
+        // (the backend's completed-for-quoting endpoint already filters by emp_id)
+        if (inq.workflow_stage === 'quotation-prep' && !rateRequest) continue
 
         pending.push({
           type: 'inquiry',
@@ -538,6 +572,101 @@ export default function Workspace({
           sourceData: { inquiry: inq, nextStage: resolvedNextStage.id, container: cont, containerIdx: ci, customer: cust, rateRequest },
           kycIncomplete: inq.kyc_completed === false,
           rfqRef: inq.rfq_ref,
+        })
+      }
+    }
+
+    // --- From Sent Quotations (customer-response items) ---
+    // Group flat rows by quote_id; each group becomes one work item.
+    const sentByQuote = new Map<number, SentQuotationRow[]>()
+    for (const row of sentQuotations) {
+      if (!sentByQuote.has(row.quote_id)) sentByQuote.set(row.quote_id, [])
+      sentByQuote.get(row.quote_id)!.push(row)
+    }
+    for (const [quoteId, rows] of sentByQuote) {
+      const first = rows[0]
+      // Role guard — customer-response is a CS/Sales step
+      if (role && role !== 'CS' && role !== 'Sales') continue
+
+      // Try to find the matching inquiry for extra display data
+      const matchInq = inquiries.find(i => i.inq_id === first.inq_id)
+      const displayId = matchInq?.id ?? `INQ-${first.inq_id}`
+      const customerName = first.client_name
+      const routeLabel = `${first.origin} → ${first.destination}`
+      const containerLabel = `${first.qty}x ${first.container_type}`
+
+      // Build quotation options array (compatible with QuotationOptionRow)
+      const sentOptions = rows
+        .filter(r => r.option_id != null)
+        .map(r => ({
+          quote_id: r.quote_id,
+          option_id: r.option_id!,
+          rate_id: r.rate_id,
+          amt: r.amt,
+          final_amt: r.final_amt,
+          option_currency: r.option_currency,
+          vessel: r.vessel,
+          voyage: r.voyage,
+          remark: r.remark,
+          margin: r.margin,
+          is_percentage: r.is_percentage,
+          client_name: r.client_name,
+          origin: r.origin,
+          destination: r.destination,
+          qty: r.qty,
+          container_type: r.container_type,
+          contact_name: null,
+          email: null,
+          whatsapp: null,
+        }))
+
+      pending.push({
+        type: 'inquiry',
+        refId: displayId,
+        customerName,
+        title: `Awaiting response from ${customerName}`,
+        subtitle: `${matchInq?.request ?? 'Freight'} · ${routeLabel} · ${containerLabel}`,
+        urgentFlag: matchInq ? isSpotInquiry(matchInq.inquiry_text ?? '') : false,
+        createdAt: first.quote_date,
+        previousContext: findContext(displayId),
+        actionLabel: 'Record Response',
+        actionKind: 'customer-response',
+        sourceData: {
+          inquiry: matchInq ?? { id: displayId, inq_id: first.inq_id, customer_name: customerName, origin: first.origin, destination: first.destination, quotation_id: quoteId },
+          quoteId,
+          sentOptions,
+        },
+        kycIncomplete: false,
+        rfqRef: matchInq?.rfq_ref,
+      })
+    }
+
+    // --- From Accepted Quotations (booking-request items) ---
+    // Each row from GET /quotations/accepted is one accepted quotation ready for booking.
+    if (!role || role === 'CS' || role === 'Sales') {
+      for (const aq of acceptedQuotations) {
+        const matchInq = inquiries.find(i => i.inq_id === aq.inq_id)
+        const displayId = matchInq?.id ?? `INQ-${aq.inq_id}`
+        const containerLabel = `${aq.qty}x ${aq.container_type}`
+        const routeLabel = `${aq.origin} → ${aq.destination}`
+
+        pending.push({
+          type: 'inquiry',
+          refId: displayId,
+          customerName: aq.client_name,
+          title: `Create booking for ${aq.client_name} · ${containerLabel}`,
+          subtitle: `${matchInq?.request ?? 'Freight'} · ${routeLabel} · ${containerLabel} · ${aq.delivery_type === 'DOOR_TO_DOOR' || aq.delivery_type === 'door-to-door' ? 'Door-to-Door' : 'Port-to-Port'}`,
+          urgentFlag: matchInq ? isSpotInquiry(matchInq.inquiry_text ?? '') : false,
+          createdAt: matchInq?.created_at ?? '',
+          previousContext: findContext(displayId),
+          actionLabel: 'Create Booking',
+          actionKind: 'booking-request',
+          sourceData: {
+            inquiry: matchInq ?? { id: displayId, inq_id: aq.inq_id, cli_id: aq.cli_id, customer_name: aq.client_name, origin: aq.origin, destination: aq.destination },
+            acceptedQuotation: aq,
+          },
+          kycIncomplete: matchInq?.kyc_completed === false,
+          rfqRef: matchInq?.rfq_ref,
         })
       }
     }
@@ -942,7 +1071,10 @@ export default function Workspace({
     // --- From KYC Pending Queue (GET /kyc/kyc-requests/pending) ---
     // CS and Sales see clients awaiting KYC initiation regardless of inquiry workflow stage
     if (!role || role === 'CS' || role === 'Sales') {
+      const seenCliIds = new Set<number>()
       for (const client of kycPendingClients) {
+        if (seenCliIds.has(client.cli_id)) continue
+        seenCliIds.add(client.cli_id)
         pending.push({
           type: 'inquiry',
           refId: `KYC-${client.cli_id}`,
@@ -997,7 +1129,7 @@ export default function Workspace({
     })
 
     return { pendingItems: pending }
-  }, [inquiries, bookings, quotes, customers, activityLog, activeRole, kycPendingClients, kycRequests, completedRateRequests]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [inquiries, bookings, quotes, customers, activityLog, activeRole, kycPendingClients, kycRequests, completedRateRequests, sentQuotations, acceptedQuotations]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------------------
   // Step-based filtering (replaces filter chips)
@@ -1057,10 +1189,27 @@ export default function Workspace({
 
   // Selected item for split-panel detail view
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+
+  // Action kinds that fire immediately on click (navigate away, open modal, or
+  // advance workflow). These should NOT be auto-selected on load — the right
+  // panel stays blank until the user explicitly clicks one.
+  const IMMEDIATE_FIRE_KINDS = useMemo(() => new Set([
+    'check-rates', 'check-inttra-rates',
+    'confirm-booking', 'bl-approval',
+    'verify-kyc', 'approve-quote', 'record-master-bl', 'create-house-bl',
+    'acknowledge-procurement', 'advance-workflow',
+  ]), [])
+
   const selectedItem = useMemo(() => {
-    if (!selectedItemId) return filteredItems[0] ?? null
+    if (!selectedItemId) {
+      // No explicit click yet — auto-select the first item ONLY if it has an
+      // inline form (i.e. is NOT an immediate-fire kind). Otherwise show blank.
+      const first = filteredItems[0] ?? null
+      if (first && IMMEDIATE_FIRE_KINDS.has(first.actionKind)) return null
+      return first
+    }
     return filteredItems.find(i => `${i.type}-${i.refId}-${i.actionKind}-${(i.sourceData as any)?.containerIdx ?? 0}` === selectedItemId) ?? filteredItems[0] ?? null
-  }, [selectedItemId, filteredItems])
+  }, [selectedItemId, filteredItems, IMMEDIATE_FIRE_KINDS])
 
   const getItemKey = (item: WorkspaceItem) => `${item.type}-${item.refId}-${item.actionKind}-${(item.sourceData as any)?.containerIdx ?? 0}`
   // ---------------------------------------------------------------------------
@@ -1071,6 +1220,7 @@ export default function Workspace({
     roleSteps, actionModal, selectedItem, pendingVesselForBooking,
     formVessel, formVoyage, formNote, formDecision,
     lastQuotationId, quotationContent, selectedRateOptionIds, bestRateOptionId,
+    optionOverrides,
     sendMethod, customerContactEmail, customerContactPhone,
     customerDecision, linerBooked, selectedOptionRateId,
     bkShippingLine, bkContainerType, bkQuantity, bkContainers,
@@ -1098,6 +1248,7 @@ export default function Workspace({
     setKycAirImports, setKycAirExports, setKycGeneralCargo, setKycDangerousGoods, setKycPerishableGoods,
     setKycDocBrForm, setKycDocVatCert, setKycDocSvatCert, setKycDocTinCert, setKycDocForm20,
     setQuotationContent, setQuoteCopied, setSelectedRateOptionIds, setBestRateOptionId,
+    setOptionOverrides,
     setSendMethod, setWaConfirmed, setEmailConfirmed, setDraftCollapsed,
     setCustomerContactEmail, setCustomerContactPhone, setQuotationSending,
     setCustomerDecision, setLinerBooked,
@@ -1144,7 +1295,7 @@ export default function Workspace({
 
 
   return (
-    <div className="ws-split-layout db-page-anim">
+    <div className="ws-split-layout">
       <div className="ws-split-body">
       {/* ---- Left Panel: Item List ---- */}
       <div className={`ws-left-panel ${leftPanelOpen ? '' : 'ws-left-collapsed'}`}>
@@ -1152,7 +1303,7 @@ export default function Workspace({
           <>
         <div style={{ padding: '20px 20px 14px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
           <div>
-            <h1 style={{ fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text)' }}>Your workspace</h1>
+            <h1 style={{ fontSize: 19, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text)' }}>Your workspace</h1>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>
               {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''} in this step
             </p>
@@ -1189,8 +1340,8 @@ export default function Workspace({
                 {group.rfqRef != null && (
                   <div style={{
                     padding: '7px 11px', margin: '10px 0 5px',
-                    background: 'rgba(44,44,130,0.07)', borderLeft: '3px solid #2c2c82',
-                    borderRadius: 4, fontSize: 11, fontWeight: 700, color: '#2c2c82',
+                    background: 'rgba(15,143,168,0.07)', borderLeft: '3px solid #0f8fa8',
+                    borderRadius: 4, fontSize: 11, fontWeight: 700, color: '#0f8fa8',
                     textTransform: 'uppercase', letterSpacing: '0.04em',
                   }}>
                     RFQ-{group.rfqRef} · {group.items[0].customerName} · {group.items.length} route{group.items.length !== 1 ? 's' : ''}
@@ -1204,7 +1355,7 @@ export default function Workspace({
                   key={key}
                   onClick={() => {
                     setSelectedItemId(key)
-                    if (item.actionKind === 'send-kyc' || item.actionKind === 'customer-response' || item.actionKind === 'booking-request' || item.actionKind === 'review-booking-request' || item.actionKind === 'confirm-liner-booking' || item.actionKind === 'attach-release-order' || item.actionKind === 'release-booking' || item.actionKind === 'save-draft-bl' || item.actionKind === 'send-draft-bl' || item.actionKind === 'generate-si' || item.actionKind === 'create-hbl' || item.actionKind === 'create-bl' || item.actionKind === 'record-cutoff' || item.actionKind === 'request-si' || item.actionKind === 'submit-si' || item.actionKind === 'send-pre-advice') {
+                    if (item.actionKind === 'send-kyc' || item.actionKind === 'prepare-quotation' || item.actionKind === 'customer-response' || item.actionKind === 'booking-request' || item.actionKind === 'review-booking-request' || item.actionKind === 'confirm-liner-booking' || item.actionKind === 'attach-release-order' || item.actionKind === 'release-booking' || item.actionKind === 'save-draft-bl' || item.actionKind === 'send-draft-bl' || item.actionKind === 'generate-si' || item.actionKind === 'create-hbl' || item.actionKind === 'create-bl' || item.actionKind === 'record-cutoff' || item.actionKind === 'request-si' || item.actionKind === 'submit-si' || item.actionKind === 'send-pre-advice' || item.actionKind === 'send-pre-alert' || item.actionKind === 'save-vessel-schedule' || item.actionKind === 'create-vessel-booking' || item.actionKind === 'check-rates' || item.actionKind === 'check-inttra-rates' || item.actionKind === 'send-to-customer' || item.actionKind === 'confirm-booking' || item.actionKind === 'bl-approval' || item.actionKind === 'verify-kyc' || item.actionKind === 'approve-quote' || item.actionKind === 'record-master-bl' || item.actionKind === 'create-house-bl' || item.actionKind === 'acknowledge-procurement' || item.actionKind === 'advance-workflow') {
                       handleAction(item)
                     }
                   }}
@@ -1335,6 +1486,16 @@ export default function Workspace({
               quotationOptionsLoading={quotationOptionsLoading}
               selectedOptionRateId={selectedOptionRateId}
               setSelectedOptionRateId={setSelectedOptionRateId}
+              selectedRateOptionIds={selectedRateOptionIds}
+              setSelectedRateOptionIds={setSelectedRateOptionIds}
+              bestRateOptionId={bestRateOptionId}
+              setBestRateOptionId={setBestRateOptionId}
+              optionOverrides={optionOverrides}
+              setOptionOverrides={setOptionOverrides}
+              quotationContent={quotationContent}
+              setQuotationContent={setQuotationContent}
+              quoteCopied={quoteCopied}
+              setQuoteCopied={setQuoteCopied}
               cutoffLiner={cutoffLiner}
               setCutoffLiner={setCutoffLiner}
               cutoffMode={cutoffMode}
@@ -1499,6 +1660,8 @@ export default function Workspace({
               linerList={linerList}
               bookings={bookings}
               vesselSchedules={vesselSchedules}
+              unsentQuotations={unsentQuotations}
+              lastQuotationId={lastQuotationId}
               activeEmployee={activeEmployee}
               activeRole={activeRole}
               handleModalSubmit={handleModalSubmit}
@@ -1517,8 +1680,17 @@ export default function Workspace({
         ) : (
           <div style={{ maxWidth: 420, margin: '60px auto 0', textAlign: 'center' }}>
             <Inbox size={40} style={{ color: 'var(--text-muted)', marginBottom: 14, opacity: 0.4 }} />
-            <div style={{ fontSize: 17, fontWeight: 700, color: '#334155', marginBottom: 6 }}>All caught up</div>
-            <div style={{ fontSize: 13, color: '#94a3b8' }}>No items need your attention in this step.</div>
+            {filteredItems.length > 0 ? (
+              <>
+                <div style={{ fontSize: 17, fontWeight: 700, color: '#334155', marginBottom: 6 }}>Select an item</div>
+                <div style={{ fontSize: 13, color: '#94a3b8' }}>Click on an item from the list to get started.</div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontSize: 17, fontWeight: 700, color: '#334155', marginBottom: 6 }}>All caught up</div>
+                <div style={{ fontSize: 13, color: '#94a3b8' }}>No items need your attention in this step.</div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -1698,6 +1870,8 @@ export default function Workspace({
         setSelectedRateOptionIds={setSelectedRateOptionIds}
         bestRateOptionId={bestRateOptionId}
         setBestRateOptionId={setBestRateOptionId}
+        optionOverrides={optionOverrides}
+        setOptionOverrides={setOptionOverrides}
         sendMethod={sendMethod}
         setSendMethod={setSendMethod}
         waConfirmed={waConfirmed}

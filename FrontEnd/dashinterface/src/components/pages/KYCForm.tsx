@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Printer, Send, Loader2, ShieldCheck } from 'lucide-react'
+import { FileCheck, Printer, Send, Loader2, ShieldCheck } from 'lucide-react'
 import type { Customer } from '../../types'
 import { useRole } from '../../RoleContext'
 import { apiSendKyc } from '../../api'
+import { PAGE_WRAPPER, PAGE_TITLE_ROW, PAGE_TITLE_ICON, PAGE_TITLE_H2, CARD, SECTION_LABEL, FIELD_LABEL, INPUT_STYLE } from './pageStyles'
 
 interface KYCFormProps {
   customers: Customer[]
@@ -44,58 +45,51 @@ export default function KYCForm({ customers, onFlash }: KYCFormProps) {
   }
 
   return (
-    <div className="db-page-anim">
+    <div style={PAGE_WRAPPER}>
       {/* Screen-only header with print button */}
-      <div className="db-page-head kyc-no-print">
-        <div className="db-page-head-row">
-          <div>
-            <h1 className="db-page-title">KYC Form</h1>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-              Generate a printable Know Your Customer form or email it directly to a customer
-            </div>
-          </div>
-          <button
-            className="db-btn primary"
-            onClick={() => window.print()}
-            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            <Printer size={14} /> Print / Save as PDF
-          </button>
+      <div className="kyc-no-print" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={PAGE_TITLE_ROW}>
+          <FileCheck size={18} style={PAGE_TITLE_ICON} />
+          <h2 style={PAGE_TITLE_H2}>KYC Form</h2>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+            Generate a printable Know Your Customer form or email it directly
+          </span>
         </div>
+        <button
+          className="db-btn primary"
+          onClick={() => window.print()}
+          style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          <Printer size={14} /> Print / Save as PDF
+        </button>
       </div>
 
       {/* Send KYC via Email card (screen-only) */}
-      <div className="db-chart-card kyc-no-print" style={{ marginBottom: 18 }}>
-        <div className="db-chart-head">
-          <div>
-            <div className="db-chart-title">Send KYC Form via Email</div>
-            <div className="db-chart-sub">Email the KYC form directly to a customer using Resend</div>
-          </div>
-        </div>
+      <div className="kyc-no-print" style={{ ...CARD, marginBottom: 18 }}>
+        <div style={{ ...SECTION_LABEL, marginBottom: 6 }}>Send KYC Form via Email</div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14 }}>Email the KYC form directly to a customer using Resend</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, alignItems: 'flex-end' }}>
           <div>
-            <label className="lt-label">Customer Name</label>
+            <label style={FIELD_LABEL}>Customer Name</label>
             <input
               list="kyc-customers"
               value={customerName}
               onChange={e => setCustomerName(e.target.value)}
               placeholder="Select or type customer name..."
-              className="lt-input"
-              style={{ width: '100%' }}
+              style={INPUT_STYLE}
             />
             <datalist id="kyc-customers">
               {customers.map(c => <option key={c.id} value={c.name} />)}
             </datalist>
           </div>
           <div>
-            <label className="lt-label">Recipient Email</label>
+            <label style={FIELD_LABEL}>Recipient Email</label>
             <input
               type="email"
               value={recipientEmail}
               onChange={e => setRecipientEmail(e.target.value)}
               placeholder="customer@example.com"
-              className="lt-input"
-              style={{ width: '100%' }}
+              style={INPUT_STYLE}
             />
           </div>
           <button

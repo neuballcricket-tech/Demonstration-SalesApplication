@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { X } from 'lucide-react'
 
 interface TagInputProps {
@@ -6,21 +6,39 @@ interface TagInputProps {
   onChange: (values: string[]) => void
   suggestions: string[]
   placeholder?: string
+  /** Optional display formatter — shown in dropdown and tag chips while the
+   *  raw suggestion string is stored as the actual value. */
+  formatLabel?: (value: string) => string
 }
 
-export default function TagInput({ values, onChange, suggestions, placeholder }: TagInputProps) {
+export default function TagInput({ values, onChange, suggestions, placeholder, formatLabel }: TagInputProps) {
   const [input, setInput] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [highlightIdx, setHighlightIdx] = useState(-1)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  const display = formatLabel ?? ((v: string) => v)
+
+  // Deduplicate suggestions so we never render duplicate React keys
+  const uniqueSuggestions = useMemo(() => {
+    const seen = new Set<string>()
+    return suggestions.filter(s => {
+      const key = s.toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }, [suggestions])
+
   const filtered = input.trim()
-    ? suggestions.filter(s =>
-        s.toLowerCase().includes(input.toLowerCase()) &&
-        !values.some(v => v.toLowerCase() === s.toLowerCase())
-      )
-    : suggestions.filter(s => !values.some(v => v.toLowerCase() === s.toLowerCase()))
+    ? uniqueSuggestions.filter(s => {
+        const q = input.toLowerCase()
+        // Search against both the raw value and the formatted label
+        return (s.toLowerCase().includes(q) || display(s).toLowerCase().includes(q)) &&
+          !values.some(v => v.toLowerCase() === s.toLowerCase())
+      })
+    : uniqueSuggestions.filter(s => !values.some(v => v.toLowerCase() === s.toLowerCase()))
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -84,7 +102,7 @@ export default function TagInput({ values, onChange, suggestions, placeholder }:
             color: 'var(--accent, #3b82f6)',
             borderRadius: 12, whiteSpace: 'nowrap',
           }}>
-            {v}
+            {display(v)}
             <button
               type="button"
               onClick={e => { e.stopPropagation(); removeValue(i) }}
@@ -129,7 +147,7 @@ export default function TagInput({ values, onChange, suggestions, placeholder }:
               }}
               onMouseEnter={() => setHighlightIdx(i)}
             >
-              {s}
+              {display(s)}
             </div>
           ))}
         </div>

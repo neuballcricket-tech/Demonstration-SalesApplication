@@ -1,14 +1,15 @@
 import { useState } from 'react'
-import { Plus, Trash2, Upload, FileSpreadsheet } from 'lucide-react'
+import { ListChecks, Plus, Trash2, Upload, FileSpreadsheet } from 'lucide-react'
 import PortCombobox from '../shared/PortCombobox'
 import SearchCombobox from '../shared/SearchCombobox'
-import { CONTAINER_TYPES, type ClientRecord, type ContainerType } from '../../types'
+import { CONTAINER_TYPES, CONTAINER_TYPE_LABELS, type ClientRecord, type ContainerType } from '../../types'
 import { apiCreateRfq, apiPreviewRfq, type RfqLinePayload } from '../../api'
+import { PAGE_WRAPPER, PAGE_TITLE_ROW, PAGE_TITLE_ICON, PAGE_TITLE_H2, CARD, FIELD_LABEL, INPUT_STYLE } from './pageStyles'
 
 interface Row { origin: string; destination: string; containerType: ContainerType; qty: number }
 
 const blankRow = (origin = ''): Row => ({
-  origin, destination: '', containerType: '40 HC', qty: 1,
+  origin, destination: '', containerType: '40HC', qty: 1,
 })
 
 // backend expects codes like 40HC, the UI shows "40 HC"
@@ -45,7 +46,7 @@ export default function RfqNew({ clientList, onFlash, onGoBack }: Props) {
       setRows(res.rows.map(r => ({
         origin: r.origin_code || r.origin || '',
         destination: r.destination_code || r.destination || (res.destination ?? ''),
-        containerType: '40 HC' as ContainerType,
+        containerType: '40HC' as ContainerType,
         qty: 1,
       })))
       if (res.destination) setDestination(res.destination)
@@ -139,15 +140,16 @@ export default function RfqNew({ clientList, onFlash, onGoBack }: Props) {
     errors[k] ? <div style={{ color: '#dc2626', fontSize: 11, marginTop: 3 }}>{errors[k]}</div> : null
 
   return (
-    <div className="db-page-anim">
-      <div className="db-page-head">
-        <h1 className="db-page-title">New RFQ</h1>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+    <div style={PAGE_WRAPPER}>
+      <div style={PAGE_TITLE_ROW}>
+        <ListChecks size={18} style={PAGE_TITLE_ICON} />
+        <h2 style={PAGE_TITLE_H2}>New RFQ</h2>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
           One customer, many routes. Each route becomes its own inquiry.
-        </div>
+        </span>
       </div>
 
-      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
+      <div style={CARD}>
 
 
       {/* Upload a tender spreadsheet */}
@@ -169,7 +171,7 @@ export default function RfqNew({ clientList, onFlash, onGoBack }: Props) {
           {uploadNote && <span style={{ fontSize: 12, color: 'var(--accent)' }}>{uploadNote}</span>}
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
-            <label className="lt-label" style={{ margin: 0 }}>Destination</label>
+            <label style={{ ...FIELD_LABEL, margin: 0, display: 'inline' }}>Destination</label>
             <div style={{ width: 200 }}>
               <PortCombobox value={destination} onChange={setDestination} placeholder="e.g. Hamburg" />
             </div>
@@ -182,7 +184,7 @@ export default function RfqNew({ clientList, onFlash, onGoBack }: Props) {
         {/* Customer + contact */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 22 }}>
           <div>
-            <label className="lt-label">
+            <label style={FIELD_LABEL}>
               Customer <span style={{ color: '#dc2626' }}>*</span>
               {matchedCli && <span style={{ marginLeft: 8, fontSize: 11, color: '#16a34a', fontWeight: 500 }}>✓ found</span>}
             </label>
@@ -195,14 +197,14 @@ export default function RfqNew({ clientList, onFlash, onGoBack }: Props) {
             <Err k="customer" />
           </div>
           <div>
-            <label className="lt-label">Contact Person <span style={{ color: '#dc2626' }}>*</span></label>
-            <input className="lt-input" style={{ width: '100%' }} value={contactName}
+            <label style={FIELD_LABEL}>Contact Person <span style={{ color: '#dc2626' }}>*</span></label>
+            <input style={INPUT_STYLE} value={contactName}
                    onChange={e => setContactName(e.target.value)} maxLength={100} placeholder="e.g. John Silva" />
             <Err k="contact" />
           </div>
           <div>
-            <label className="lt-label">Contact Email</label>
-            <input className="lt-input" style={{ width: '100%' }} value={contactEmail}
+            <label style={FIELD_LABEL}>Contact Email</label>
+            <input style={INPUT_STYLE} value={contactEmail}
                    onChange={e => setContactEmail(e.target.value)} maxLength={120} placeholder="e.g. john@acme.com" />
           </div>
         </div>
@@ -231,25 +233,25 @@ export default function RfqNew({ clientList, onFlash, onGoBack }: Props) {
             ) ? 'rgba(220,38,38,0.06)' : undefined,
           }}>
             <div>
-              {i === 0 && <label className="lt-label">Origin</label>}
+              {i === 0 && <label style={FIELD_LABEL}>Origin</label>}
               <PortCombobox value={r.origin} onChange={v => update(i, { origin: v })} placeholder="e.g. Colombo" />
               <Err k={`r${i}.origin`} />
             </div>
             <div>
-              {i === 0 && <label className="lt-label">Destination</label>}
+              {i === 0 && <label style={FIELD_LABEL}>Destination</label>}
               <PortCombobox value={r.destination} onChange={v => update(i, { destination: v })} placeholder="e.g. Hamburg" />
               <Err k={`r${i}.destination`} />
             </div>
             <div>
-              {i === 0 && <label className="lt-label">Container</label>}
-              <select className="lt-select" style={{ width: '100%' }} value={r.containerType}
+              {i === 0 && <label style={FIELD_LABEL}>Container</label>}
+              <select style={INPUT_STYLE} value={r.containerType}
                       onChange={e => update(i, { containerType: e.target.value as ContainerType })}>
-                {CONTAINER_TYPES.map(ct => <option key={ct} value={ct}>{ct}</option>)}
+                {CONTAINER_TYPES.map(ct => <option key={ct} value={ct}>{CONTAINER_TYPE_LABELS[ct]}</option>)}
               </select>
             </div>
             <div>
-              {i === 0 && <label className="lt-label">Qty</label>}
-              <input className="lt-input" type="number" min={1} style={{ width: '100%' }} value={r.qty}
+              {i === 0 && <label style={FIELD_LABEL}>Qty</label>}
+              <input type="number" min={1} style={INPUT_STYLE} value={r.qty}
                      onChange={e => update(i, { qty: Math.max(1, Number(e.target.value)) })} />
               <Err k={`r${i}.qty`} />
             </div>

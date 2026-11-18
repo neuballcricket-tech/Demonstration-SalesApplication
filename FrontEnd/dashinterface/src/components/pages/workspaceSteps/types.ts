@@ -56,3 +56,10 @@ export interface MblContainerRow {
   grossWeight: string
   cbm: string
 }
+
+/** Per-option margin/remark overrides for the prepare-quotation step. */
+export interface QuotationOptionOverride {
+  margin: number
+  isPercentage: boolean
+  remark: string
+}

@@ -15,6 +15,7 @@ import {
   type Inquiry, type Customer, type SBU, type CustomerTier, type PaymentTerms, type DeliveryType,
   type InquiryPriority, type CommodityType, type ContainerType, type CustomerType,
   type LinerRecord, type ContainerLine,
+  linerDisplay,
 } from '../../types'
 import { apiGetLiners } from '../../api'
 import { useRole } from '../../RoleContext'
@@ -123,6 +124,10 @@ export default function ChatAssistant({
   const customerNames = customers.map(c => c.name)
   const [linerList, setLinerList] = useState<LinerRecord[]>([])
   useEffect(() => { apiGetLiners().then(setLinerList).catch(() => {}) }, [])
+  const formatLinerLabel = (name: string) => {
+    const l = linerList.find(x => x.name === name)
+    return l ? linerDisplay(l) : name
+  }
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
@@ -347,6 +352,7 @@ export default function ChatAssistant({
                     onChange={preferredLiners => setInqForm(p => ({ ...p, preferredLiners }))}
                     suggestions={linerList.map(l => l.name)}
                     placeholder="Type to add liners..."
+                    formatLabel={formatLinerLabel}
                   />
                 </FormField>
                 <FormField label="Remarks">
@@ -416,6 +422,7 @@ export default function ChatAssistant({
                           onChange={doorAgents => setInqForm(p => ({ ...p, containers: p.containers.map((cc, i) => i === idx ? { ...cc, doorAgents } : cc) }))}
                           suggestions={linerList.map(l => l.name)}
                           placeholder="Type to add agents..."
+                          formatLabel={formatLinerLabel}
                         />
                       </FormField>
                     </div>
@@ -657,31 +664,32 @@ export default function ChatAssistant({
 
   return (
     <>
-    <div className="db-page-anim ca-wrap">
-      <div className="db-page-head">
-        <div className="db-page-head-row">
+    <div className="ca-wrap">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px 12px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Sparkles size={18} style={{ color: '#0f8fa8' }} />
           <div>
-            <h1 className="db-page-title">Command Center</h1>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
+            <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Command Center</h2>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
               AI-powered assistant — ask questions, look up data, create records, and manage your sales workflow.
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }} title={aiConnected ? 'AI assistant connected' : 'AI assistant offline'}>
-              {aiConnected
-                ? <Wifi size={13} style={{ color: '#16a34a' }} />
-                : <WifiOff size={13} style={{ color: '#94a3b8' }} />}
-              <span style={{ fontSize: 11, color: aiConnected ? '#16a34a' : '#94a3b8' }}>
-                {aiWaiting ? 'AI thinking...' : aiConnected ? 'AI online' : 'AI offline'}
-              </span>
-            </div>
-            <span
-              className="db-topbar-role-pill"
-              style={{ background: roleColor + '12', color: roleColor, border: `1px solid ${roleColor}30` }}
-            >
-              {activeEmployee.name} — {ROLE_LABELS[activeRole]}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }} title={aiConnected ? 'AI assistant connected' : 'AI assistant offline'}>
+            {aiConnected
+              ? <Wifi size={13} style={{ color: '#16a34a' }} />
+              : <WifiOff size={13} style={{ color: '#94a3b8' }} />}
+            <span style={{ fontSize: 11, color: aiConnected ? '#16a34a' : '#94a3b8' }}>
+              {aiWaiting ? 'AI thinking...' : aiConnected ? 'AI online' : 'AI offline'}
             </span>
           </div>
+          <span
+            className="db-topbar-role-pill"
+            style={{ background: roleColor + '12', color: roleColor, border: `1px solid ${roleColor}30` }}
+          >
+            {activeEmployee.name} — {ROLE_LABELS[activeRole]}
+          </span>
         </div>
       </div>
 

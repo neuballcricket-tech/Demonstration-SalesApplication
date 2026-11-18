@@ -6,6 +6,7 @@ import {
   type Customer, type Inquiry,
 } from '../../types'
 import { useRole } from '../../RoleContext'
+import { PAGE_WRAPPER, PAGE_TITLE_ROW, PAGE_TITLE_ICON, PAGE_TITLE_H2, CARD, SECTION_LABEL, FIELD_LABEL, INPUT_STYLE } from './pageStyles'
 
 interface QuotationsProps {
   quotes: Quote[]
@@ -86,15 +87,14 @@ export default function Quotations({
   }
 
   return (
-    <div className="db-page-anim">
-      <div className="db-page-head">
-        <div className="db-page-head-row">
-          <div>
-            <h1 className="db-page-title">Quotations</h1>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-              {quotes.length} quotes · {counts['Awaiting Approval'] ?? 0} pending approval · {counts['Confirmed'] ?? 0} confirmed
-            </div>
-          </div>
+    <div style={PAGE_WRAPPER}>
+      <div style={PAGE_TITLE_ROW}>
+        <FileText size={18} style={PAGE_TITLE_ICON} />
+        <h2 style={PAGE_TITLE_H2}>Quotations</h2>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+          {quotes.length} quotes · {counts['Awaiting Approval'] ?? 0} pending approval · {counts['Confirmed'] ?? 0} confirmed
+        </span>
+        <div style={{ marginLeft: 'auto' }}>
           <button
             className="db-btn primary"
             onClick={() => canCreate && setShowBuilder(true)}
@@ -109,12 +109,10 @@ export default function Quotations({
 
       {/* Ready to Quote — inquiries at quotation-prep stage */}
       {readyToQuote.length > 0 && (
-        <div className="db-chart-card" style={{ marginBottom: 18 }}>
-          <div className="db-chart-head">
-            <div>
-              <div className="db-chart-title">Ready to Quote</div>
-              <div className="db-chart-sub">{readyToQuote.length} {readyToQuote.length === 1 ? 'inquiry' : 'inquiries'} awaiting quotation</div>
-            </div>
+        <div style={{ ...CARD, marginBottom: 18 }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={SECTION_LABEL}>Ready to Quote</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{readyToQuote.length} {readyToQuote.length === 1 ? 'inquiry' : 'inquiries'} awaiting quotation</div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
             {readyToQuote.map(inq => {
@@ -169,25 +167,23 @@ export default function Quotations({
       )}
 
       {/* Filters */}
-      <div className="db-chart-card" style={{ marginBottom: 18 }}>
+      <div style={{ ...CARD, marginBottom: 18 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
-            <label className="lt-label">By Customer</label>
+            <label style={FIELD_LABEL}>By Customer</label>
             <input
               value={customerFilter}
               onChange={e => setCustomerFilter(e.target.value)}
               placeholder="Search customer name..."
-              className="lt-input"
-              style={{ width: '100%' }}
+              style={INPUT_STYLE}
             />
           </div>
           <div>
-            <label className="lt-label">By Status</label>
+            <label style={FIELD_LABEL}>By Status</label>
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value as QuoteStatus | 'all')}
-              className="lt-select"
-              style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+              style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
             >
               <option value="all">All</option>
               {(['Draft', 'Awaiting Approval', 'Approved', 'Sent', 'Confirmed', 'Lost'] as QuoteStatus[]).map(s =>
@@ -199,12 +195,10 @@ export default function Quotations({
       </div>
 
       {/* Quote list */}
-      <div className="db-chart-card">
-        <div className="db-chart-head">
-          <div>
-            <div className="db-chart-title">Quotes</div>
-            <div className="db-chart-sub">Showing {filtered.length} of {quotes.length}</div>
-          </div>
+      <div style={CARD}>
+        <div style={{ marginBottom: 14 }}>
+          <div style={SECTION_LABEL}>Quotes</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Showing {filtered.length} of {quotes.length}</div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -596,14 +590,13 @@ function QuoteBuilderModal({
         {/* Customer + route */}
         <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
           <div>
-            <label className="lt-label">Customer</label>
+            <label style={FIELD_LABEL}>Customer</label>
             <input
               list="qb-customers"
               value={customerName}
               onChange={e => setCustomerName(e.target.value)}
               placeholder="Customer name"
-              className="lt-input"
-              style={{ width: '100%' }}
+              style={INPUT_STYLE}
             />
             <datalist id="qb-customers">
               {customers.map(c => <option key={c.id} value={c.name} />)}
@@ -617,16 +610,16 @@ function QuoteBuilderModal({
             )}
           </div>
           <div>
-            <label className="lt-label">Origin</label>
-            <input value={origin} onChange={e => setOrigin(e.target.value)} className="lt-input" style={{ width: '100%' }} />
+            <label style={FIELD_LABEL}>Origin</label>
+            <input value={origin} onChange={e => setOrigin(e.target.value)} style={INPUT_STYLE} />
           </div>
           <div>
-            <label className="lt-label">Destination</label>
-            <input value={destination} onChange={e => setDestination(e.target.value)} className="lt-input" style={{ width: '100%' }} />
+            <label style={FIELD_LABEL}>Destination</label>
+            <input value={destination} onChange={e => setDestination(e.target.value)} style={INPUT_STYLE} />
           </div>
           <div>
-            <label className="lt-label">Quote Type</label>
-            <select value={quoteType} onChange={e => setQuoteType(e.target.value as QuoteType)} className="lt-select" style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}>
+            <label style={FIELD_LABEL}>Quote Type</label>
+            <select value={quoteType} onChange={e => setQuoteType(e.target.value as QuoteType)} style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}>
               {QUOTE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
@@ -640,7 +633,7 @@ function QuoteBuilderModal({
         {/* Rate lines */}
         <div style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <label className="lt-label" style={{ marginBottom: 0 }}>Rate Options ({lines.length})</label>
+            <label style={{ ...FIELD_LABEL, marginBottom: 0 }}>Rate Options ({lines.length})</label>
             <button className="db-btn secondary" onClick={addLine} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
               <Plus size={11} /> Add line
             </button>
@@ -663,27 +656,27 @@ function QuoteBuilderModal({
                 {lines.map(l => (
                   <tr key={l.id}>
                     <td style={{ padding: '4px 4px' }}>
-                      <input value={l.shipping_line} onChange={e => updateLine(l.id, { shipping_line: e.target.value })} className="lt-input" style={{ width: 110, padding: '6px 8px' }} list="qb-lines" />
+                      <input value={l.shipping_line} onChange={e => updateLine(l.id, { shipping_line: e.target.value })} style={{ ...INPUT_STYLE, width: 110, padding: '6px 8px' }} list="qb-lines" />
                     </td>
                     <td style={{ padding: '4px 4px' }}>
-                      <select value={l.rate_type} onChange={e => updateLine(l.id, { rate_type: e.target.value as RateType })} className="lt-select" style={{ padding: '6px 8px' }}>
+                      <select value={l.rate_type} onChange={e => updateLine(l.id, { rate_type: e.target.value as RateType })} style={{ ...INPUT_STYLE, padding: '6px 8px' }}>
                         {RATE_TYPES.map(r => <option key={r} value={r}>{r}</option>)}
                       </select>
                     </td>
                     <td style={{ padding: '4px 4px' }}>
-                      <input type="number" value={l.base_rate_usd} onChange={e => updateLine(l.id, { base_rate_usd: Number(e.target.value) })} className="lt-input" style={{ width: 80, padding: '6px 8px' }} />
+                      <input type="number" value={l.base_rate_usd} onChange={e => updateLine(l.id, { base_rate_usd: Number(e.target.value) })} style={{ ...INPUT_STYLE, width: 80, padding: '6px 8px' }} />
                     </td>
                     <td style={{ padding: '4px 4px' }}>
-                      <input type="number" value={l.transit_days} onChange={e => updateLine(l.id, { transit_days: Number(e.target.value) })} className="lt-input" style={{ width: 60, padding: '6px 8px' }} />
+                      <input type="number" value={l.transit_days} onChange={e => updateLine(l.id, { transit_days: Number(e.target.value) })} style={{ ...INPUT_STYLE, width: 60, padding: '6px 8px' }} />
                     </td>
                     <td style={{ padding: '4px 4px' }}>
-                      <input type="number" value={l.free_time_days} onChange={e => updateLine(l.id, { free_time_days: Number(e.target.value) })} className="lt-input" style={{ width: 60, padding: '6px 8px' }} />
+                      <input type="number" value={l.free_time_days} onChange={e => updateLine(l.id, { free_time_days: Number(e.target.value) })} style={{ ...INPUT_STYLE, width: 60, padding: '6px 8px' }} />
                     </td>
                     <td style={{ padding: '4px 4px' }}>
-                      <input value={l.transshipment_points} onChange={e => updateLine(l.id, { transshipment_points: e.target.value })} className="lt-input" style={{ width: 110, padding: '6px 8px' }} />
+                      <input value={l.transshipment_points} onChange={e => updateLine(l.id, { transshipment_points: e.target.value })} style={{ ...INPUT_STYLE, width: 110, padding: '6px 8px' }} />
                     </td>
                     <td style={{ padding: '4px 4px' }}>
-                      <input type="number" value={l.destination_charges_usd} onChange={e => updateLine(l.id, { destination_charges_usd: Number(e.target.value) })} className="lt-input" style={{ width: 80, padding: '6px 8px' }} />
+                      <input type="number" value={l.destination_charges_usd} onChange={e => updateLine(l.id, { destination_charges_usd: Number(e.target.value) })} style={{ ...INPUT_STYLE, width: 80, padding: '6px 8px' }} />
                     </td>
                     <td style={{ padding: '4px 4px' }}>
                       <button className="lt-icon-btn" onClick={() => removeLine(l.id)} disabled={lines.length === 1}><Trash2 size={11} /></button>
@@ -701,12 +694,12 @@ function QuoteBuilderModal({
         {/* Margin + employee + summary */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: 10, alignItems: 'flex-end', marginBottom: 14 }}>
           <div>
-            <label className="lt-label">Margin %</label>
-            <input type="number" value={margin} onChange={e => setMargin(Number(e.target.value))} className="lt-input" style={{ width: '100%' }} />
+            <label style={FIELD_LABEL}>Margin %</label>
+            <input type="number" value={margin} onChange={e => setMargin(Number(e.target.value))} style={INPUT_STYLE} />
           </div>
           <div>
-            <label className="lt-label">Created by</label>
-            <select value={createdBy} onChange={e => setCreatedBy(Number(e.target.value))} className="lt-select" style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}>
+            <label style={FIELD_LABEL}>Created by</label>
+            <select value={createdBy} onChange={e => setCreatedBy(Number(e.target.value))} style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}>
               {EMPLOYEES.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
             </select>
           </div>

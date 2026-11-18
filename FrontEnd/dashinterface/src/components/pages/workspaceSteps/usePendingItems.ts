@@ -54,7 +54,7 @@ export function usePendingItems(
           ? inq.containers.map((c, ci) => ({ container: c, containerIdx: ci }))
           : [{
               container: {
-                containerType: inq.container_type ?? '20 GP',
+                containerType: inq.container_type ?? '20GP',
                 quantity: inq.container_qty ?? 1,
                 weight: inq.cargo_weight ?? '',
                 commodityType: inq.commodity_type ?? 'Miscellaneous manufactured articles — furniture, toys',
@@ -111,10 +111,14 @@ export function usePendingItems(
           default:                    title = `${stage.label} — ${inq.customer_name}`
         }
 
-        // Attach saved rate request data for quotation-prep work items
-        const rateRequest = inq.workflow_stage === 'quotation-prep' && inq.inq_id
+        // Attach saved rate request data for quotation-prep and send-to-customer work items
+        const rateRequest = (inq.workflow_stage === 'quotation-prep' || inq.workflow_stage === 'quotation-sent') && inq.inq_id
           ? completedRateRequests.find(rr => rr.inq_id === inq.inq_id)
           : undefined
+
+        // Only show quotation-prep items that have a completed rate request
+        // (the backend's completed-for-quoting endpoint already filters by emp_id)
+        if (inq.workflow_stage === 'quotation-prep' && !rateRequest) continue
 
         pending.push({
           type: 'inquiry',
@@ -534,7 +538,10 @@ export function usePendingItems(
     // --- From KYC Pending Queue (GET /kyc/kyc-requests/pending) ---
     // CS and Sales see clients awaiting KYC initiation regardless of inquiry workflow stage
     if (!role || role === 'CS' || role === 'Sales') {
+      const seenCliIds = new Set<number>()
       for (const client of kycPendingClients) {
+        if (seenCliIds.has(client.cli_id)) continue
+        seenCliIds.add(client.cli_id)
         pending.push({
           type: 'inquiry',
           refId: `KYC-${client.cli_id}`,
@@ -576,8 +583,20 @@ export function usePendingItems(
       }
     }
 
+    // Deduplicate: same refId + actionKind + containerIdx should appear only once.
+    // This guards against data-source duplication (optimistic inserts, StrictMode
+    // double-fetches, or stale temp items surviving a refresh).
+    const seen = new Set<string>()
+    const deduped = pending.filter(item => {
+      const ci = item.sourceData?.containerIdx ?? 0
+      const key = `${item.refId}::${item.actionKind}::${ci}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+
     // Sort: urgent first, then by urgencySortKey (lower = more urgent), then newest first
-    pending.sort((a, b) => {
+    deduped.sort((a, b) => {
       if (a.urgentFlag !== b.urgentFlag) return a.urgentFlag ? -1 : 1
       // If both have urgencySortKey, sort by it (lower = more urgent)
       const aKey = a.urgencySortKey ?? Infinity
@@ -588,7 +607,7 @@ export function usePendingItems(
       return b.createdAt.localeCompare(a.createdAt)
     })
 
-    return { pendingItems: pending }
+    return { pendingItems: deduped }
   }, [inquiries, bookings, quotes, customers, activityLog, activeRole, kycPendingClients, kycRequests, completedRateRequests]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return { pendingItems }

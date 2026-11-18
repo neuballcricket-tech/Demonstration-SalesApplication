@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { ArrowLeft, Check, DollarSign, FileText, FileSpreadsheet, Plus, Upload, X } from 'lucide-react'
 import {
-  RATE_SOURCE_COLORS, portOptions,
+  RATE_SOURCE_COLORS, portOptions, linerDisplay,
   type PortRecord, type LinerRecord, type TradeLaneRecord, type EmployeeRecord, type ClientRecord,
   type RateSourceType,
 } from '../../types'
 import { apiGetPorts, apiGetLiners, apiGetTradeLanes, apiGetEmployeesDb, apiGetClientsDb, apiCreateTariffRate, apiCreateContractedRate, apiCreateNacRate, apiPreviewBulkTariffRates, apiBulkCreateTariffRates, type BulkTariffPreviewRow } from '../../api'
 import TagInput from '../shared/TagInput'
+import { FIELD_LABEL, INPUT_STYLE } from './pageStyles'
 
 interface TariffContainerRate {
   containerType: string
@@ -191,8 +192,8 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
         apiCreateTariffRate({
           lin_id: rrLinerId !== '' ? rrLinerId : undefined,
           tr_ln_id: 1,
-          updated_by: 1,
-          salesperson: 1,
+          updated_by: 6,
+          salesperson: 6,
           origin: rrOrigin,
           destination: rrDestination,
           valid_from: rrValidFrom || undefined,
@@ -216,13 +217,13 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
           valid_to: rrValidTo || undefined,
           contracted_volume: cc.contractedVolume.trim() ? (parseInt(cc.contractedVolume) || 0) : 0,
           container_type: cc.containerType || undefined,
-          updated_by: 1,
+          updated_by: 6,
           origin: rrOrigin,
           destination: rrDestination,
           rate: cc.rate,
           currency: cc.currency,
-          emp_id_sales: 1,
-          emp_id_cs: 1,
+          emp_id_sales: 6,
+          emp_id_cs: 6,
           free_time: rrFreeTime.trim() || undefined,
           max_weight: cc.weight.trim() ? parseInt(cc.weight) : undefined,
           note: rrNote || undefined,
@@ -251,8 +252,8 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
           rate: nc.rate,
           currency: nc.currency,
           contracted_volume: nc.contractedVolume.trim() ? (parseInt(nc.contractedVolume) || 0) : 0,
-          emp_id_sales: 1,
-          emp_id_cs: 1,
+          emp_id_sales: 6,
+          emp_id_cs: 6,
           free_time: rrFreeTime.trim() || undefined,
           max_weight: nc.weight.trim() ? parseInt(nc.weight) : undefined,
           note: rrNote || undefined,
@@ -274,15 +275,15 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
   const secDot = (color: string): React.CSSProperties => ({ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 })
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
         <button className="lt-icon-btn" onClick={mode === 'review' ? () => setMode('edit') : onGoBack} title={mode === 'review' ? 'Back to Edit' : 'Back to Workspace'} style={{ padding: 6 }}>
           <ArrowLeft size={18} />
         </button>
         <div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            {mode === 'review' ? <><FileText size={18} /> Review Rate</> : <><DollarSign size={18} /> Record Rate</>}
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            {mode === 'review' ? <><FileText size={18} style={{ color: '#0f8fa8' }} /> Review Rate</> : <><DollarSign size={18} style={{ color: '#0f8fa8' }} /> Record Rate</>}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
             {mode === 'review'
@@ -293,12 +294,12 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
       </div>
 
       {/* Form / Review */}
-      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
+      <div style={{ background: 'var(--bg-card, #fff)', border: '1px solid var(--border)', borderRadius: 10, padding: 18 }}>
 
         {mode === 'edit' && <>
         {/* Rate Type Selector */}
         <div style={{ marginBottom: 14 }}>
-          <label className="lt-label">Rate Type <span style={{ color: '#dc2626' }}>*</span></label>
+          <label style={FIELD_LABEL}>Rate Type <span style={{ color: '#dc2626' }}>*</span></label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
             {(['Tariff Rate', 'Contracted', 'NAC'] as RateSourceType[]).map(t => (
               <button
@@ -321,7 +322,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
         {/* Entry mode toggle — only for Tariff Rate */}
         {rrType === 'Tariff Rate' && (
           <div style={{ marginBottom: 14 }}>
-            <label className="lt-label">Entry Mode</label>
+            <label style={FIELD_LABEL}>Entry Mode</label>
             <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
               {([['manual', 'Manual Entry'], ['bulk', 'Excel Upload']] as const).map(([key, label]) => (
                 <button
@@ -350,16 +351,16 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             {/* Liner, Month, Year selectors */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
               <div>
-                <label className="lt-label">Liner <span style={{ color: '#dc2626' }}>*</span></label>
-                <select className="lt-select" style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+                <label style={FIELD_LABEL}>Liner <span style={{ color: '#dc2626' }}>*</span></label>
+                <select style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
                         value={bulkLinerId} onChange={e => setBulkLinerId(e.target.value === '' ? '' : Number(e.target.value))}>
                   <option value="">— Select liner —</option>
-                  {linerList.filter(l => ['ONE', 'PIL', 'LAEC', 'Standardized'].includes(l.name)).map(l => <option key={l.lin_id} value={l.lin_id}>{l.name}{l.is_on_inttra ? ' (INTTRA)' : ''}{l.has_portal ? ' (Portal)' : ''}</option>)}
+                  {linerList.filter(l => ['ONE', 'PIL', 'LAEC', 'Standardized'].includes(l.name)).map(l => <option key={l.lin_id} value={l.lin_id}>{linerDisplay(l)}{l.is_on_inttra ? ' (INTTRA)' : ''}{l.has_portal ? ' (Portal)' : ''}</option>)}
                 </select>
               </div>
               <div>
-                <label className="lt-label">Month <span style={{ color: '#dc2626' }}>*</span></label>
-                <select className="lt-select" style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+                <label style={FIELD_LABEL}>Month <span style={{ color: '#dc2626' }}>*</span></label>
+                <select style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
                         value={bulkMonth} onChange={e => setBulkMonth(Number(e.target.value))}>
                   {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, i) => (
                     <option key={i + 1} value={i + 1}>{m}</option>
@@ -367,8 +368,8 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
                 </select>
               </div>
               <div>
-                <label className="lt-label">Year <span style={{ color: '#dc2626' }}>*</span></label>
-                <select className="lt-select" style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+                <label style={FIELD_LABEL}>Year <span style={{ color: '#dc2626' }}>*</span></label>
+                <select style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
                         value={bulkYear} onChange={e => setBulkYear(Number(e.target.value))}>
                   {Array.from({ length: 5 }, (_, i) => now.getFullYear() - 1 + i).map(y => (
                     <option key={y} value={y}>{y}</option>
@@ -473,22 +474,22 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             {/* — Carrier & Service — */}
             <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['Tariff Rate'])} />Carrier & Service</div>
             <div>
-              <label className="lt-label">Liner <span style={{ color: '#dc2626' }}>*</span></label>
-              <select className="lt-select" style={selectStyle} value={rrLinerId} onChange={e => setRrLinerId(e.target.value === '' ? '' : Number(e.target.value))}>
+              <label style={FIELD_LABEL}>Liner <span style={{ color: '#dc2626' }}>*</span></label>
+              <select style={{ ...INPUT_STYLE, ...selectStyle }} value={rrLinerId} onChange={e => setRrLinerId(e.target.value === '' ? '' : Number(e.target.value))}>
                 <option value="">— Select liner —</option>
-                {linerList.map(l => <option key={l.lin_id} value={l.lin_id}>{l.name}{l.is_on_inttra ? ' (INTTRA)' : ''}{l.has_portal ? ' (Portal)' : ''}</option>)}
+                {linerList.map(l => <option key={l.lin_id} value={l.lin_id}>{linerDisplay(l)}{l.is_on_inttra ? ' (INTTRA)' : ''}{l.has_portal ? ' (Portal)' : ''}</option>)}
               </select>
             </div>
             <div>
-              <label className="lt-label">Trade Lane <span style={{ color: '#dc2626' }}>*</span></label>
-              <select className="lt-select" style={selectStyle} value={rrTradeLaneId} onChange={e => setRrTradeLaneId(e.target.value === '' ? '' : Number(e.target.value))}>
+              <label style={FIELD_LABEL}>Trade Lane <span style={{ color: '#dc2626' }}>*</span></label>
+              <select style={{ ...INPUT_STYLE, ...selectStyle }} value={rrTradeLaneId} onChange={e => setRrTradeLaneId(e.target.value === '' ? '' : Number(e.target.value))}>
                 <option value="">— Select trade lane —</option>
                 {tradeLaneList.map(t => <option key={t.trln_id} value={t.trln_id}>{t.trln_name}</option>)}
               </select>
             </div>
             <div>
-              <label className="lt-label">Salesperson</label>
-              <select className="lt-select" style={selectStyle} value={rrSalesPersonId} onChange={e => setRrSalesPersonId(e.target.value === '' ? '' : Number(e.target.value))}>
+              <label style={FIELD_LABEL}>Salesperson</label>
+              <select style={{ ...INPUT_STYLE, ...selectStyle }} value={rrSalesPersonId} onChange={e => setRrSalesPersonId(e.target.value === '' ? '' : Number(e.target.value))}>
                 <option value="">— Select salesperson —</option>
                 {dbEmployeeList.map(e => <option key={e.emp_id} value={e.emp_id}>{e.name}{e.desig ? ` (${e.desig})` : ''}</option>)}
               </select>
@@ -497,26 +498,26 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             {/* — Route — */}
             <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['Tariff Rate'])} />Route</div>
             <div>
-              <label className="lt-label">Origin <span style={{ color: '#dc2626' }}>*</span></label>
-              <input list="rr-tr-ports-origin" className="lt-input" style={{ width: '100%' }} value={rrOrigin} onChange={e => setRrOrigin(e.target.value)} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />
+              <label style={FIELD_LABEL}>Origin <span style={{ color: '#dc2626' }}>*</span></label>
+              <input list="rr-tr-ports-origin" style={INPUT_STYLE} value={rrOrigin} onChange={e => setRrOrigin(e.target.value)} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />
               <datalist id="rr-tr-ports-origin">
                 {portOptions(portList).map((o, i) => <option key={i} value={o.value} label={o.label} />)}
               </datalist>
             </div>
             <div>
-              <label className="lt-label">Destination <span style={{ color: '#dc2626' }}>*</span></label>
-              <input list="rr-tr-ports-dest" className="lt-input" style={{ width: '100%' }} value={rrDestination} onChange={e => setRrDestination(e.target.value)} placeholder="e.g. Hamburg/Germany or DEHAM" />
+              <label style={FIELD_LABEL}>Destination <span style={{ color: '#dc2626' }}>*</span></label>
+              <input list="rr-tr-ports-dest" style={INPUT_STYLE} value={rrDestination} onChange={e => setRrDestination(e.target.value)} placeholder="e.g. Hamburg/Germany or DEHAM" />
               <datalist id="rr-tr-ports-dest">
                 {portOptions(portList).map((o, i) => <option key={i} value={o.value} label={o.label} />)}
               </datalist>
             </div>
             <div>
-              <label className="lt-label">Free Time (days)</label>
-              <input className="lt-input" type="number" style={{ width: '100%' }} value={rrFreeTime} onChange={e => setRrFreeTime(e.target.value)} min={0} placeholder="e.g. 14" />
+              <label style={FIELD_LABEL}>Free Time (days)</label>
+              <input type="number" style={INPUT_STYLE} value={rrFreeTime} onChange={e => setRrFreeTime(e.target.value)} min={0} placeholder="e.g. 14" />
             </div>
             <div>
-              <label className="lt-label">Service Lane</label>
-              <input list="rr-tr-service-lanes" className="lt-input" style={{ width: '100%' }} value={rrServiceLane} onChange={e => setRrServiceLane(e.target.value)} placeholder="Type to filter..." />
+              <label style={FIELD_LABEL}>Service Lane</label>
+              <input list="rr-tr-service-lanes" style={INPUT_STYLE} value={rrServiceLane} onChange={e => setRrServiceLane(e.target.value)} placeholder="Type to filter..." />
               <datalist id="rr-tr-service-lanes">
                 {tradeLaneList.map(t => <option key={t.trln_id} value={t.trln_name} />)}
               </datalist>
@@ -524,12 +525,12 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             {/* — Validity — */}
             <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['Tariff Rate'])} />Validity</div>
             <div>
-              <label className="lt-label">Valid From <span style={{ color: '#dc2626' }}>*</span></label>
-              <input className="lt-input" type="date" style={{ width: '100%' }} value={rrValidFrom} onChange={e => setRrValidFrom(e.target.value)} />
+              <label style={FIELD_LABEL}>Valid From <span style={{ color: '#dc2626' }}>*</span></label>
+              <input type="date" style={INPUT_STYLE} value={rrValidFrom} onChange={e => setRrValidFrom(e.target.value)} />
             </div>
             <div>
-              <label className="lt-label">Valid To <span style={{ color: '#dc2626' }}>*</span></label>
-              <input className="lt-input" type="date" style={{ width: '100%' }} value={rrValidTo} onChange={e => setRrValidTo(e.target.value)} />
+              <label style={FIELD_LABEL}>Valid To <span style={{ color: '#dc2626' }}>*</span></label>
+              <input type="date" style={INPUT_STYLE} value={rrValidTo} onChange={e => setRrValidTo(e.target.value)} />
             </div>
 
             {/* — Container Rates — */}
@@ -539,24 +540,24 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             </div>
             <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 1fr 0.65fr 28px', gap: 8 }}>
-                <label className="lt-label" style={{ margin: 0 }}>Container Type <span style={{ color: '#dc2626' }}>*</span></label>
-                <label className="lt-label" style={{ margin: 0 }}>Max Weight</label>
-                <label className="lt-label" style={{ margin: 0 }}>Rate <span style={{ color: '#dc2626' }}>*</span></label>
-                <label className="lt-label" style={{ margin: 0 }}>Currency</label>
+                <label style={{ ...FIELD_LABEL, margin: 0 }}>Container Type <span style={{ color: '#dc2626' }}>*</span></label>
+                <label style={{ ...FIELD_LABEL, margin: 0 }}>Max Weight</label>
+                <label style={{ ...FIELD_LABEL, margin: 0 }}>Rate <span style={{ color: '#dc2626' }}>*</span></label>
+                <label style={{ ...FIELD_LABEL, margin: 0 }}>Currency</label>
                 <div />
               </div>
               {rrTariffContainers.map((ct, idx) => (
                 <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 1fr 0.65fr 28px', gap: 8, alignItems: 'center' }}>
-                  <select className="lt-select" style={{ width: '100%', fontSize: 12, padding: '8px 10px', borderRadius: 8 }} value={ct.containerType} onChange={e => updateTariffContainer(idx, { containerType: e.target.value })}>
+                  <select style={{ ...INPUT_STYLE, fontSize: 12, padding: '8px 10px', borderRadius: 8 }} value={ct.containerType} onChange={e => updateTariffContainer(idx, { containerType: e.target.value })}>
                     <option value="">— Select —</option>
                     <option value="20GP">20GP</option><option value="40GP">40GP</option><option value="40HC">40HC</option>
                     <option value="20 Reefer">20 Reefer</option><option value="40 Reefer">40 Reefer</option>
                     <option value="20 Flat Rack">20 Flat Rack</option><option value="40 Flat Rack">40 Flat Rack</option>
                     <option value="20 Open Tops">20 Open Tops</option><option value="40 Open Tops">40 Open Tops</option>
                   </select>
-                  <input className="lt-input" style={{ width: '100%' }} value={ct.weight} onChange={e => updateTariffContainer(idx, { weight: e.target.value })} placeholder="e.g. 28000 kg" />
-                  <input className="lt-input" type="number" style={{ width: '100%' }} value={ct.rate} onChange={e => updateTariffContainer(idx, { rate: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 2100.00" />
-                  <select className="lt-select" style={{ width: '100%', fontSize: 12, padding: '8px 6px', borderRadius: 8 }} value={ct.currency} onChange={e => updateTariffContainer(idx, { currency: e.target.value })}>
+                  <input style={INPUT_STYLE} value={ct.weight} onChange={e => updateTariffContainer(idx, { weight: e.target.value })} placeholder="e.g. 28000 kg" />
+                  <input type="number" style={INPUT_STYLE} value={ct.rate} onChange={e => updateTariffContainer(idx, { rate: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 2100.00" />
+                  <select style={{ ...INPUT_STYLE, fontSize: 12, padding: '8px 6px', borderRadius: 8 }} value={ct.currency} onChange={e => updateTariffContainer(idx, { currency: e.target.value })}>
                     <option value="USD">USD</option><option value="EUR">EUR</option><option value="LKR">LKR</option><option value="GBP">GBP</option><option value="SGD">SGD</option>
                   </select>
                   <button type="button" className="lt-icon-btn" title="Remove" style={{ padding: 3, opacity: rrTariffContainers.length > 1 ? 1 : 0.3, cursor: rrTariffContainers.length > 1 ? 'pointer' : 'not-allowed' }} disabled={rrTariffContainers.length === 1} onClick={() => removeTariffContainer(idx)}>
@@ -569,12 +570,12 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             {/* — Additional Information — */}
             <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['Tariff Rate'])} />Additional Information</div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label className="lt-label">Note</label>
-              <input className="lt-input" style={{ width: '100%' }} value={rrNote} onChange={e => setRrNote(e.target.value)} placeholder="Any notes..." />
+              <label style={FIELD_LABEL}>Note</label>
+              <input style={INPUT_STYLE} value={rrNote} onChange={e => setRrNote(e.target.value)} placeholder="Any notes..." />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label className="lt-label">Analysis Note</label>
-              <input className="lt-input" style={{ width: '100%' }} value={rrSpecialRemark} onChange={e => setRrSpecialRemark(e.target.value)} placeholder="Special remarks..." />
+              <label style={FIELD_LABEL}>Analysis Note</label>
+              <input style={INPUT_STYLE} value={rrSpecialRemark} onChange={e => setRrSpecialRemark(e.target.value)} placeholder="Special remarks..." />
             </div>
           </div>
         )}
@@ -585,25 +586,25 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             {/* — Contract & Assignment — */}
             <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['Contracted'])} />Contract & Assignment</div>
             <div>
-              <label className="lt-label">Contract Reference <span style={{ color: '#dc2626' }}>*</span></label>
-              <input className="lt-input" style={{ width: '100%' }} value={rrContractId} onChange={e => setRrContractId(e.target.value)} placeholder="Sent by the liner" />
+              <label style={FIELD_LABEL}>Contract Reference <span style={{ color: '#dc2626' }}>*</span></label>
+              <input style={INPUT_STYLE} value={rrContractId} onChange={e => setRrContractId(e.target.value)} placeholder="Sent by the liner" />
             </div>
             <div>
-              <label className="lt-label">Liner <span style={{ color: '#dc2626' }}>*</span></label>
-              <select className="lt-select" style={selectStyle} value={rrLinerId} onChange={e => setRrLinerId(e.target.value === '' ? '' : Number(e.target.value))}>
+              <label style={FIELD_LABEL}>Liner <span style={{ color: '#dc2626' }}>*</span></label>
+              <select style={{ ...INPUT_STYLE, ...selectStyle }} value={rrLinerId} onChange={e => setRrLinerId(e.target.value === '' ? '' : Number(e.target.value))}>
                 <option value="">— Select liner —</option>
-                {linerList.map(l => <option key={l.lin_id} value={l.lin_id}>{l.name}{l.is_on_inttra ? ' (INTTRA)' : ''}{l.has_portal ? ' (Portal)' : ''}</option>)}
+                {linerList.map(l => <option key={l.lin_id} value={l.lin_id}>{linerDisplay(l)}{l.is_on_inttra ? ' (INTTRA)' : ''}{l.has_portal ? ' (Portal)' : ''}</option>)}
               </select>
             </div>
             <div>
-              <label className="lt-label">Sales Person</label>
-              <select className="lt-select" style={selectStyle} value={rrSalesPersonId} onChange={e => setRrSalesPersonId(e.target.value === '' ? '' : Number(e.target.value))}>
+              <label style={FIELD_LABEL}>Sales Person</label>
+              <select style={{ ...INPUT_STYLE, ...selectStyle }} value={rrSalesPersonId} onChange={e => setRrSalesPersonId(e.target.value === '' ? '' : Number(e.target.value))}>
                 <option value="">— Select salesperson —</option>
                 {dbEmployeeList.map(e => <option key={e.emp_id} value={e.emp_id}>{e.name}{e.desig ? ` (${e.desig})` : ''}</option>)}
               </select>
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label className="lt-label">Applicable Customers</label>
+              <label style={FIELD_LABEL}>Applicable Customers</label>
               <TagInput
                 values={rrApplicableCustomers}
                 onChange={setRrApplicableCustomers}
@@ -615,26 +616,26 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             {/* — Route — */}
             <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['Contracted'])} />Route</div>
             <div>
-              <label className="lt-label">Origin <span style={{ color: '#dc2626' }}>*</span></label>
-              <input list="rr-c-ports-origin" className="lt-input" style={{ width: '100%' }} value={rrOrigin} onChange={e => setRrOrigin(e.target.value)} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />
+              <label style={FIELD_LABEL}>Origin <span style={{ color: '#dc2626' }}>*</span></label>
+              <input list="rr-c-ports-origin" style={INPUT_STYLE} value={rrOrigin} onChange={e => setRrOrigin(e.target.value)} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />
               <datalist id="rr-c-ports-origin">
                 {portOptions(portList).map((o, i) => <option key={i} value={o.value} label={o.label} />)}
               </datalist>
             </div>
             <div>
-              <label className="lt-label">Destination <span style={{ color: '#dc2626' }}>*</span></label>
-              <input list="rr-c-ports-dest" className="lt-input" style={{ width: '100%' }} value={rrDestination} onChange={e => setRrDestination(e.target.value)} placeholder="e.g. Hamburg/Germany or DEHAM" />
+              <label style={FIELD_LABEL}>Destination <span style={{ color: '#dc2626' }}>*</span></label>
+              <input list="rr-c-ports-dest" style={INPUT_STYLE} value={rrDestination} onChange={e => setRrDestination(e.target.value)} placeholder="e.g. Hamburg/Germany or DEHAM" />
               <datalist id="rr-c-ports-dest">
                 {portOptions(portList).map((o, i) => <option key={i} value={o.value} label={o.label} />)}
               </datalist>
             </div>
             <div>
-              <label className="lt-label">Free Time (days)</label>
-              <input className="lt-input" type="number" style={{ width: '100%' }} value={rrFreeTime} onChange={e => setRrFreeTime(e.target.value)} min={0} placeholder="e.g. 14" />
+              <label style={FIELD_LABEL}>Free Time (days)</label>
+              <input type="number" style={INPUT_STYLE} value={rrFreeTime} onChange={e => setRrFreeTime(e.target.value)} min={0} placeholder="e.g. 14" />
             </div>
             <div>
-              <label className="lt-label">Service Lane</label>
-              <input list="rr-service-lanes" className="lt-input" style={{ width: '100%' }} value={rrServiceLane} onChange={e => setRrServiceLane(e.target.value)} placeholder="Type to filter..." />
+              <label style={FIELD_LABEL}>Service Lane</label>
+              <input list="rr-service-lanes" style={INPUT_STYLE} value={rrServiceLane} onChange={e => setRrServiceLane(e.target.value)} placeholder="Type to filter..." />
               <datalist id="rr-service-lanes">
                 {tradeLaneList.map(t => <option key={t.trln_id} value={t.trln_name} />)}
               </datalist>
@@ -642,12 +643,12 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             {/* — Validity — */}
             <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['Contracted'])} />Validity</div>
             <div>
-              <label className="lt-label">Valid From <span style={{ color: '#dc2626' }}>*</span></label>
-              <input className="lt-input" type="date" style={{ width: '100%' }} value={rrValidFrom} onChange={e => setRrValidFrom(e.target.value)} />
+              <label style={FIELD_LABEL}>Valid From <span style={{ color: '#dc2626' }}>*</span></label>
+              <input type="date" style={INPUT_STYLE} value={rrValidFrom} onChange={e => setRrValidFrom(e.target.value)} />
             </div>
             <div>
-              <label className="lt-label">Valid To <span style={{ color: '#dc2626' }}>*</span></label>
-              <input className="lt-input" type="date" style={{ width: '100%' }} value={rrValidTo} onChange={e => setRrValidTo(e.target.value)} />
+              <label style={FIELD_LABEL}>Valid To <span style={{ color: '#dc2626' }}>*</span></label>
+              <input type="date" style={INPUT_STYLE} value={rrValidTo} onChange={e => setRrValidTo(e.target.value)} />
             </div>
 
             {/* — Container Rates — */}
@@ -657,23 +658,23 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             </div>
             <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.65fr 0.75fr 0.85fr 0.6fr 28px', gap: 8 }}>
-                <label className="lt-label" style={{ margin: 0 }}>Container Type <span style={{ color: '#dc2626' }}>*</span></label>
-                <label className="lt-label" style={{ margin: 0 }}>Contracted TUs</label>
-                <label className="lt-label" style={{ margin: 0 }}>Max Weight</label>
-                <label className="lt-label" style={{ margin: 0 }}>Rate <span style={{ color: '#dc2626' }}>*</span></label>
-                <label className="lt-label" style={{ margin: 0 }}>Currency</label>
+                <label style={{ ...FIELD_LABEL, margin: 0 }}>Container Type <span style={{ color: '#dc2626' }}>*</span></label>
+                <label style={{ ...FIELD_LABEL, margin: 0 }}>Contracted TUs</label>
+                <label style={{ ...FIELD_LABEL, margin: 0 }}>Max Weight</label>
+                <label style={{ ...FIELD_LABEL, margin: 0 }}>Rate <span style={{ color: '#dc2626' }}>*</span></label>
+                <label style={{ ...FIELD_LABEL, margin: 0 }}>Currency</label>
                 <div />
               </div>
               {rrContractedContainers.map((cc, idx) => (
                 <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.65fr 0.75fr 0.85fr 0.6fr 28px', gap: 8, alignItems: 'center' }}>
-                  <select className="lt-select" style={{ width: '100%', fontSize: 12, padding: '8px 10px', borderRadius: 8 }} value={cc.containerType} onChange={e => updateContractedContainer(idx, { containerType: e.target.value })}>
+                  <select style={{ ...INPUT_STYLE, fontSize: 12, padding: '8px 10px', borderRadius: 8 }} value={cc.containerType} onChange={e => updateContractedContainer(idx, { containerType: e.target.value })}>
                     <option value="">— Select —</option>
                     <option value="20GP">20GP</option><option value="40GP">40GP</option><option value="40HC">40HC</option>
                   </select>
-                  <input className="lt-input" type="number" style={{ width: '100%' }} value={cc.contractedVolume} onChange={e => updateContractedContainer(idx, { contractedVolume: e.target.value })} min={0} placeholder="e.g. 500" />
-                  <input className="lt-input" style={{ width: '100%' }} value={cc.weight} onChange={e => updateContractedContainer(idx, { weight: e.target.value })} placeholder="e.g. 28000 kg" />
-                  <input className="lt-input" type="number" style={{ width: '100%' }} value={cc.rate} onChange={e => updateContractedContainer(idx, { rate: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 2450.00" />
-                  <select className="lt-select" style={{ width: '100%', fontSize: 12, padding: '8px 6px', borderRadius: 8 }} value={cc.currency} onChange={e => updateContractedContainer(idx, { currency: e.target.value })}>
+                  <input type="number" style={INPUT_STYLE} value={cc.contractedVolume} onChange={e => updateContractedContainer(idx, { contractedVolume: e.target.value })} min={0} placeholder="e.g. 500" />
+                  <input style={INPUT_STYLE} value={cc.weight} onChange={e => updateContractedContainer(idx, { weight: e.target.value })} placeholder="e.g. 28000 kg" />
+                  <input type="number" style={INPUT_STYLE} value={cc.rate} onChange={e => updateContractedContainer(idx, { rate: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 2450.00" />
+                  <select style={{ ...INPUT_STYLE, fontSize: 12, padding: '8px 6px', borderRadius: 8 }} value={cc.currency} onChange={e => updateContractedContainer(idx, { currency: e.target.value })}>
                     <option value="USD">USD</option><option value="EUR">EUR</option><option value="LKR">LKR</option><option value="GBP">GBP</option><option value="SGD">SGD</option>
                   </select>
                   <button type="button" className="lt-icon-btn" title="Remove" style={{ padding: 3, opacity: rrContractedContainers.length > 1 ? 1 : 0.3, cursor: rrContractedContainers.length > 1 ? 'pointer' : 'not-allowed' }} disabled={rrContractedContainers.length === 1} onClick={() => removeContractedContainer(idx)}>
@@ -686,12 +687,12 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             {/* — Additional Information — */}
             <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['Contracted'])} />Additional Information</div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label className="lt-label">Note</label>
-              <input className="lt-input" style={{ width: '100%' }} value={rrNote} onChange={e => setRrNote(e.target.value)} placeholder="Any notes..." />
+              <label style={FIELD_LABEL}>Note</label>
+              <input style={INPUT_STYLE} value={rrNote} onChange={e => setRrNote(e.target.value)} placeholder="Any notes..." />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label className="lt-label">Analysis Note</label>
-              <input className="lt-input" style={{ width: '100%' }} value={rrSpecialRemark} onChange={e => setRrSpecialRemark(e.target.value)} placeholder="Special remarks..." />
+              <label style={FIELD_LABEL}>Analysis Note</label>
+              <input style={INPUT_STYLE} value={rrSpecialRemark} onChange={e => setRrSpecialRemark(e.target.value)} placeholder="Special remarks..." />
             </div>
           </div>
         )}
@@ -702,19 +703,19 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             {/* — Customer & Reference — */}
             <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['NAC'])} />Customer & Reference</div>
             <div>
-              <label className="lt-label">NAC Reference No</label>
-              <input className="lt-input" style={{ width: '100%' }} value={rrNacRefNo} onChange={e => setRrNacRefNo(e.target.value)} placeholder="e.g. NAC-2026-001" />
+              <label style={FIELD_LABEL}>NAC Reference No</label>
+              <input style={INPUT_STYLE} value={rrNacRefNo} onChange={e => setRrNacRefNo(e.target.value)} placeholder="e.g. NAC-2026-001" />
             </div>
             <div>
-              <label className="lt-label">Customer Name <span style={{ color: '#dc2626' }}>*</span></label>
-              <input list="rr-nac-clients" className="lt-input" style={{ width: '100%' }} value={rrNacCustomerName} onChange={e => setRrNacCustomerName(e.target.value)} placeholder="Type to filter..." />
+              <label style={FIELD_LABEL}>Customer Name <span style={{ color: '#dc2626' }}>*</span></label>
+              <input list="rr-nac-clients" style={INPUT_STYLE} value={rrNacCustomerName} onChange={e => setRrNacCustomerName(e.target.value)} placeholder="Type to filter..." />
               <datalist id="rr-nac-clients">
                 {dbClientList.map(c => <option key={c.cli_id} value={c.name} />)}
               </datalist>
             </div>
             <div>
-              <label className="lt-label">Sales Person <span style={{ color: '#dc2626' }}>*</span></label>
-              <select className="lt-select" style={selectStyle} value={rrSalesPersonId} onChange={e => setRrSalesPersonId(e.target.value === '' ? '' : Number(e.target.value))}>
+              <label style={FIELD_LABEL}>Sales Person <span style={{ color: '#dc2626' }}>*</span></label>
+              <select style={{ ...INPUT_STYLE, ...selectStyle }} value={rrSalesPersonId} onChange={e => setRrSalesPersonId(e.target.value === '' ? '' : Number(e.target.value))}>
                 <option value="">— Select salesperson —</option>
                 {dbEmployeeList.map(e => <option key={e.emp_id} value={e.emp_id}>{e.name}{e.desig ? ` (${e.desig})` : ''}</option>)}
               </select>
@@ -723,40 +724,40 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             {/* — Carrier & Route — */}
             <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['NAC'])} />Carrier & Route</div>
             <div>
-              <label className="lt-label">Liner <span style={{ color: '#dc2626' }}>*</span></label>
-              <select className="lt-select" style={selectStyle} value={rrLinerId} onChange={e => setRrLinerId(e.target.value === '' ? '' : Number(e.target.value))}>
+              <label style={FIELD_LABEL}>Liner <span style={{ color: '#dc2626' }}>*</span></label>
+              <select style={{ ...INPUT_STYLE, ...selectStyle }} value={rrLinerId} onChange={e => setRrLinerId(e.target.value === '' ? '' : Number(e.target.value))}>
                 <option value="">— Select liner —</option>
-                {linerList.map(l => <option key={l.lin_id} value={l.lin_id}>{l.name}{l.is_on_inttra ? ' (INTTRA)' : ''}{l.has_portal ? ' (Portal)' : ''}</option>)}
+                {linerList.map(l => <option key={l.lin_id} value={l.lin_id}>{linerDisplay(l)}{l.is_on_inttra ? ' (INTTRA)' : ''}{l.has_portal ? ' (Portal)' : ''}</option>)}
               </select>
             </div>
             <div>
-              <label className="lt-label">Origin <span style={{ color: '#dc2626' }}>*</span></label>
-              <input list="rr-nac-ports-origin" className="lt-input" style={{ width: '100%' }} value={rrOrigin} onChange={e => setRrOrigin(e.target.value)} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />
+              <label style={FIELD_LABEL}>Origin <span style={{ color: '#dc2626' }}>*</span></label>
+              <input list="rr-nac-ports-origin" style={INPUT_STYLE} value={rrOrigin} onChange={e => setRrOrigin(e.target.value)} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />
               <datalist id="rr-nac-ports-origin">
                 {portOptions(portList).map((o, i) => <option key={i} value={o.value} label={o.label} />)}
               </datalist>
             </div>
             <div>
-              <label className="lt-label">Destination <span style={{ color: '#dc2626' }}>*</span></label>
-              <input list="rr-nac-ports-dest" className="lt-input" style={{ width: '100%' }} value={rrDestination} onChange={e => setRrDestination(e.target.value)} placeholder="e.g. Hamburg/Germany or DEHAM" />
+              <label style={FIELD_LABEL}>Destination <span style={{ color: '#dc2626' }}>*</span></label>
+              <input list="rr-nac-ports-dest" style={INPUT_STYLE} value={rrDestination} onChange={e => setRrDestination(e.target.value)} placeholder="e.g. Hamburg/Germany or DEHAM" />
               <datalist id="rr-nac-ports-dest">
                 {portOptions(portList).map((o, i) => <option key={i} value={o.value} label={o.label} />)}
               </datalist>
             </div>
             <div>
-              <label className="lt-label">Free Time (days)</label>
-              <input className="lt-input" type="number" style={{ width: '100%' }} value={rrFreeTime} onChange={e => setRrFreeTime(e.target.value)} min={0} placeholder="e.g. 14" />
+              <label style={FIELD_LABEL}>Free Time (days)</label>
+              <input type="number" style={INPUT_STYLE} value={rrFreeTime} onChange={e => setRrFreeTime(e.target.value)} min={0} placeholder="e.g. 14" />
             </div>
 
             {/* — Validity — */}
             <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['NAC'])} />Validity</div>
             <div>
-              <label className="lt-label">Valid From <span style={{ color: '#dc2626' }}>*</span></label>
-              <input className="lt-input" type="date" style={{ width: '100%' }} value={rrValidFrom} onChange={e => setRrValidFrom(e.target.value)} />
+              <label style={FIELD_LABEL}>Valid From <span style={{ color: '#dc2626' }}>*</span></label>
+              <input type="date" style={INPUT_STYLE} value={rrValidFrom} onChange={e => setRrValidFrom(e.target.value)} />
             </div>
             <div>
-              <label className="lt-label">Valid To <span style={{ color: '#dc2626' }}>*</span></label>
-              <input className="lt-input" type="date" style={{ width: '100%' }} value={rrValidTo} onChange={e => setRrValidTo(e.target.value)} />
+              <label style={FIELD_LABEL}>Valid To <span style={{ color: '#dc2626' }}>*</span></label>
+              <input type="date" style={INPUT_STYLE} value={rrValidTo} onChange={e => setRrValidTo(e.target.value)} />
             </div>
 
             {/* — Container Rates — */}
@@ -766,23 +767,23 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             </div>
             <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.65fr 0.75fr 0.85fr 0.6fr 28px', gap: 8 }}>
-                <label className="lt-label" style={{ margin: 0 }}>Container Type <span style={{ color: '#dc2626' }}>*</span></label>
-                <label className="lt-label" style={{ margin: 0 }}>Contracted TUs</label>
-                <label className="lt-label" style={{ margin: 0 }}>Max Weight</label>
-                <label className="lt-label" style={{ margin: 0 }}>Rate <span style={{ color: '#dc2626' }}>*</span></label>
-                <label className="lt-label" style={{ margin: 0 }}>Currency</label>
+                <label style={{ ...FIELD_LABEL, margin: 0 }}>Container Type <span style={{ color: '#dc2626' }}>*</span></label>
+                <label style={{ ...FIELD_LABEL, margin: 0 }}>Contracted TUs</label>
+                <label style={{ ...FIELD_LABEL, margin: 0 }}>Max Weight</label>
+                <label style={{ ...FIELD_LABEL, margin: 0 }}>Rate <span style={{ color: '#dc2626' }}>*</span></label>
+                <label style={{ ...FIELD_LABEL, margin: 0 }}>Currency</label>
                 <div />
               </div>
               {rrNacContainers.map((nc, idx) => (
                 <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.65fr 0.75fr 0.85fr 0.6fr 28px', gap: 8, alignItems: 'center' }}>
-                  <select className="lt-select" style={{ width: '100%', fontSize: 12, padding: '8px 10px', borderRadius: 8 }} value={nc.containerType} onChange={e => updateNacContainer(idx, { containerType: e.target.value })}>
+                  <select style={{ ...INPUT_STYLE, fontSize: 12, padding: '8px 10px', borderRadius: 8 }} value={nc.containerType} onChange={e => updateNacContainer(idx, { containerType: e.target.value })}>
                     <option value="">— Select —</option>
                     <option value="20GP">20GP</option><option value="40GP">40GP</option><option value="40HC">40HC</option>
                   </select>
-                  <input className="lt-input" type="number" style={{ width: '100%' }} value={nc.contractedVolume} onChange={e => updateNacContainer(idx, { contractedVolume: e.target.value })} min={0} placeholder="e.g. 500" />
-                  <input className="lt-input" style={{ width: '100%' }} value={nc.weight} onChange={e => updateNacContainer(idx, { weight: e.target.value })} placeholder="e.g. 28000 kg" />
-                  <input className="lt-input" type="number" style={{ width: '100%' }} value={nc.rate} onChange={e => updateNacContainer(idx, { rate: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 3200.00" />
-                  <select className="lt-select" style={{ width: '100%', fontSize: 12, padding: '8px 6px', borderRadius: 8 }} value={nc.currency} onChange={e => updateNacContainer(idx, { currency: e.target.value })}>
+                  <input type="number" style={INPUT_STYLE} value={nc.contractedVolume} onChange={e => updateNacContainer(idx, { contractedVolume: e.target.value })} min={0} placeholder="e.g. 500" />
+                  <input style={INPUT_STYLE} value={nc.weight} onChange={e => updateNacContainer(idx, { weight: e.target.value })} placeholder="e.g. 28000 kg" />
+                  <input type="number" style={INPUT_STYLE} value={nc.rate} onChange={e => updateNacContainer(idx, { rate: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 3200.00" />
+                  <select style={{ ...INPUT_STYLE, fontSize: 12, padding: '8px 6px', borderRadius: 8 }} value={nc.currency} onChange={e => updateNacContainer(idx, { currency: e.target.value })}>
                     <option value="USD">USD</option><option value="EUR">EUR</option><option value="LKR">LKR</option><option value="GBP">GBP</option><option value="SGD">SGD</option>
                   </select>
                   <button type="button" className="lt-icon-btn" title="Remove" style={{ padding: 3, opacity: rrNacContainers.length > 1 ? 1 : 0.3, cursor: rrNacContainers.length > 1 ? 'pointer' : 'not-allowed' }} disabled={rrNacContainers.length === 1} onClick={() => removeNacContainer(idx)}>
@@ -795,12 +796,12 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             {/* — Additional Information — */}
             <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['NAC'])} />Additional Information</div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label className="lt-label">Note</label>
-              <input className="lt-input" style={{ width: '100%' }} value={rrNote} onChange={e => setRrNote(e.target.value)} placeholder="Any notes..." />
+              <label style={FIELD_LABEL}>Note</label>
+              <input style={INPUT_STYLE} value={rrNote} onChange={e => setRrNote(e.target.value)} placeholder="Any notes..." />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label className="lt-label">Analysis Note</label>
-              <input className="lt-input" style={{ width: '100%' }} value={rrSpecialRemark} onChange={e => setRrSpecialRemark(e.target.value)} placeholder="Special remarks..." />
+              <label style={FIELD_LABEL}>Analysis Note</label>
+              <input style={INPUT_STYLE} value={rrSpecialRemark} onChange={e => setRrSpecialRemark(e.target.value)} placeholder="Special remarks..." />
             </div>
           </div>
         )}

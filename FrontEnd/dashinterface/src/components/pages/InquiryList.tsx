@@ -1,14 +1,15 @@
 import { useMemo, useState, useRef, useEffect } from 'react'
-import { Eye, CheckCircle2, MessageSquarePlus, X, Edit3, Send, Trash2, Check } from 'lucide-react'
+import { Eye, CheckCircle2, MessageSquarePlus, X, Edit3, Send, Trash2, Check, ListChecks } from 'lucide-react'
 import {
-  EMPLOYEES, SBUS, INQUIRY_PRIORITIES, COMMODITY_TYPES, CONTAINER_TYPES, WORKFLOW_STAGES, ROLE_LABELS, ROLE_COLORS, stageRoleLabel, stageRoleColor, findCustomer,
+  EMPLOYEES, SBUS, INQUIRY_PRIORITIES, COMMODITY_TYPES, CONTAINER_TYPES, CONTAINER_TYPE_LABELS, WORKFLOW_STAGES, ROLE_LABELS, ROLE_COLORS, stageRoleLabel, stageRoleColor, findCustomer,
   type Inquiry, type InquiryStatus, type Followup, type Customer, type SBU, type CustomerTier,
   type Quote, type QuoteStatus, type WorkflowStage, type InquiryPriority, type ContainerLine,
-  type LinerRecord,
+  type LinerRecord, linerDisplay,
 } from '../../types'
 import { apiGetLiners } from '../../api'
 import { useRole } from '../../RoleContext'
 import CustomerEditModal from '../shared/CustomerEditModal'
+import { PAGE_WRAPPER_WIDE, PAGE_TITLE_ROW, PAGE_TITLE_ICON, PAGE_TITLE_H2, CARD, SECTION_LABEL, TABLE_TH, FIELD_LABEL, INPUT_STYLE } from './pageStyles'
 
 interface InquiryListProps {
   inquiries: Inquiry[]
@@ -60,12 +61,13 @@ const BE_PRIORITY_REV: Record<string, string> = {
   Low: 'LOW', Medium: 'MEDIUM', High: 'HIGH', Urgent: 'URGENT',
 }
 
-// Reverse-map frontend ContainerType labels → backend container_type codes for PATCH
+// Frontend container type codes now match backend directly — this map is identity for safety.
 const BE_CONTAINER_TYPE_REV: Record<string, string> = {
-  '20 GP': '20GP', '40 GP': '40GP', '40 HC': '40HC',
-  '20 REEFER': '20RF', '40 REEFER': '40RF',
-  '20 OPEN TOP': '20OT', '40 OPEN TOP': '40OT',
-  '20 FLAT RACK': '20FR', '40 FLAT RACK': '40FR',
+  '20GP': '20GP', '40GP': '40GP', '40HC': '40HC',
+  '20RF': '20RF', '40RF': '40RF',
+  '20OT': '20OT', '40OT': '40OT',
+  '20FR': '20FR', '40FR': '40FR',
+  'TANKER': 'TANKER',
 }
 
 type ContainerDraft = {
@@ -150,7 +152,7 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
         rows.push({
           inquiry: inq,
           container: {
-            containerType: inq.container_type ?? '20 GP',
+            containerType: inq.container_type ?? '20GP',
             quantity: inq.container_qty ?? 1,
             weight: inq.cargo_weight ?? '',
             commodityType: inq.commodity_type ?? 'Miscellaneous manufactured articles — furniture, toys',
@@ -268,38 +270,33 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
   }
 
   return (
-    <div className="db-page-anim">
-      <div className="db-page-head">
-        <div className="db-page-head-row">
-          <div>
-            <h1 className="db-page-title">Inquiry List</h1>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-              View, filter and manage all customer inquiries
-            </div>
-          </div>
-        </div>
+    <div style={PAGE_WRAPPER_WIDE}>
+      <div style={PAGE_TITLE_ROW}>
+        <ListChecks size={18} style={PAGE_TITLE_ICON} />
+        <h2 style={PAGE_TITLE_H2}>Inquiries</h2>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+          View, filter and manage all customer inquiries
+        </span>
       </div>
 
       {/* Filters */}
-      <div className="db-chart-card" style={{ marginBottom: 18 }}>
+      <div style={{ ...CARD, marginBottom: 18 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
           <div>
-            <label className="lt-label">By Customer</label>
+            <label style={FIELD_LABEL}>By Customer</label>
             <input
               value={customerFilter}
               onChange={e => setCustomerFilter(e.target.value)}
               placeholder="Search customer name..."
-              className="lt-input"
-              style={{ width: '100%' }}
+              style={INPUT_STYLE}
             />
           </div>
           <div>
-            <label className="lt-label">By Status</label>
+            <label style={FIELD_LABEL}>By Status</label>
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value as StatusFilter)}
-              className="lt-select"
-              style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+              style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
             >
               <option value="all">All</option>
               <option value="pending">Pending</option>
@@ -307,12 +304,11 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
             </select>
           </div>
           <div>
-            <label className="lt-label">By Priority</label>
+            <label style={FIELD_LABEL}>By Priority</label>
             <select
               value={priorityFilter}
               onChange={e => setPriorityFilter(e.target.value as PriorityFilter)}
-              className="lt-select"
-              style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+              style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
             >
               <option value="all">All</option>
               {INQUIRY_PRIORITIES.map(p => (
@@ -321,12 +317,11 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
             </select>
           </div>
           <div>
-            <label className="lt-label">By SBU</label>
+            <label style={FIELD_LABEL}>By SBU</label>
             <select
               value={sbuFilter}
               onChange={e => setSbuFilter(e.target.value as SBUFilter)}
-              className="lt-select"
-              style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+              style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
             >
               <option value="all">All</option>
               {SBUS.map(s => (
@@ -335,12 +330,11 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
             </select>
           </div>
           <div>
-            <label className="lt-label">By Salesperson</label>
+            <label style={FIELD_LABEL}>By Salesperson</label>
             <select
               value={employeeFilter}
               onChange={e => setEmployeeFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-              className="lt-select"
-              style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+              style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
             >
               <option value="all">All</option>
               {EMPLOYEES.map(emp => (
@@ -349,44 +343,41 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
             </select>
           </div>
           <div>
-            <label className="lt-label">By Date</label>
+            <label style={FIELD_LABEL}>By Date</label>
             <input
               type="date"
               value={dateFilter}
               onChange={e => setDateFilter(e.target.value)}
-              className="lt-input"
-              style={{ width: '100%' }}
+              style={INPUT_STYLE}
             />
           </div>
         </div>
       </div>
 
       {/* Table */}
-      <div className="db-chart-card">
-        <div className="db-chart-head">
-          <div>
-            <div className="db-chart-title">Inquiries</div>
-            <div className="db-chart-sub">{isProcurement ? `Showing ${procRows.length} container lines from ${filtered.length} inquiries` : `Showing ${filtered.length} of ${inquiries.length}`}</div>
-          </div>
+      <div style={CARD}>
+        <div style={{ marginBottom: 14 }}>
+          <div style={SECTION_LABEL}>Inquiries</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{isProcurement ? `Showing ${procRows.length} container lines from ${filtered.length} inquiries` : `Showing ${filtered.length} of ${inquiries.length}`}</div>
         </div>
 
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.06em' }}>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Inquiry ID</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Customer</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Origin → Destination</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Priority</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Container</th>
-                {isProcurement && <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Commodity</th>}
-                {isProcurement && <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Free Time</th>}
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>SBU</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Status</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Quote</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Salesperson</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Cargo Ready Date</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Actions</th>
+              <tr>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Inquiry ID</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Customer</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Origin → Destination</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Priority</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Container</th>
+                {isProcurement && <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Commodity</th>}
+                {isProcurement && <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Free Time</th>}
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>SBU</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Status</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Quote</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Salesperson</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Cargo Ready Date</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -819,8 +810,7 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
                 </div>
                 <textarea
                   ref={followupRef}
-                  className="lt-input"
-                  style={{ width: '100%', minHeight: 60, resize: 'vertical', marginBottom: 8, fontSize: 12 }}
+                  style={{ ...INPUT_STYLE, minHeight: 60, resize: 'vertical', marginBottom: 8, fontSize: 12 }}
                   placeholder="Write a follow-up note..."
                   value={followupNote}
                   onChange={e => setFollowupNote(e.target.value)}
@@ -871,20 +861,18 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label className="lt-label">Origin</label>
+                <label style={FIELD_LABEL}>Origin</label>
                 <input
-                  className="lt-input"
-                  style={{ width: '100%' }}
+                  style={INPUT_STYLE}
                   value={editDraft.origin}
                   onChange={e => setEditDraft(d => d && ({ ...d, origin: e.target.value }))}
                   placeholder="e.g. Colombo"
                 />
               </div>
               <div>
-                <label className="lt-label">SBU</label>
+                <label style={FIELD_LABEL}>SBU</label>
                 <select
-                  className="lt-select"
-                  style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+                  style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
                   value={editDraft.sbu}
                   onChange={e => setEditDraft(d => d && ({ ...d, sbu: e.target.value }))}
                 >
@@ -893,10 +881,9 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
                 </select>
               </div>
               <div>
-                <label className="lt-label">Priority</label>
+                <label style={FIELD_LABEL}>Priority</label>
                 <select
-                  className="lt-select"
-                  style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+                  style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
                   value={editDraft.priority}
                   onChange={e => setEditDraft(d => d && ({ ...d, priority: e.target.value }))}
                 >
@@ -905,10 +892,9 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
                 </select>
               </div>
               <div>
-                <label className="lt-label">Delivery Type</label>
+                <label style={FIELD_LABEL}>Delivery Type</label>
                 <select
-                  className="lt-select"
-                  style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+                  style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
                   value={editDraft.delivery_type}
                   onChange={e => setEditDraft(d => d && ({ ...d, delivery_type: e.target.value as 'door-to-door' | 'port-to-port' | 'port-to-door' | 'door-to-port' }))}
                 >
@@ -919,31 +905,28 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
                 </select>
               </div>
               <div>
-                <label className="lt-label">Incoterm</label>
+                <label style={FIELD_LABEL}>Incoterm</label>
                 <input
-                  className="lt-input"
-                  style={{ width: '100%' }}
+                  style={INPUT_STYLE}
                   value={editDraft.incoterm}
                   onChange={e => setEditDraft(d => d && ({ ...d, incoterm: e.target.value }))}
                   placeholder="e.g. FOB, CIF, EXW, DDP"
                 />
               </div>
               <div>
-                <label className="lt-label">Cargo Ready Date</label>
+                <label style={FIELD_LABEL}>Cargo Ready Date</label>
                 <input
                   type="date"
-                  className="lt-input"
-                  style={{ width: '100%' }}
+                  style={INPUT_STYLE}
                   value={editDraft.cargo_ready_date}
                   onChange={e => setEditDraft(d => d && ({ ...d, cargo_ready_date: e.target.value }))}
                 />
               </div>
               <div>
-                <label className="lt-label">Preferred Rate (USD)</label>
+                <label style={FIELD_LABEL}>Preferred Rate (USD)</label>
                 <input
                   type="number"
-                  className="lt-input"
-                  style={{ width: '100%' }}
+                  style={INPUT_STYLE}
                   value={editDraft.preferred_rate}
                   onChange={e => setEditDraft(d => d && ({ ...d, preferred_rate: e.target.value }))}
                   placeholder="e.g. 1200"
@@ -951,17 +934,16 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
                 />
               </div>
               <div>
-                <label className="lt-label">Preferred Liners</label>
+                <label style={FIELD_LABEL}>Preferred Liners</label>
                 <input
                   list="il-liners"
-                  className="lt-input"
-                  style={{ width: '100%' }}
+                  style={INPUT_STYLE}
                   value={editDraft.preferred_liners}
                   onChange={e => setEditDraft(d => d && ({ ...d, preferred_liners: e.target.value }))}
                   placeholder="e.g. MSC, Maersk, CMA CGM"
                 />
                 <datalist id="il-liners">
-                  {linerList.map(l => <option key={l.lin_id} value={l.name} />)}
+                  {linerList.map(l => <option key={l.lin_id} value={l.name}>{linerDisplay(l)}</option>)}
                 </datalist>
               </div>
             </div>
@@ -976,10 +958,9 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
                     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Container {ci + 1}</div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                       <div>
-                        <label className="lt-label">Commodity Type</label>
+                        <label style={FIELD_LABEL}>Commodity Type</label>
                         <select
-                          className="lt-select"
-                          style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+                          style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
                           value={cd.com_type}
                           onChange={e => updateContainerDraft(ci, { com_type: e.target.value })}
                         >
@@ -987,53 +968,48 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
                         </select>
                       </div>
                       <div>
-                        <label className="lt-label">HS Code</label>
+                        <label style={FIELD_LABEL}>HS Code</label>
                         <input
-                          className="lt-input"
-                          style={{ width: '100%' }}
+                          style={INPUT_STYLE}
                           value={cd.hs_code}
                           onChange={e => updateContainerDraft(ci, { hs_code: e.target.value })}
                           placeholder="e.g. 6205.20"
                         />
                       </div>
                       <div>
-                        <label className="lt-label">Weight (kg)</label>
+                        <label style={FIELD_LABEL}>Weight (kg)</label>
                         <input
                           type="number"
-                          className="lt-input"
-                          style={{ width: '100%' }}
+                          style={INPUT_STYLE}
                           value={cd.weight}
                           onChange={e => updateContainerDraft(ci, { weight: e.target.value })}
                           min={0}
                         />
                       </div>
                       <div>
-                        <label className="lt-label">Container Type</label>
+                        <label style={FIELD_LABEL}>Container Type</label>
                         <select
-                          className="lt-select"
-                          style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+                          style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
                           value={cd.container_type}
                           onChange={e => updateContainerDraft(ci, { container_type: e.target.value })}
                         >
-                          {CONTAINER_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                          {CONTAINER_TYPES.map(t => <option key={t} value={t}>{CONTAINER_TYPE_LABELS[t]}</option>)}
                         </select>
                       </div>
                       <div>
-                        <label className="lt-label">Quantity</label>
+                        <label style={FIELD_LABEL}>Quantity</label>
                         <input
                           type="number"
-                          className="lt-input"
-                          style={{ width: '100%' }}
+                          style={INPUT_STYLE}
                           value={cd.qty}
                           onChange={e => updateContainerDraft(ci, { qty: e.target.value })}
                           min={1}
                         />
                       </div>
                       <div>
-                        <label className="lt-label">Load Type</label>
+                        <label style={FIELD_LABEL}>Load Type</label>
                         <select
-                          className="lt-select"
-                          style={{ width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+                          style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
                           value={cd.is_fully_loaded ? 'fcl' : 'lcl'}
                           onChange={e => updateContainerDraft(ci, { is_fully_loaded: e.target.value === 'fcl' })}
                         >
@@ -1042,51 +1018,46 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
                         </select>
                       </div>
                       <div>
-                        <label className="lt-label">Destination</label>
+                        <label style={FIELD_LABEL}>Destination</label>
                         <input
-                          className="lt-input"
-                          style={{ width: '100%' }}
+                          style={INPUT_STYLE}
                           value={cd.destination}
                           onChange={e => updateContainerDraft(ci, { destination: e.target.value })}
                           placeholder="e.g. Hamburg"
                         />
                       </div>
                       <div>
-                        <label className="lt-label">Zip Code</label>
+                        <label style={FIELD_LABEL}>Zip Code</label>
                         <input
-                          className="lt-input"
-                          style={{ width: '100%' }}
+                          style={INPUT_STYLE}
                           value={cd.zip_code}
                           onChange={e => updateContainerDraft(ci, { zip_code: e.target.value })}
                         />
                       </div>
                       <div>
-                        <label className="lt-label">Address</label>
+                        <label style={FIELD_LABEL}>Address</label>
                         <input
-                          className="lt-input"
-                          style={{ width: '100%' }}
+                          style={INPUT_STYLE}
                           value={cd.address}
                           onChange={e => updateContainerDraft(ci, { address: e.target.value })}
                           placeholder="Door delivery address"
                         />
                       </div>
                       <div>
-                        <label className="lt-label">Free Time (days)</label>
+                        <label style={FIELD_LABEL}>Free Time (days)</label>
                         <input
                           type="number"
-                          className="lt-input"
-                          style={{ width: '100%' }}
+                          style={INPUT_STYLE}
                           value={cd.free_time}
                           onChange={e => updateContainerDraft(ci, { free_time: e.target.value })}
                           min={0}
                         />
                       </div>
                       <div>
-                        <label className="lt-label">Temperature (°C)</label>
+                        <label style={FIELD_LABEL}>Temperature (°C)</label>
                         <input
                           type="number"
-                          className="lt-input"
-                          style={{ width: '100%' }}
+                          style={INPUT_STYLE}
                           value={cd.temperature}
                           onChange={e => updateContainerDraft(ci, { temperature: e.target.value })}
                           placeholder="Reefer only"

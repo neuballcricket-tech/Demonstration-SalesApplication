@@ -29,13 +29,15 @@ export const CS_STEPS: StepDef[] = [
   { key: 'cs-record-si',   label: 'Record SI',         actionKinds: ['submit-si'],        stepNumber: 10, group: 'post-cutoff' },
 
   { key: 'cs-generate-si', label: 'Generate SI',       actionKinds: ['generate-si'],          stepNumber: 10, group: 'post-cutoff' },
-  { key: 'cs-bl-vessel',   label: 'Vessel',            actionKinds: ['save-vessel-schedule'], stepNumber: 11 },
-  { key: 'cs-bl-booking',  label: 'Booking Creation', actionKinds: ['create-vessel-booking'], stepNumber: 12 },
-  { key: 'cs-draft-bl',    label: 'Draft BL',          actionKinds: ['save-draft-bl'],        stepNumber: 13 },
-  { key: 'cs-create-hbl',  label: 'Create HBL',        actionKinds: ['create-hbl'],           stepNumber: 14 },
-  { key: 'cs-create-bl',   label: 'Create MBL',        actionKinds: ['create-bl'],            stepNumber: 15 },
-  { key: 'cs-pre-advice',  label: 'Pre-Advice',        actionKinds: ['send-pre-advice'],      stepNumber: 16 },
-  { key: 'cs-pre-alert',   label: 'Pre-Alert',         actionKinds: ['send-pre-alert'],       stepNumber: 17 },
+
+  // --- Steps 11–17: BL processing pipeline — reserved for future release ---
+  // { key: 'cs-bl-vessel',   label: 'Vessel',           actionKinds: ['save-vessel-schedule'],  stepNumber: 11 },
+  // { key: 'cs-bl-booking',  label: 'Booking Creation', actionKinds: ['create-vessel-booking'], stepNumber: 12 },
+  // { key: 'cs-draft-bl',    label: 'Draft BL',         actionKinds: ['save-draft-bl'],         stepNumber: 13 },
+  // { key: 'cs-create-hbl',  label: 'Create HBL',       actionKinds: ['create-hbl'],            stepNumber: 14 },
+  // { key: 'cs-create-bl',   label: 'Create MBL',       actionKinds: ['create-bl'],             stepNumber: 15 },
+  // { key: 'cs-pre-advice',  label: 'Pre-Advice',       actionKinds: ['send-pre-advice'],       stepNumber: 16 },
+  // { key: 'cs-pre-alert',   label: 'Pre-Alert',        actionKinds: ['send-pre-alert'],        stepNumber: 17 },
 ]
 
 export const FINANCE_STEPS: StepDef[] = [

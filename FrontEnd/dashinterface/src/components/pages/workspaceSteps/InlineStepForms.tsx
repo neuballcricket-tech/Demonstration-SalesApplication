@@ -7,12 +7,15 @@ import {
 } from "lucide-react"
 import { MOCK_OPEN_VOYAGES } from "../../../mockData"
 import {
-  ROLE_LABELS, daysUntil, type UserRole,
+  ROLE_LABELS, daysUntil, linerDisplay, type UserRole,
   type Booking, type LinerRecord, type ReleaseOrderFields,
+  type Inquiry, type ContainerLine,
 } from "../../../types"
-import type { KycPendingClient, QuotationOptionRow } from "../../../api"
-import type { WorkspaceItem, BlContainerRow, MblContainerRow } from "./types"
-import { empName, openMailto } from "./utils"
+import { apiGetQuotationFile, type KycPendingClient, type QuotationOptionRow, type UnsentQuotation } from "../../../api"
+import type { CompletedRateRequest } from "../../../types"
+import type { WorkspaceItem, BlContainerRow, MblContainerRow, QuotationOptionOverride } from "./types"
+import { empName, openMailto, buildRateSection, generateQuotationPdf } from "./utils"
+import { lookupQuotationId } from "./useWorkspaceActions"
 
 export interface InlineStepFormsProps {
   selectedItem: WorkspaceItem
@@ -43,6 +46,11 @@ export interface InlineStepFormsProps {
   customerDecision: "accepted" | "rejected"; setCustomerDecision: (v: "accepted" | "rejected") => void
   quotationOptions: QuotationOptionRow[]; quotationOptionsLoading: boolean
   selectedOptionRateId: number | null; setSelectedOptionRateId: (v: number | null) => void
+  selectedRateOptionIds: Set<number>; setSelectedRateOptionIds: React.Dispatch<React.SetStateAction<Set<number>>>
+  bestRateOptionId: number | null; setBestRateOptionId: (v: number | null) => void
+  optionOverrides: Record<number, QuotationOptionOverride>; setOptionOverrides: React.Dispatch<React.SetStateAction<Record<number, QuotationOptionOverride>>>
+  quotationContent: string; setQuotationContent: (v: string) => void
+  quoteCopied: boolean; setQuoteCopied: (v: boolean) => void
   cutoffLiner: string; setCutoffLiner: (v: string) => void
   cutoffMode: "paste" | "upload"; setCutoffMode: (v: "paste" | "upload") => void
   cutoffContent: string; setCutoffContent: (v: string) => void
@@ -129,6 +137,8 @@ export interface InlineStepFormsProps {
   linerList: LinerRecord[]
   bookings: Booking[]
   vesselSchedules: import("../../../types").VesselSchedule[]
+  unsentQuotations: UnsentQuotation[]
+  lastQuotationId: number | null
   activeEmployee: { id: number; name: string }
   activeRole: string
   handleModalSubmit: () => void
@@ -158,6 +168,11 @@ export default function InlineStepForms({
   kycDocForm20, setKycDocForm20,
   customerDecision, setCustomerDecision, quotationOptions, quotationOptionsLoading,
   selectedOptionRateId, setSelectedOptionRateId,
+  selectedRateOptionIds, setSelectedRateOptionIds,
+  bestRateOptionId, setBestRateOptionId,
+  optionOverrides, setOptionOverrides,
+  quotationContent, setQuotationContent,
+  quoteCopied, setQuoteCopied,
   cutoffLiner, setCutoffLiner, cutoffMode, setCutoffMode,
   cutoffContent, setCutoffContent, cutoffFileName, setCutoffFileName,
   cutoffNotes, setCutoffNotes, cutoffSiDate, setCutoffSiDate,
@@ -201,12 +216,50 @@ export default function InlineStepForms({
   bkBookingType, setBkBookingType, bkReeferTemp, setBkReeferTemp,
   bkDeliveryAgent, setBkDeliveryAgent, bkSpecificRouting, setBkSpecificRouting,
   bkRaNumber, setBkRaNumber, formNote, setFormNote,
-  linerList, bookings, vesselSchedules, activeEmployee, activeRole,
+  linerList, bookings, vesselSchedules, unsentQuotations, lastQuotationId, activeEmployee, activeRole,
   handleModalSubmit, handleAction,
   onAddVesselSchedule, onMarkBlVesselConfirmed, onMarkBlBookingCreated,
   onLogActivity, onFlash, setActionModal,
   setVesselCreatedPrompt, setActiveStep,
 }: InlineStepFormsProps) {
+  // PDF download state for send-to-customer step
+  const [pdfDownloading, setPdfDownloading] = React.useState(false)
+  const [pdfDownloaded, setPdfDownloaded] = React.useState(false)
+
+  // Auto-initialise state when send-to-customer is auto-selected (no card click yet)
+  React.useEffect(() => {
+    if (selectedItem.actionKind === 'send-to-customer' && !actionModal) {
+      handleAction(selectedItem)
+    }
+  }, [selectedItem.actionKind, selectedItem.refId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Regenerate the RATE OPTIONS section of the quotation draft when margins/selections change
+  React.useEffect(() => {
+    if (selectedItem.actionKind !== 'prepare-quotation' || !actionModal) return
+    const { rateRequest: rr } = actionModal.sourceData as { rateRequest?: CompletedRateRequest }
+    if (!rr) return
+
+    const selectedArr = Array.from(selectedRateOptionIds)
+    const rateSection = buildRateSection(rr, selectedArr, bestRateOptionId, linerList, actionModal.previousContext, optionOverrides)
+
+    setQuotationContent(prev => {
+      // Splice the updated RATE OPTIONS block into the existing quotation text
+      const marker = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+      const rateHeaderIdx = prev.indexOf('RATE OPTIONS')
+      if (rateHeaderIdx === -1) return prev
+      // Find the divider line after RATE OPTIONS header
+      const afterHeader = prev.indexOf(marker, rateHeaderIdx)
+      if (afterHeader === -1) return prev
+      const sectionStart = afterHeader + marker.length + 1 // skip past the divider + newline
+      // Find the next divider (marks the start of TERMS or next section)
+      const sectionEnd = prev.indexOf(marker, sectionStart)
+      if (sectionEnd === -1) return prev
+      // Replace the content between the two dividers
+      return prev.slice(0, sectionStart) + rateSection + '\n\n' + prev.slice(sectionEnd)
+    })
+    setQuoteCopied(false)
+  }, [selectedRateOptionIds, bestRateOptionId, optionOverrides]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <>
 {selectedItem.actionKind === 'send-kyc' && actionModal ? (() => {
@@ -216,7 +269,7 @@ export default function InlineStepForms({
       {/* Header */}
       <div style={{ padding: '10px 14px', background: '#0891b2', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
         <ShieldCheck size={14} style={{ color: '#fff' }} />
-        <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>KYC — CHECK DOCUMENTS</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>KYC — CHECK DOCUMENTS</span>
       </div>
 
       {/* Pre-fetched client registry data */}
@@ -369,6 +422,262 @@ export default function InlineStepForms({
       </div>
     </div>
   )
+})() : selectedItem.actionKind === 'prepare-quotation' && actionModal ? (() => {
+  const { inquiry: pqInq, container: pqCont, rateRequest: pqRr } = actionModal.sourceData as {
+    inquiry: import('../../../types').Inquiry; container: import('../../../types').ContainerLine; rateRequest?: CompletedRateRequest
+  }
+  const pqOptions = pqRr?.options.filter(o => o.rate) ?? []
+  const pqDest = pqCont?.destination || pqInq.destination
+  const pqContainerLabel = pqCont ? `${pqCont.quantity}× ${pqCont.containerType}` : ''
+  const pqCommodity = pqCont?.commodityType || pqInq.commodity_type || ''
+
+  const computeFinal = (optId: number, baseRate: number) => {
+    const ovr = optionOverrides[optId]
+    if (!ovr) return baseRate
+    return ovr.isPercentage ? baseRate * (1 + ovr.margin / 100) : baseRate + ovr.margin
+  }
+
+  // Check if any selected option has zero or negative margin
+  const hasInvalidMargin = pqOptions.some(opt => {
+    if (!selectedRateOptionIds.has(opt.option_id)) return false
+    const ovr = optionOverrides[opt.option_id]
+    if (!ovr) return true // no override means margin=0
+    return ovr.margin <= 0
+  })
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+      {/* Header */}
+      <div style={{ padding: '8px 14px', background: 'var(--accent)', borderRadius: '8px 8px 0 0', marginBottom: 1 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>PREPARE QUOTATION</span>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginLeft: 10 }}>
+          Select rates, set margins, and review before sending
+        </span>
+      </div>
+
+      {/* Fields */}
+      <div style={{ border: '1px solid var(--border)', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
+        {/* Customer row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Customer</div>
+          <div style={{ padding: '8px 10px', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
+            {pqInq.customer_name}{pqInq.tier ? ` (${pqInq.tier})` : ''}
+          </div>
+        </div>
+
+        {/* Route row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Route</div>
+          <div style={{ padding: '8px 10px', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
+            {pqInq.origin} → {pqDest}
+          </div>
+        </div>
+
+        {/* Cargo row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Cargo</div>
+          <div style={{ padding: '8px 10px', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
+            {pqContainerLabel}{pqCommodity ? ` · ${pqCommodity}` : ''}
+          </div>
+        </div>
+
+        {/* RATE OPTIONS section divider */}
+        <div style={{ padding: '7px 12px', background: 'rgba(15,143,168,0.12)', borderBottom: '1px solid var(--border)' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: 0.4 }}>RATE OPTIONS</span>
+          <span style={{ fontSize: 9, color: 'var(--text-muted)', marginLeft: 8 }}>{pqOptions.length} option{pqOptions.length !== 1 ? 's' : ''}</span>
+        </div>
+
+        {/* Rate options table header */}
+        {pqOptions.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 110px 80px 100px 80px 1fr', borderBottom: '1px solid var(--border)', background: 'var(--bg-card)' }}>
+            <div style={{ padding: '6px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center' }}></div>
+            <div style={{ padding: '6px 8px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', borderRight: '1px solid var(--border)' }}>LINER / VESSEL</div>
+            <div style={{ padding: '6px 8px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center', borderRight: '1px solid var(--border)' }}>SCHEDULE</div>
+            <div style={{ padding: '6px 8px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'right', borderRight: '1px solid var(--border)' }}>RATE</div>
+            <div style={{ padding: '6px 8px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center', borderRight: '1px solid var(--border)' }}>MARGIN</div>
+            <div style={{ padding: '6px 8px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'right', borderRight: '1px solid var(--border)' }}>FINAL</div>
+            <div style={{ padding: '6px 8px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>REMARK</div>
+          </div>
+        )}
+
+        {/* Rate option rows */}
+        {pqOptions.map((opt, idx) => {
+          const r = opt.rate!
+          const isSelected = selectedRateOptionIds.has(opt.option_id)
+          const isBest = bestRateOptionId === opt.option_id
+          const ovr = optionOverrides[opt.option_id] ?? { margin: 0, isPercentage: true, remark: '' }
+          const baseRate = r.rate ?? 0
+          const finalAmt = computeFinal(opt.option_id, baseRate)
+          const linerName = r.lin_id ? (linerList.find(l => l.lin_id === r.lin_id)?.name ?? `Liner #${r.lin_id}`) : opt.rate_type.replace(/_/g, ' ')
+          const typeLabel = opt.rate_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+          const isLast = idx === pqOptions.length - 1
+          const fmtShort = (d: string | null | undefined) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : null
+          const vesselLabel = opt.vessel_name || r.vessel_name || null
+          const voyageLabel = opt.voyage_number || null
+
+          return (
+            <div key={opt.option_id} style={{
+              display: 'grid',
+              gridTemplateColumns: '36px 1fr 110px 80px 100px 80px 1fr',
+              borderBottom: isLast ? undefined : '1px solid var(--border)',
+              opacity: isSelected ? 1 : 0.4,
+              background: isBest ? 'rgba(22,163,74,0.04)' : undefined,
+            }}>
+              {/* Checkbox + best star */}
+              <div style={{ padding: '6px 4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                <input type="checkbox" checked={isSelected}
+                  onChange={() => {
+                    setSelectedRateOptionIds(prev => {
+                      const next = new Set(prev)
+                      if (next.has(opt.option_id)) next.delete(opt.option_id)
+                      else next.add(opt.option_id)
+                      return next
+                    })
+                  }}
+                  style={{ cursor: 'pointer' }}
+                />
+                <button type="button" title={isBest ? 'Best rate' : 'Mark as best'}
+                  onClick={() => setBestRateOptionId(isBest ? null : opt.option_id)}
+                  style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, fontSize: 13, lineHeight: 1, color: isBest ? '#f59e0b' : 'var(--text-muted)' }}>
+                  {isBest ? '★' : '☆'}
+                </button>
+              </div>
+
+              {/* Liner / Vessel info */}
+              <div style={{ padding: '6px 8px', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{linerName}</span>
+                {vesselLabel && <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{vesselLabel}{voyageLabel ? ` / ${voyageLabel}` : ''}</span>}
+                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{typeLabel}{opt.service_name ? ` · ${opt.service_name}` : ''}</span>
+              </div>
+
+              {/* Schedule — ETD / ETA / Cutoff */}
+              <div style={{ padding: '5px 8px', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1 }}>
+                {(opt.etd_pol || opt.eta_pod) ? (<>
+                  {opt.etd_pol && <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>ETD {fmtShort(opt.etd_pol)}</div>}
+                  {opt.eta_pod && <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>ETA {fmtShort(opt.eta_pod)}</div>}
+                  {opt.bk_cutoff && <div style={{ fontSize: 9, color: '#b45309' }}>Cut {fmtShort(opt.bk_cutoff)}</div>}
+                </>) : (
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{r.transit ? `${r.transit}d transit` : '—'}</span>
+                )}
+              </div>
+
+              {/* Base rate */}
+              <div style={{ padding: '6px 8px', borderRight: '1px solid var(--border)', textAlign: 'right', fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                {baseRate.toLocaleString()} {r.currency ?? 'USD'}
+              </div>
+
+              {/* Margin input + toggle */}
+              <div style={{ padding: '4px 4px', borderRight: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 2 }}>
+                <input className="lt-input" type="number" step="any"
+                  style={{ width: 48, border: `1px solid ${isSelected && ovr.margin <= 0 ? '#dc2626' : 'var(--border)'}`, borderRadius: 4, background: isSelected && ovr.margin <= 0 ? 'rgba(220,38,38,0.04)' : 'transparent', padding: '3px 4px', textAlign: 'right', fontSize: 11 }}
+                  value={ovr.margin}
+                  onChange={e => {
+                    const val = parseFloat(e.target.value) || 0
+                    setOptionOverrides(prev => ({ ...prev, [opt.option_id]: { ...ovr, margin: val } }))
+                  }}
+                  disabled={!isSelected}
+                />
+                <button type="button"
+                  style={{ border: '1px solid var(--border)', borderRadius: 4, background: 'transparent', cursor: 'pointer', padding: '2px 4px', fontSize: 10, fontWeight: 600, color: ovr.isPercentage ? 'var(--accent)' : 'var(--text-muted)', minWidth: 24, textAlign: 'center' }}
+                  onClick={() => setOptionOverrides(prev => ({ ...prev, [opt.option_id]: { ...ovr, isPercentage: !ovr.isPercentage } }))}
+                  disabled={!isSelected}
+                  title={ovr.isPercentage ? 'Percentage markup' : 'Flat amount markup'}>
+                  {ovr.isPercentage ? '%' : '$'}
+                </button>
+              </div>
+
+              {/* Final amount */}
+              <div style={{ padding: '6px 8px', borderRight: '1px solid var(--border)', textAlign: 'right', fontSize: 12, fontWeight: 700, color: isBest ? '#16a34a' : 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+                {(Math.round(finalAmt * 100) / 100).toLocaleString()}
+              </div>
+
+              {/* Remark input */}
+              <div style={{ padding: '4px 6px', display: 'flex', alignItems: 'center' }}>
+                <input className="lt-input"
+                  style={{ width: '100%', border: 'none', background: 'transparent', padding: '3px 0', fontSize: 11 }}
+                  value={ovr.remark}
+                  onChange={e => setOptionOverrides(prev => ({ ...prev, [opt.option_id]: { ...ovr, remark: e.target.value } }))}
+                  placeholder="Add remark…"
+                  disabled={!isSelected}
+                />
+              </div>
+            </div>
+          )
+        })}
+
+        {pqOptions.length === 0 && (
+          <div style={{ padding: '16px 12px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+            No rate options available. Rate check may not have been completed.
+          </div>
+        )}
+
+        {/* QUOTATION DOCUMENT section divider */}
+        <div style={{ padding: '7px 12px', background: 'rgba(15,143,168,0.12)', borderBottom: '1px solid var(--border)' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: 0.4 }}>QUOTATION DOCUMENT</span>
+        </div>
+
+        {/* Quotation textarea */}
+        <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border)' }}>
+          <textarea
+            className="lt-input"
+            style={{ width: '100%', minHeight: 140, border: '1px solid var(--border)', borderRadius: 6, background: 'transparent', padding: '8px 10px', fontSize: 11, fontFamily: 'monospace', resize: 'vertical' }}
+            value={quotationContent}
+            onChange={e => { setQuotationContent(e.target.value); setQuoteCopied(false) }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+            <button type="button"
+              style={{ border: '1px solid var(--border)', borderRadius: 4, background: 'transparent', cursor: 'pointer', padding: '3px 10px', fontSize: 11, fontWeight: 600, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 4 }}
+              onClick={() => generateQuotationPdf(
+                pqInq,
+                pqCont,
+                pqOptions,
+                selectedRateOptionIds,
+                bestRateOptionId,
+                optionOverrides,
+                linerList,
+                activeEmployee.name,
+                computeFinal,
+              )}>
+              <FileText size={11} /> Download PDF
+            </button>
+            <button type="button"
+              style={{ border: '1px solid var(--border)', borderRadius: 4, background: quoteCopied ? 'rgba(22,163,74,0.08)' : 'transparent', cursor: 'pointer', padding: '3px 10px', fontSize: 11, fontWeight: 600, color: quoteCopied ? '#16a34a' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}
+              onClick={() => { navigator.clipboard.writeText(quotationContent); setQuoteCopied(true) }}>
+              {quoteCopied ? <><ClipboardCheck size={11} /> Copied</> : <><Copy size={11} /> Copy to Clipboard</>}
+            </button>
+          </div>
+        </div>
+
+        {/* Notes row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr' }}>
+          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Notes</div>
+          <div style={{ padding: '4px 8px' }}>
+            <input className="lt-input" style={{ width: '100%', border: 'none', background: 'transparent', padding: '4px 0' }}
+              value={formNote} onChange={e => setFormNote(e.target.value)}
+              placeholder="Internal notes (optional)"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Margin warning */}
+      {hasInvalidMargin && selectedRateOptionIds.size > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', marginTop: 12, background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, fontSize: 12, color: '#dc2626' }}>
+          <AlertTriangle size={14} />
+          <span>One or more selected options have a <strong>zero or negative margin</strong>. Special permission is required to proceed with non-positive margins.</span>
+        </div>
+      )}
+
+      {/* Submit */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+        <button className="db-btn primary"
+          disabled={(selectedRateOptionIds.size === 0 && pqOptions.length > 0) || hasInvalidMargin}
+          onClick={handleModalSubmit}>
+          <Send size={12} /> Save Quotation
+        </button>
+      </div>
+    </div>
+  )
 })() : selectedItem.actionKind === 'customer-response' && actionModal ? (() => {
   const ctx = actionModal.previousContext
   const crDisabled = customerDecision === 'accepted' && quotationOptions.length > 0 && selectedOptionRateId == null
@@ -377,7 +686,7 @@ export default function InlineStepForms({
       {/* Header */}
       <div style={{ padding: '10px 14px', background: '#7c3aed', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
         <MessageSquare size={14} style={{ color: '#fff' }} />
-        <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>RECORD CUSTOMER RESPONSE</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>RECORD CUSTOMER RESPONSE</span>
       </div>
 
       {/* Previous context */}
@@ -450,10 +759,10 @@ export default function InlineStepForms({
                     }} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
-                        Option {opt.option_id}
+                        {opt.vessel ? `${opt.vessel}${opt.voyage ? ` / ${opt.voyage}` : ''}` : `Option ${opt.option_id}`}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
-                        {opt.option_currency ?? 'USD'} {opt.amt != null ? Number(opt.amt).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '—'}
+                        {opt.option_currency ?? 'USD'} {opt.final_amt != null ? Number(opt.final_amt).toLocaleString(undefined, { minimumFractionDigits: 2 }) : opt.amt != null ? Number(opt.amt).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '—'}
                         {opt.rate_id != null && <span style={{ marginLeft: 8, color: 'var(--text-muted)' }}>Rate #{opt.rate_id}</span>}
                       </div>
                     </div>
@@ -551,7 +860,7 @@ export default function InlineStepForms({
           onChange={e => setCutoffLiner(e.target.value)}
           placeholder="e.g. Maersk, MSC, Hapag-Lloyd" />
         <datalist id="ws-cut-liners-inline">
-          {linerList.map(l => <option key={l.lin_id} value={l.name} />)}
+          {linerList.map(l => <option key={l.lin_id} value={l.name}>{linerDisplay(l)}</option>)}
         </datalist>
       </div>
 
@@ -1347,7 +1656,7 @@ export default function InlineStepForms({
           <div style={{ padding: '10px 14px', background: '#7c3aed', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <FileText size={14} style={{ color: '#fff' }} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>RELEASE ORDER — REVIEW</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>RELEASE ORDER — REVIEW</span>
             </div>
             <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>Step 1 of 2</span>
           </div>
@@ -1433,7 +1742,7 @@ export default function InlineStepForms({
           <div style={{ padding: '10px 14px', background: '#7c3aed', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Send size={14} style={{ color: '#fff' }} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>RELEASE TO CUSTOMER</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>RELEASE TO CUSTOMER</span>
             </div>
             <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>Step 2 of 2</span>
           </div>
@@ -1593,7 +1902,7 @@ export default function InlineStepForms({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {/* Header */}
       <div style={{ padding: '8px 14px', background: '#7c3aed', borderRadius: '8px 8px 0 0', marginBottom: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>RELEASE ORDER</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>RELEASE ORDER</span>
         <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>Attach & send to CS</span>
       </div>
       {/* Booking summary — read-only */}
@@ -1724,7 +2033,7 @@ export default function InlineStepForms({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {/* Form header */}
       <div style={{ padding: '8px 14px', background: '#16a34a', borderRadius: '8px 8px 0 0', marginBottom: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>LINER BOOKING CONFIRMATION</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>LINER BOOKING CONFIRMATION</span>
         <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>RA# {cbBkg.voyage_number || '—'}</span>
       </div>
       {/* Booking summary — read-only */}
@@ -1785,7 +2094,7 @@ export default function InlineStepForms({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {/* Header */}
       <div style={{ padding: '8px 14px', background: '#0891b2', borderRadius: '8px 8px 0 0', marginBottom: 1 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>RECORD SHIPPING INSTRUCTIONS</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>RECORD SHIPPING INSTRUCTIONS</span>
       </div>
       <div style={{ border: '1px solid var(--border)', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
         {/* Booking summary */}
@@ -2050,7 +2359,7 @@ export default function InlineStepForms({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* Header */}
       <div style={{ padding: '8px 14px', background: '#0891b2', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>GENERATE SI</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>GENERATE SI</span>
         <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>{gsBkg.customer_name}</span>
       </div>
 
@@ -2309,7 +2618,7 @@ export default function InlineStepForms({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ padding: '8px 14px', background: '#0891b2', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>VESSEL SCHEDULE</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>VESSEL SCHEDULE</span>
         <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>{blBkg.customer_name} · {blBkg.origin} → {blBkg.destination}</span>
       </div>
 
@@ -2511,7 +2820,7 @@ export default function InlineStepForms({
       )}
 
       <div style={{ padding: '8px 14px', background: '#0891b2', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>BOOKING</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>BOOKING</span>
         <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>{blBkg.customer_name} · {blBkg.origin} → {blBkg.destination}</span>
       </div>
 
@@ -2786,7 +3095,7 @@ export default function InlineStepForms({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* Header banner */}
       <div style={{ padding: '8px 14px', background: '#d97706', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>HOUSE BILL OF LADING</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>HOUSE BILL OF LADING</span>
         <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>{chblBkg.customer_name} · {chblBkg.origin} → {chblBkg.destination}</span>
       </div>
 
@@ -3111,7 +3420,7 @@ export default function InlineStepForms({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* Header banner */}
       <div style={{ padding: '8px 14px', background: '#0d9488', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>MASTER BILL OF LADING</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>MASTER BILL OF LADING</span>
         <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>{mblSelectedHblIds.length} HBL(s) selected</span>
       </div>
 
@@ -3273,26 +3582,30 @@ export default function InlineStepForms({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {/* Form header */}
       <div style={{ padding: '8px 14px', background: 'var(--accent)', borderRadius: '8px 8px 0 0', marginBottom: 1 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>BOOKING FORMAT REQUEST</span>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>BOOKING FORMAT REQUEST</span>
         {!isCS && <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginLeft: 10 }}>Submitted by CS — review and add RA number</span>}
       </div>
       {/* Fields table */}
       <div style={{ border: '1px solid var(--border)', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
         {/* Carrier */}
         <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Carrier</div>
+          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Carrier<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></div>
           <div style={{ padding: '4px 8px' }}>
-            <select className="lt-input" style={{ width: '100%', border: 'none', background: 'transparent', padding: '4px 0' }}
-              value={bkShippingLine} onChange={e => setBkShippingLine(e.target.value)}>
-              <option value="">— Select carrier —</option>
-              {linerList.map(l => <option key={l.lin_id} value={l.name}>{l.name}</option>)}
-            </select>
+            {actionModal?.sourceData?.acceptedQuotation?.lin_id && bkShippingLine ? (
+              <span style={{ display: 'block', padding: '4px 0', fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{bkShippingLine}</span>
+            ) : (
+              <select className="lt-input" style={{ width: '100%', border: 'none', background: 'transparent', padding: '4px 0' }}
+                value={bkShippingLine} onChange={e => setBkShippingLine(e.target.value)}>
+                <option value="">— Select carrier —</option>
+                {linerList.map(l => <option key={l.lin_id} value={l.name}>{linerDisplay(l)}</option>)}
+              </select>
+            )}
           </div>
         </div>
         {/* Containers (dynamic list) */}
         <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', borderBottom: '1px solid var(--border)' }}>
           <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', paddingTop: 10 }}>
-            Containers
+            Containers<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span>
             <span style={{ fontSize: 9, color: 'var(--text-muted)', marginLeft: 4 }}>({bkContainers.reduce((s, c) => s + c.qty, 0)})</span>
           </div>
           <div style={{ padding: '4px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -3333,7 +3646,7 @@ export default function InlineStepForms({
         </div>
         {/* Cargo Ready Date */}
         <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Cargo Ready Date</div>
+          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Cargo Ready Date<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></div>
           <div style={{ padding: '4px 8px' }}>
             <input className="lt-input" type="date" style={{ width: '100%', border: 'none', background: 'transparent', padding: '4px 0' }}
               value={bkCargoReadyDate} onChange={e => setBkCargoReadyDate(e.target.value)} />
@@ -3341,12 +3654,12 @@ export default function InlineStepForms({
         </div>
         {/* Vessel + Vessel ETD */}
         <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 90px 1fr', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Vessel</div>
+          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Vessel<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></div>
           <div style={{ padding: '4px 8px', borderRight: '1px solid var(--border)' }}>
             <input className="lt-input" style={{ width: '100%', border: 'none', background: 'transparent', padding: '4px 0' }}
               value={bkVessel} onChange={e => setBkVessel(e.target.value)} placeholder="e.g. MSC Asya" />
           </div>
-          <div style={{ padding: '8px 8px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>ETD</div>
+          <div style={{ padding: '8px 8px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>ETD<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></div>
           <div style={{ padding: '4px 8px' }}>
             <input className="lt-input" type="date" style={{ width: '100%', border: 'none', background: 'transparent', padding: '4px 0' }}
               value={bkVesselEtd} onChange={e => setBkVesselEtd(e.target.value)} />
@@ -3354,7 +3667,7 @@ export default function InlineStepForms({
         </div>
         {/* Voyage */}
         <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Voyage</div>
+          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Voyage<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></div>
           <div style={{ padding: '4px 8px' }}>
             <input className="lt-input" style={{ width: '100%', border: 'none', background: 'transparent', padding: '4px 0' }}
               value={bkVoyage} onChange={e => setBkVoyage(e.target.value)} placeholder="e.g. MA622R" />
@@ -3375,7 +3688,7 @@ export default function InlineStepForms({
         </div>
         {/* Agreed Rate + Rate Remark */}
         <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 100px 1fr', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Agreed Rate</div>
+          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Agreed Rate<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></div>
           <div style={{ padding: '4px 8px', borderRight: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>$</span>
             <input className="lt-input" type="number" min={0} step="any" style={{ width: '100%', border: 'none', background: 'transparent', padding: '4px 0' }}
@@ -3389,7 +3702,7 @@ export default function InlineStepForms({
         </div>
         {/* Delivery Term */}
         <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Delivery Term</div>
+          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Delivery Term<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></div>
           <div style={{ padding: '4px 8px' }}>
             <input className="lt-input" style={{ width: '100%', border: 'none', background: 'transparent', padding: '4px 0' }}
               value={bkDeliveryTerm} onChange={e => setBkDeliveryTerm(e.target.value)} placeholder="CY/CY" />
@@ -3397,10 +3710,10 @@ export default function InlineStepForms({
         </div>
         {/* HS Code */}
         <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>HS Code</div>
+          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>HS Code<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></div>
           <div style={{ padding: '4px 8px' }}>
             <input className="lt-input" style={{ width: '100%', border: 'none', background: 'transparent', padding: '4px 0' }}
-              value={bkHsCode} onChange={e => setBkHsCode(e.target.value)} placeholder="Harmonized System code (optional)" />
+              value={bkHsCode} onChange={e => setBkHsCode(e.target.value)} placeholder="Harmonized System code" />
           </div>
         </div>
         {/* Special Instructions header */}
@@ -3437,7 +3750,7 @@ export default function InlineStepForms({
         </div>
         {/* BL Type */}
         <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>BL Type</div>
+          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>BL Type<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span></div>
           <div style={{ padding: '6px 10px', display: 'flex', gap: 16, alignItems: 'center' }}>
             {(['OBL', 'Seaway Bill'] as const).map(t => (
               <label key={t} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)' }}>
@@ -3476,30 +3789,273 @@ export default function InlineStepForms({
         </div>
       </div>
       {/* Submit */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-        <button className="db-btn primary" style={{ background: '#0f8fa8', borderColor: '#0f8fa8' }} onClick={handleModalSubmit}>
-          {isCS
-            ? <><Ship size={12} /> Create Booking &amp; Send to Procurement</>
-            : <><Ship size={12} /> Assign RA Number &amp; Move to Booking</>
+      {(() => {
+        const missingFields: string[] = []
+        if (!bkShippingLine) missingFields.push('Carrier')
+        if (!bkContainers.length) missingFields.push('Containers')
+        if (!bkVessel) missingFields.push('Vessel')
+        if (!bkVesselEtd) missingFields.push('ETD')
+        if (!bkVoyage) missingFields.push('Voyage')
+        if (!bkCargoReadyDate) missingFields.push('Cargo Ready Date')
+        if (!bkAgreedRate) missingFields.push('Agreed Rate')
+        if (!bkDeliveryTerm) missingFields.push('Delivery Term')
+        if (!bkHsCode) missingFields.push('HS Code')
+        if (!bkBlType) missingFields.push('BL Type')
+        const bookingDisabled = missingFields.length > 0
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 20 }}>
+            {bookingDisabled && (
+              <div style={{ fontSize: 11, color: '#dc2626', padding: '0 2px' }}>
+                Missing required fields: {missingFields.join(', ')}
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button className="db-btn primary" onClick={handleModalSubmit} disabled={bookingDisabled}
+                style={bookingDisabled ? { opacity: 0.4, cursor: 'not-allowed' } : {}}>
+                {isCS
+                  ? <><Ship size={12} /> Create Booking &amp; Send to Procurement</>
+                  : <><Ship size={12} /> Assign RA Number &amp; Move to Booking</>
+                }
+              </button>
+            </div>
+          </div>
+        )
+      })()}
+    </div>
+  )
+})() : selectedItem.actionKind === 'send-to-customer' && actionModal ? (() => {
+  const ctx = actionModal.previousContext
+  const quotationFromLog = ctx?.notes?.match(/Quotation:\n([\s\S]+)/)?.[1] ?? ''
+  const quotationText = quotationContent || quotationFromLog
+  const stcInquiry = actionModal.sourceData.inquiry as Inquiry
+  const stcContainer = actionModal.sourceData.container as ContainerLine | undefined
+  const stcRr = actionModal.sourceData.rateRequest as CompletedRateRequest | undefined
+  const stcOptions = stcRr?.options?.filter(o => o.rate && selectedRateOptionIds.has(o.option_id)) ?? []
+  const canAttachQuotation = stcOptions.length > 0
+  const computeFinal = (optId: number, baseRate: number) => {
+    const ovr = optionOverrides[optId]
+    if (!ovr) return baseRate
+    return ovr.isPercentage ? baseRate * (1 + ovr.margin / 100) : baseRate + ovr.margin
+  }
+  const emailSubject = `Quotation for ${stcInquiry.customer_name} — ${stcInquiry.id}`
+
+  // Resolve quote_id for fetching the saved PDF from S3
+  const resolvedQuoteId = lastQuotationId ?? lookupQuotationId(stcInquiry.inq_id) ?? (stcInquiry as any).quotation_id ?? null
+
+  const handleOpenOutlook = () => {
+    openMailto(customerContactEmail, emailSubject, quotationText)
+  }
+  const handleDownloadPdf = () => {
+    if (!resolvedQuoteId) return
+    setPdfDownloading(true)
+    apiGetQuotationFile(resolvedQuoteId)
+      .then(res => {
+        window.open(res.download_url, '_blank')
+        setPdfDownloaded(true)
+      })
+      .catch(err => {
+        console.error('[Workspace] Failed to fetch quotation file:', err)
+        alert('Could not download the quotation file. It may not have been saved yet.')
+      })
+      .finally(() => setPdfDownloading(false))
+  }
+
+  const stcDisabled =
+    (sendMethod === 'email' && (!customerContactEmail.trim() || !customerContactEmail.includes('@') || !emailConfirmed)) ||
+    (sendMethod === 'whatsapp' && !waConfirmed)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {ctx && (
+        <div className="ws-context-card" style={{ marginTop: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <User size={11} style={{ color: 'var(--text-muted)' }} />
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
+              {empName(ctx.actor_id)} ({ROLE_LABELS[ctx.actor_role]})
+            </span>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{ctx.action}</div>
+        </div>
+      )}
+
+      {/* Quotation preview — collapsible, plain text only */}
+      {quotationText && (
+        <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+          <button type="button" onClick={() => setDraftCollapsed(c => !c)}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-card)', border: 'none', cursor: 'pointer' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: '#0f8fa8', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
+              <FileText size={12} /> Quotation Preview
+            </span>
+            <ChevronDown size={13} style={{ color: 'var(--text-muted)', transform: draftCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }} />
+          </button>
+          {!draftCollapsed && (
+            <div className="ws-doc-body" style={{ whiteSpace: 'pre-wrap', fontSize: 11, lineHeight: 1.5, maxHeight: 240, overflowY: 'auto', padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
+              {quotationText}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Send method toggle */}
+      <div>
+        <label className="lt-label">Send Method</label>
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          <button
+            className={`db-btn ${sendMethod === 'email' ? 'primary' : ''}`}
+            style={sendMethod !== 'email' ? { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' } : {}}
+            onClick={() => { setSendMethod('email'); setEmailConfirmed(false) }}
+          >
+            <Mail size={13} style={{ marginRight: 4 }} /> Email
+          </button>
+          <button
+            className={`db-btn ${sendMethod === 'whatsapp' ? 'primary' : ''}`}
+            style={sendMethod === 'whatsapp' ? { background: '#25d366', borderColor: '#25d366' } : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+            onClick={() => { setSendMethod('whatsapp'); setEmailConfirmed(false) }}
+          >
+            <MessageCircle size={13} style={{ marginRight: 4 }} /> WhatsApp
+          </button>
+        </div>
+      </div>
+
+      {/* Email fields */}
+      {sendMethod === 'email' && (
+        <>
+          <div>
+            <label className="lt-label">Customer Email <span style={{ color: '#dc2626' }}>*</span></label>
+            <input className="lt-input" style={{ width: '100%' }} type="email"
+              value={customerContactEmail} onChange={e => setCustomerContactEmail(e.target.value)}
+              placeholder="customer@example.com" autoFocus />
+          </div>
+          {customerContactEmail.includes('@') && (
+            <>
+              {/* Download quotation PDF from S3 */}
+              {resolvedQuoteId && (
+                <button className="db-btn" type="button" onClick={handleDownloadPdf} disabled={pdfDownloading}
+                  style={{ background: pdfDownloaded ? '#16a34a' : 'var(--bg-card)', border: `1px solid ${pdfDownloaded ? '#16a34a' : 'var(--border)'}`, color: pdfDownloaded ? '#fff' : 'var(--text-secondary)', width: '100%' }}>
+                  {pdfDownloading
+                    ? <><FileText size={13} style={{ marginRight: 6 }} /> Downloading...</>
+                    : pdfDownloaded
+                      ? <><FileText size={13} style={{ marginRight: 6 }} /> Downloaded — attach to email</>
+                      : <><FileText size={13} style={{ marginRight: 6 }} /> Download Quotation PDF</>
+                  }
+                </button>
+              )}
+              {/* Open Outlook compose with quotation text in body */}
+              <button className="db-btn" type="button" onClick={handleOpenOutlook}
+                style={{ background: '#0078d4', borderColor: '#0078d4', color: '#fff', width: '100%' }}>
+                <Mail size={13} style={{ marginRight: 6 }} /> Open in Outlook
+              </button>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', padding: '0 2px', lineHeight: 1.4 }}>
+                {resolvedQuoteId
+                  ? 'Download the PDF first, then open Outlook and attach it to the email before sending.'
+                  : 'Opens Outlook with the quotation text. Attach any files manually if needed.'}
+              </div>
+              <div style={{ padding: '10px 14px', background: 'rgba(0,120,212,0.06)', border: '1px solid rgba(0,120,212,0.2)', borderRadius: 8 }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <input type="checkbox" checked={emailConfirmed} onChange={e => setEmailConfirmed(e.target.checked)} style={{ marginTop: 2 }} />
+                  <span>
+                    I confirm that I have sent this quotation to the customer via email.
+                    <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                      Download the PDF, open Outlook, attach the file, verify the content, send it, then check this box.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {/* WhatsApp fields */}
+      {sendMethod === 'whatsapp' && (
+        <>
+          <div>
+            <label className="lt-label">Customer WhatsApp Number</label>
+            <input className="lt-input" style={{ width: '100%' }}
+              value={customerContactPhone} onChange={e => setCustomerContactPhone(e.target.value)}
+              placeholder="+94 7X XXX XXXX" autoFocus />
+          </div>
+          {/* Download quotation PDF for WhatsApp attachment */}
+          {resolvedQuoteId && (
+            <button className="db-btn" type="button" onClick={handleDownloadPdf} disabled={pdfDownloading}
+              style={{ background: pdfDownloaded ? '#16a34a' : 'var(--bg-card)', border: `1px solid ${pdfDownloaded ? '#16a34a' : 'var(--border)'}`, color: pdfDownloaded ? '#fff' : 'var(--text-secondary)', width: '100%' }}>
+              {pdfDownloading
+                ? <><FileText size={13} style={{ marginRight: 6 }} /> Downloading...</>
+                : pdfDownloaded
+                  ? <><FileText size={13} style={{ marginRight: 6 }} /> Downloaded — attach to WhatsApp</>
+                  : <><FileText size={13} style={{ marginRight: 6 }} /> Download Quotation PDF</>
+              }
+            </button>
+          )}
+          <div style={{ padding: '10px 14px', background: 'rgba(37,211,102,0.06)', border: '1px solid rgba(37,211,102,0.2)', borderRadius: 8 }}>
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)' }}>
+              <input type="checkbox" checked={waConfirmed} onChange={e => setWaConfirmed(e.target.checked)} style={{ marginTop: 2 }} />
+              <span>
+                I confirm that I have sent this quotation to the customer via WhatsApp.
+                <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                  Download the PDF and send it along with the quotation message via WhatsApp.
+                </span>
+              </span>
+            </label>
+          </div>
+        </>
+      )}
+
+      <div>
+        <label className="lt-label">Notes (optional)</label>
+        <input className="lt-input" style={{ width: '100%' }} value={formNote}
+          onChange={e => setFormNote(e.target.value)}
+          placeholder="Any additional notes..." />
+      </div>
+
+      {/* Submit */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 18, borderTop: '1px solid #eef2f6' }}>
+        <button
+          className="db-btn primary"
+          disabled={stcDisabled}
+          style={
+            sendMethod === 'whatsapp' && waConfirmed ? { background: '#25d366', borderColor: '#25d366' } :
+            sendMethod === 'email' && customerContactEmail.includes('@') && emailConfirmed ? {} :
+            stcDisabled ? { opacity: 0.4, cursor: 'not-allowed' } : {}
           }
+          onClick={handleModalSubmit}
+        >
+          {sendMethod === 'email' ? <><Mail size={12} /> Send via Email</> : <><MessageCircle size={12} /> Confirm WhatsApp Sent</>}
         </button>
       </div>
     </div>
   )
 })() : (
-  <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 24, boxShadow: '0 1px 2px rgba(15,23,42,0.03)' }}>
-    <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 18, color: 'var(--text)' }}>{selectedItem.actionLabel}</div>
-    <div style={{ fontSize: 13, color: '#64748b', marginBottom: 18 }}>{selectedItem.subtitle}</div>
-    <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 18, borderTop: '1px solid #eef2f6' }}>
-      <button
-        className="db-btn primary"
-        style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-        onClick={() => handleAction(selectedItem)}
-      >
-        {selectedItem.actionLabel} <ChevronRight size={13} />
-      </button>
-    </div>
-  </div>
+  // Default fallback — safety net for unknown/future action kinds.
+  // For action kinds that already fire immediately when the card is clicked
+  // (navigate-away, modal-open, or workflow-advance), skip the button entirely
+  // so the right panel just shows item context without a redundant intermediary.
+  (() => {
+    const IMMEDIATE_KINDS = new Set([
+      'check-rates', 'check-inttra-rates',
+      'confirm-booking', 'bl-approval',
+      'verify-kyc', 'approve-quote', 'record-master-bl', 'create-house-bl',
+      'acknowledge-procurement', 'advance-workflow',
+    ])
+    const isImmediate = IMMEDIATE_KINDS.has(selectedItem.actionKind)
+    return (
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 24, boxShadow: '0 1px 2px rgba(15,23,42,0.03)' }}>
+        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 18, color: 'var(--text)' }}>{selectedItem.actionLabel}</div>
+        <div style={{ fontSize: 13, color: '#64748b', marginBottom: 18 }}>{selectedItem.subtitle}</div>
+        {!isImmediate && (
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 18, borderTop: '1px solid #eef2f6' }}>
+            <button
+              className="db-btn primary"
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              onClick={() => handleAction(selectedItem)}
+            >
+              {selectedItem.actionLabel} <ChevronRight size={13} />
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  })()
 )}
     </>
   )

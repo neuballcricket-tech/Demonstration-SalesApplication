@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { CheckCircle2, AlertTriangle, ListPlus, History, Phone, Zap, Lock } from 'lucide-react'
+import { ClipboardList, CheckCircle2, AlertTriangle, ListPlus, History, Phone, Zap, Lock } from 'lucide-react'
 import {
   EMPLOYEES, isOverdue, daysOverdue, todayISO, isSpotInquiry,
   type Inquiry, type Task, type MissingItem, type Followup,
 } from '../../types'
 import { useRole } from '../../RoleContext'
+import { PAGE_WRAPPER, PAGE_TITLE_ROW, PAGE_TITLE_ICON, PAGE_TITLE_H2, CARD, SECTION_LABEL, INPUT_STYLE, TABLE_TH } from './pageStyles'
 
 interface FollowupsProps {
   inquiries: Inquiry[]
@@ -78,27 +79,24 @@ export default function Followups({
   )
 
   return (
-    <div className="db-page-anim">
-      <div className="db-page-head">
-        <div className="db-page-head-row">
-          <div>
-            <h1 className="db-page-title">Operations</h1>
-            <div style={{ fontSize: 13.5, color: 'var(--text-muted)', marginTop: 5 }}>
-              Follow-ups, tasks, urgent spot rates, and most-chased inquiries — everything that needs attention today
-            </div>
-          </div>
-        </div>
+    <div style={PAGE_WRAPPER}>
+      <div style={PAGE_TITLE_ROW}>
+        <ClipboardList size={18} style={PAGE_TITLE_ICON} />
+        <h2 style={PAGE_TITLE_H2}>Operations</h2>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+          Follow-ups, tasks, urgent spot rates, and most-chased inquiries
+        </span>
       </div>
 
       {/* Phase 4.2: Spot Rate / Urgent — only render if we actually have any */}
       {spotInquiries.length > 0 && (
-        <div className="db-chart-card" style={{ marginBottom: 22, borderColor: 'rgba(220,38,38,0.25)' }}>
-          <div className="db-chart-head">
+        <div style={{ ...CARD, marginBottom: 22, borderColor: 'rgba(220,38,38,0.25)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Zap size={15} style={{ color: '#dc2626' }} />
               <div>
-                <div className="db-chart-title">Spot Rate / Urgent — Time Critical</div>
-                <div className="db-chart-sub">Confirm within 15 minutes · spot-rate validity windows are short</div>
+                <div style={SECTION_LABEL}>Spot Rate / Urgent — Time Critical</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Confirm within 15 minutes · spot-rate validity windows are short</div>
               </div>
             </div>
             <span className="lt-pill overdue">{spotInquiries.length} urgent</span>
@@ -139,14 +137,12 @@ export default function Followups({
 
       {/* Phase 4.1: Most-chased inquiries — surfaces the procurement chase load */}
       {mostChased.length > 0 && (
-        <div className="db-chart-card" style={{ marginBottom: 22 }}>
-          <div className="db-chart-head">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Phone size={14} style={{ color: '#d97706' }} />
-              <div>
-                <div className="db-chart-title">Most-Chased Pending Inquiries</div>
-                <div className="db-chart-sub">How many times sales has followed up — high counts = procurement bottleneck</div>
-              </div>
+        <div style={{ ...CARD, marginBottom: 22 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <Phone size={14} style={{ color: '#d97706' }} />
+            <div>
+              <div style={SECTION_LABEL}>Most-Chased Pending Inquiries</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>How many times sales has followed up — high counts = procurement bottleneck</div>
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -191,13 +187,9 @@ export default function Followups({
       )}
 
       {/* Section 1: Add Follow-up */}
-      <div className="db-chart-card" style={{ marginBottom: 18 }}>
-        <div className="db-chart-head">
-          <div>
-            <div className="db-chart-title">Section 1 — Log Follow-up</div>
-            <div className="db-chart-sub">Every entry creates a row in fact_followups · check "complete" to also close the inquiry</div>
-          </div>
-        </div>
+      <div style={{ ...CARD, marginBottom: 18 }}>
+        <div style={{ ...SECTION_LABEL, marginBottom: 6 }}>Log Follow-up</div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14 }}>Every entry creates a row in fact_followups · check "complete" to also close the inquiry</div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr 1fr auto', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
           <input
@@ -205,7 +197,7 @@ export default function Followups({
             value={followupCustomer}
             onChange={e => setFollowupCustomer(e.target.value)}
             placeholder="Select / type customer"
-            className="lt-input"
+            style={INPUT_STYLE}
           />
           <datalist id="customer-options">
             {customerOptions.map(c => <option key={c} value={c} />)}
@@ -214,13 +206,12 @@ export default function Followups({
             value={followupNote}
             onChange={e => setFollowupNote(e.target.value)}
             placeholder='Note (e.g. "Called, awaiting SI")'
-            className="lt-input"
+            style={INPUT_STYLE}
           />
           <select
             value={followupEmployee}
             onChange={e => setFollowupEmployee(Number(e.target.value))}
-            className="lt-select"
-            style={{ padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+            style={INPUT_STYLE}
           >
             {EMPLOYEES.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
           </select>
@@ -246,26 +237,24 @@ export default function Followups({
       </div>
 
       {/* Section 1b: Recent follow-ups history */}
-      <div className="db-chart-card" style={{ marginBottom: 18 }}>
-        <div className="db-chart-head">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <History size={14} style={{ color: 'var(--accent-light)' }} />
-            <div>
-              <div className="db-chart-title">Recent Follow-ups (fact_followups)</div>
-              <div className="db-chart-sub">{followups.length} records · most recent first</div>
-            </div>
+      <div style={{ ...CARD, marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <History size={14} style={{ color: '#0f8fa8' }} />
+          <div>
+            <div style={SECTION_LABEL}>Recent Follow-ups</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{followups.length} records · most recent first</div>
           </div>
         </div>
 
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.06em' }}>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>When</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Customer</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Note</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Employee</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Closed inquiry?</th>
+              <tr>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>When</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Customer</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Note</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Employee</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Closed inquiry?</th>
               </tr>
             </thead>
             <tbody>
@@ -291,14 +280,10 @@ export default function Followups({
       </div>
 
       {/* Section 2: Tasks */}
-      <div className="db-chart-card" style={{ marginBottom: 18 }}>
-        <div className="db-chart-head">
-          <div>
-            <div className="db-chart-title">Section 2 — Tasks</div>
-            <div className="db-chart-sub">
-              {tasks.filter(t => t.status === 'pending').length} pending · {tasks.filter(t => t.status === 'pending' && isOverdue(t.due_date)).length} overdue · {tasks.filter(t => t.status === 'completed').length} completed
-            </div>
-          </div>
+      <div style={{ ...CARD, marginBottom: 18 }}>
+        <div style={{ ...SECTION_LABEL, marginBottom: 6 }}>Tasks</div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14 }}>
+          {tasks.filter(t => t.status === 'pending').length} pending · {tasks.filter(t => t.status === 'pending' && isOverdue(t.due_date)).length} overdue · {tasks.filter(t => t.status === 'completed').length} completed
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr 140px 1fr auto', gap: 10, marginBottom: 14 }}>
@@ -307,20 +292,19 @@ export default function Followups({
             value={taskCustomer}
             onChange={e => setTaskCustomer(e.target.value)}
             placeholder="Customer"
-            className="lt-input"
+            style={INPUT_STYLE}
           />
           <input
             value={taskText}
             onChange={e => setTaskText(e.target.value)}
             placeholder="Task (e.g. Send Quotation)"
-            className="lt-input"
+            style={INPUT_STYLE}
           />
-          <input type="date" value={taskDue} onChange={e => setTaskDue(e.target.value)} className="lt-input" />
+          <input type="date" value={taskDue} onChange={e => setTaskDue(e.target.value)} style={INPUT_STYLE} />
           <select
             value={taskEmployee}
             onChange={e => setTaskEmployee(Number(e.target.value))}
-            className="lt-select"
-            style={{ padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
+            style={INPUT_STYLE}
           >
             {EMPLOYEES.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
           </select>
@@ -338,13 +322,13 @@ export default function Followups({
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.06em' }}>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Customer</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Task</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Status</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Due Date</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Employee</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}></th>
+              <tr>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Customer</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Task</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Status</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Due Date</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Employee</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}></th>
               </tr>
             </thead>
             <tbody>
@@ -390,13 +374,13 @@ export default function Followups({
       </div>
 
       {/* Section 3: Missing Tasks */}
-      <div className="db-chart-card" style={{ borderColor: 'rgba(217,119,6,0.25)' }}>
-        <div className="db-chart-head">
+      <div style={{ ...CARD, borderColor: 'rgba(217,119,6,0.25)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <AlertTriangle size={16} style={{ color: '#d97706' }} />
             <div>
-              <div className="db-chart-title">Section 3 — Missing Tasks (Power Feature)</div>
-              <div className="db-chart-sub">Customers with outstanding documents or actions blocking the deal · cutoff dates flagged</div>
+              <div style={SECTION_LABEL}>Missing Tasks</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Customers with outstanding documents or actions blocking the deal · cutoff dates flagged</div>
             </div>
           </div>
           <span className="lt-pill pending">{missingItems.length} items</span>
@@ -405,12 +389,12 @@ export default function Followups({
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.06em' }}>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Customer</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Missing Item</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Outstanding Since</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Cutoff</th>
-                <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Owner</th>
+              <tr>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Customer</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Missing Item</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Outstanding Since</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Cutoff</th>
+                <th style={{ ...TABLE_TH, borderBottom: '1px solid var(--border)' }}>Owner</th>
               </tr>
             </thead>
             <tbody>

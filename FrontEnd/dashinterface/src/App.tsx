@@ -17,6 +17,8 @@ import NewInquiry from './components/pages/NewInquiry'
 import RfqNew from './components/pages/RfqNew'
 import RecordRate from './components/pages/RecordRate'
 import RateCheck from './components/pages/RateCheck'
+import Schedules from './components/pages/Schedules'
+import TrackAndTrace from './components/pages/TrackAndTrace'
 import Login from './components/pages/Login'
 import Profile from './components/pages/Profile'
 import {
@@ -32,7 +34,7 @@ import {
   type BackendReleaseOrderPayload, type LinerRecord,
 } from './types'
 import { RoleContext, type RoleContextValue } from './RoleContext'
-import { MOCK_INQUIRIES, MOCK_ACTIVITY, MOCK_BOOKINGS } from './mockData'
+// Mock data removed — all state is now driven by the backend API
 import {
   apiCreateFollowup,
   apiCreateQuote, apiSetQuoteStatus,
@@ -61,12 +63,13 @@ const uuid = (): string =>
         return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
       })
 
-// Container type codes the backend uses → frontend ContainerType labels
+// Container type codes — frontend now uses the same codes as the backend, so this is identity.
 const BE_CONTAINER_TYPE: Record<string, string> = {
-  '20GP': '20 GP', '40GP': '40 GP', '40HC': '40 HC',
-  '20RF': '20 REEFER', '40RF': '40 REEFER',
-  '20OT': '20 OPEN TOP', '40OT': '40 OPEN TOP',
-  '20FR': '20 FLAT RACK', '40FR': '40 FLAT RACK',
+  '20GP': '20GP', '40GP': '40GP', '40HC': '40HC',
+  '20RF': '20RF', '40RF': '40RF',
+  '20OT': '20OT', '40OT': '40OT',
+  '20FR': '20FR', '40FR': '40FR',
+  'TANKER': 'TANKER',
 }
 // Priority codes from backend → frontend InquiryPriority labels
 const BE_PRIORITY: Record<string, Inquiry['priority']> = {
@@ -95,7 +98,7 @@ function mapInquiryRows(rows: InquiryRow[]): Inquiry[] {
   for (const [inq_id, group] of grouped) {
     const h = group[0]
     const containers: ContainerLine[] = group.map(r => ({
-      containerType: (BE_CONTAINER_TYPE[r.container_type ?? ''] ?? r.container_type ?? '20 GP') as ContainerLine['containerType'],
+      containerType: (BE_CONTAINER_TYPE[r.container_type ?? ''] ?? r.container_type ?? '20GP') as ContainerLine['containerType'],
       quantity: r.qty ?? 1,
       weight: r.commodity_weight ?? '',
       commodityType: (BE_COM_TYPE[r.commodity_type ?? ''] ?? r.commodity_type ?? 'Miscellaneous manufactured articles — furniture, toys') as ContainerLine['commodityType'],
@@ -276,10 +279,9 @@ export default function App() {
         ]).then(([bookingRecords, releaseOrders]) => {
           let mapped = bookingRecords.map(r => mapBackendBooking(r, cl, liners))
           for (const ro of releaseOrders) mapped = applyReleaseOrder(mapped, ro)
-          setBookings([...mapped, ...MOCK_BOOKINGS])
+          setBookings(mapped)
         }).catch(err => {
           console.warn('[loadAppData] Could not load bookings:', err)
-          setBookings(MOCK_BOOKINGS)
         })
       })
       .catch(() => console.warn('[loadAppData] Could not load client/liner list'))
@@ -291,8 +293,8 @@ export default function App() {
       .then(setKycRequests)
       .catch(() => console.warn('[loadAppData] Could not load KYC requests'))
     apiFetchAllInquiries()
-      .then(rows => setInquiries([...mapInquiryRows(rows), ...MOCK_INQUIRIES]))
-      .catch(() => setInquiries(MOCK_INQUIRIES))
+      .then(rows => setInquiries(mapInquiryRows(rows)))
+      .catch(() => console.warn('[loadAppData] Could not load inquiries'))
       .finally(() => setInitState('ready'))
   }
 
@@ -398,7 +400,7 @@ export default function App() {
   const [shipments, setShipments] = useState<Shipment[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [vesselSchedules, setVesselSchedules] = useState<VesselSchedule[]>([])
-  const [activityLog, setActivityLog] = useState<ActivityEntry[]>(MOCK_ACTIVITY)
+  const [activityLog, setActivityLog] = useState<ActivityEntry[]>([])
   // Reference data — fetched once at startup and cached for the session
   const [clientList, setClientList] = useState<ClientRecord[]>([])
   const contactPersonList: ContactPersonRecord[] = []  // disabled until backend provides bulk endpoint
@@ -427,6 +429,17 @@ export default function App() {
     apiFetchAllInquiries()
       .then(rows => setInquiries(mapInquiryRows(rows)))
       .catch(() => console.warn('[refreshData] Failed to fetch inquiries'))
+
+    // Also refresh bookings so stale optimistic items get replaced
+    if (clientList.length) {
+      Promise.all([apiGetBookingRequests(), apiFetchPendingReleaseOrders(), apiGetLiners()])
+        .then(([bookingRecords, releaseOrders, liners]) => {
+          let mapped = bookingRecords.map(r => mapBackendBooking(r, clientList, liners))
+          for (const ro of releaseOrders) mapped = applyReleaseOrder(mapped, ro)
+          setBookings(mapped)
+        })
+        .catch(() => console.warn('[refreshData] Failed to fetch bookings'))
+    }
   }
 
   const handlePatchInquiry = (
@@ -485,7 +498,7 @@ export default function App() {
       customer_name: customerName,
       note: newFup.note,
       completion_flag: completionFlag,
-      employee_id: activeEmployeeId,
+      employee_id: 6,
     }).then(created => {
       setFollowups(prev => prev.map(f => f.id === newFup.id ? created : f))
     }).catch(err => console.error('Create followup failed:', err))
@@ -607,7 +620,7 @@ export default function App() {
       customer_name: customerName,
       task: taskText,
       due_date: dueDate,
-      employee_id: activeEmployeeId,
+      employee_id: 6,
     }).then(created => {
       setTasks(prev => prev.map(t => t.id === newTask.id ? created : t))
     }).catch(err => console.error('Create task failed:', err))
@@ -851,6 +864,7 @@ export default function App() {
     contract_no?: string; ra_number?: string; specific_routing?: string;
     booking_type?: string; reefer_temp?: string; delivery_agent?: string;
     vessel?: string; voyage?: string; rate_remark?: string;
+    containers?: { type: string; qty: number }[];
   }) => {
     const newId = `BKG-${uuid()}`
     const stamp = nowStamp()
@@ -908,6 +922,9 @@ export default function App() {
         'port-to-port': 'PORT_TO_PORT', 'door-to-door': 'DOOR_TO_DOOR',
         'port-to-door': 'PORT_TO_DOOR', 'door-to-port': 'DOOR_TO_PORT',
       }
+      // Strip apostrophes from container types: "20'GP" → "20GP"
+      const backendContainers = (payload.containers ?? [{ type: payload.container_type, qty: payload.quantity }])
+        .map(c => ({ container_type: c.type.replace(/'/g, ''), qty: c.qty }))
       apiCreateBookingRequest({
         inq_id: payload.inq_id,
         cli_id: payload.cli_id,
@@ -925,6 +942,7 @@ export default function App() {
         hs_code: payload.hs_code || '',
         bl_type: payload.bl_type === 'Seaway Bill' ? 'SEAWAY_BILL' : 'OBL',
         notes: payload.notes,
+        containers: backendContainers,
         rate_remark: payload.rate_remark,
         contract_no: payload.contract_no,
         ra_number: payload.ra_number,
@@ -938,7 +956,9 @@ export default function App() {
         ))
       }).catch(err => {
         console.error('[createBooking] API failed:', err)
-        flash(`Warning: booking saved locally but backend sync failed`)
+        // Remove the optimistic temp item so it doesn't linger as a duplicate
+        setBookings(prev => prev.filter(b => b.id !== newId))
+        flash(`ERROR creating booking: ${(err as Error).message}`)
       })
     }
 
@@ -1043,6 +1063,8 @@ export default function App() {
       }
     }).catch(err => {
       console.error('Create inquiry failed:', err)
+      // Remove the optimistic temp item so it doesn't linger as a duplicate
+      setInquiries(prev => prev.filter(i => i.id !== tempId))
       flash(`ERROR saving inquiry: ${(err as Error).message}`)
     })
     flash(`Inquiry created for ${data.customer_name}`)  // optimistic flash
@@ -1158,6 +1180,10 @@ export default function App() {
         return <Customers inquiries={inquiries} customers={customers} onUpdateCustomer={updateCustomer} onFlash={flash} />
       case 'kyc':
         return <KYCForm customers={customers} onFlash={flash} />
+      case 'schedules':
+        return <Schedules onFlash={flash} />
+      case 'tracking':
+        return <TrackAndTrace onFlash={flash} />
       case 'workspace':
         return (
           <Workspace
@@ -1277,7 +1303,7 @@ export default function App() {
         <span style={{ color: '#dc2626', fontSize: 15, fontWeight: 600 }}>Unable to connect to the backend</span>
         <span style={{ color: '#94a3b8', fontSize: 13 }}>Please ensure the API server is running and refresh the page.</span>
         <button
-          style={{ marginTop: 8, padding: '8px 20px', borderRadius: 8, background: '#2c2c82', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
+          style={{ marginTop: 8, padding: '8px 20px', borderRadius: 8, background: '#000', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
           onClick={() => setInitState('ready')}
         >
           Retry
