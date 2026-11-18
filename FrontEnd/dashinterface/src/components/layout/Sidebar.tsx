@@ -4,17 +4,20 @@ import {
   Users, FileText, Ship, LogOut, ShieldCheck, HelpCircle, X,
   UserPlus, PackagePlus, MessageSquarePlus,
   ListPlus, FileSpreadsheet, Search, ShieldAlert, CreditCard,
-  ArrowUpDown, Zap, Lock, Anchor, PackageCheck, AlertTriangle, Inbox,
+  ArrowUpDown, Zap, Lock, Anchor, PackageCheck, AlertTriangle, Inbox, DollarSign, Calendar,
+  PanelLeftClose, PanelLeftOpen, Radar,
 } from 'lucide-react'
 import {
   ROLE_PAGE_ACCESS, ROLE_QUICK_COMMANDS, ROLE_ACTIONS, ROLE_COLORS,
   type PageId, type UserRole,
-} from '../../mockData'
+} from '../../types'
 
 interface SidebarProps {
   current: PageId
   onNav: (page: PageId) => void
   activeRole: UserRole
+  collapsed: boolean
+  onToggleCollapse: () => void
 }
 
 const NAV_ITEMS: { id: PageId; label: string; icon: typeof MessageSquare }[] = [
@@ -22,23 +25,47 @@ const NAV_ITEMS: { id: PageId; label: string; icon: typeof MessageSquare }[] = [
   { id: 'chat', label: 'Command Center', icon: MessageSquare },
   { id: 'workspace', label: 'Workspace', icon: Inbox },
   { id: 'inquiry-list', label: 'Inquiry List', icon: ListChecks },
+  { id: 'rfq-new', label: 'New RFQ', icon: ListChecks },
+  { id: 'rate-list', label: 'Rate List', icon: DollarSign },
+  { id: 'booking-list', label: 'Booking List', icon: PackageCheck },
   { id: 'quotations', label: 'Quotations', icon: FileText },
   { id: 'shipments', label: 'Shipments', icon: Ship },
   { id: 'followups', label: 'Operations', icon: ClipboardList },
   { id: 'customers', label: 'Customers', icon: Users },
   { id: 'kyc', label: 'KYC Form', icon: ShieldCheck },
+  { id: 'schedules', label: 'Schedules', icon: Calendar },
+  { id: 'tracking', label: 'Track & Trace', icon: Radar },
 ]
 
-export default function Sidebar({ current, onNav, activeRole }: SidebarProps) {
+const ROLE_NAV_VISIBLE: Partial<Record<UserRole, PageId[]>> = {
+  CS: ['workspace', 'inquiry-list', 'rfq-new', 'rate-list', 'booking-list', 'customers', 'schedules', 'tracking'],
+  Sales: ['workspace', 'inquiry-list', 'rfq-new', 'rate-list', 'customers', 'schedules', 'tracking'],
+  Procurement: ['workspace', 'inquiry-list', 'rate-list', 'booking-list', 'schedules', 'tracking'],
+  Finance: ['workspace', 'schedules', 'tracking'],
+}
+
+export default function Sidebar({ current, onNav, activeRole, collapsed, onToggleCollapse }: SidebarProps) {
   const [helpOpen, setHelpOpen] = useState(false)
   const accessiblePages = ROLE_PAGE_ACCESS[activeRole]
+  const visibleNavItems = ROLE_NAV_VISIBLE[activeRole]
+    ? NAV_ITEMS.filter(item => ROLE_NAV_VISIBLE[activeRole]!.includes(item.id))
+    : NAV_ITEMS
 
   return (
     <>
-      <nav className="db-sidebar">
-        <div className="db-sidebar-section">Menu</div>
+      <nav className={`db-sidebar ${collapsed ? 'db-sidebar-collapsed' : ''}`}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between', marginBottom: 8 }}>
+          {!collapsed && <div className="db-sidebar-section" style={{ margin: 0 }}>Menu</div>}
+          <button
+            onClick={onToggleCollapse}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b', padding: 4, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+          </button>
+        </div>
 
-        {NAV_ITEMS.map(item => {
+        {visibleNavItems.map(item => {
           const Icon = item.icon
           const accessible = accessiblePages.includes(item.id)
           return (
@@ -46,24 +73,26 @@ export default function Sidebar({ current, onNav, activeRole }: SidebarProps) {
               key={item.id}
               className={`db-nav-item ${current === item.id ? 'active' : ''} ${!accessible ? 'disabled' : ''}`}
               onClick={() => accessible && onNav(item.id)}
-              title={accessible ? item.label : `Restricted — requires different role`}
-              style={{ opacity: accessible ? 1 : 0.35, cursor: accessible ? 'pointer' : 'not-allowed' }}
+              title={item.label}
+              style={{ opacity: accessible ? 1 : 0.35, cursor: accessible ? 'pointer' : 'not-allowed', justifyContent: collapsed ? 'center' : undefined }}
             >
               <span className="db-nav-item-icon"><Icon size={15} /></span>
-              {item.label}
-              {!accessible && <Lock size={10} style={{ marginLeft: 'auto', opacity: 0.6 }} />}
+              {!collapsed && item.label}
+              {!collapsed && !accessible && <Lock size={10} style={{ marginLeft: 'auto', opacity: 0.6 }} />}
             </div>
           )
         })}
 
         <div className="db-sidebar-footer">
-          <div className="db-nav-item" onClick={() => setHelpOpen(true)}>
-            <span className="db-nav-item-icon"><HelpCircle size={15} /></span>
-            Help &amp; Guide
-          </div>
-          <div className="db-nav-item">
+          {!collapsed && (
+            <div className="db-nav-item" onClick={() => setHelpOpen(true)}>
+              <span className="db-nav-item-icon"><HelpCircle size={15} /></span>
+              Help &amp; Guide
+            </div>
+          )}
+          <div className="db-nav-item" title="Sign Out" style={{ justifyContent: collapsed ? 'center' : undefined }}>
             <span className="db-nav-item-icon"><LogOut size={15} /></span>
-            Sign Out
+            {!collapsed && 'Sign Out'}
           </div>
         </div>
       </nav>
@@ -85,7 +114,7 @@ export default function Sidebar({ current, onNav, activeRole }: SidebarProps) {
                 <p className="help-intro">Each page in the sidebar serves a specific purpose in your sales workflow.</p>
 
                 <div className="help-item-list">
-                  <HelpNavItem icon={<LayoutDashboard size={14} />} title="Dashboard" color="#4f46e5">
+                  <HelpNavItem icon={<LayoutDashboard size={14} />} title="Dashboard" color="#0f8fa8">
                     High-level overview of your sales performance — KPIs, pipeline stages, conversion funnel, and top-performing accounts. Use it for a quick morning check or when reporting to management.
                   </HelpNavItem>
                   <HelpNavItem icon={<MessageSquare size={14} />} title="Command Center" color="#7c3aed">
@@ -120,7 +149,7 @@ export default function Sidebar({ current, onNav, activeRole }: SidebarProps) {
                 </p>
 
                 <div className="help-cmd-grid">
-                  <HelpCmdItem icon={<UserPlus size={13} />} cmd="/new customer" color="#4f46e5">
+                  <HelpCmdItem icon={<UserPlus size={13} />} cmd="/new customer" color="#0f8fa8">
                     <strong>Fields:</strong> Name*, Location, Tier, Payment Terms<br />
                     Registers a new customer in the system with default settings.
                   </HelpCmdItem>
