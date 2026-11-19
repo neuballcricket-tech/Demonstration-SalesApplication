@@ -3826,8 +3826,15 @@ export default function InlineStepForms({
 })() : selectedItem.actionKind === 'send-to-customer' && actionModal ? (() => {
   const ctx = actionModal.previousContext
   const quotationFromLog = ctx?.notes?.match(/Quotation:\n([\s\S]+)/)?.[1] ?? ''
-  const quotationText = quotationContent || quotationFromLog
   const stcInquiry = actionModal.sourceData.inquiry as Inquiry
+  // Fallback: extract plain text from backend body_html if no local quotation content
+  const unsentQuote = unsentQuotations.find(q => q.inq_id === stcInquiry.inq_id)
+  let quotationText = quotationContent || quotationFromLog
+  if (!quotationText && unsentQuote?.body_html) {
+    const tmp = document.createElement('div')
+    tmp.innerHTML = unsentQuote.body_html
+    quotationText = (tmp.textContent || tmp.innerText || '').replace(/\n{3,}/g, '\n\n').trim()
+  }
   const stcContainer = actionModal.sourceData.container as ContainerLine | undefined
   const stcRr = actionModal.sourceData.rateRequest as CompletedRateRequest | undefined
   const stcOptions = stcRr?.options?.filter(o => o.rate && selectedRateOptionIds.has(o.option_id)) ?? []
@@ -3840,7 +3847,7 @@ export default function InlineStepForms({
   const emailSubject = `Quotation for ${stcInquiry.customer_name} — ${stcInquiry.id}`
 
   // Resolve quote_id for fetching the saved PDF from S3
-  const resolvedQuoteId = lastQuotationId ?? lookupQuotationId(stcInquiry.inq_id) ?? (stcInquiry as any).quotation_id ?? null
+  const resolvedQuoteId = lastQuotationId ?? lookupQuotationId(stcInquiry.inq_id) ?? unsentQuote?.quote_id ?? (stcInquiry as any).quotation_id ?? null
 
   const handleOpenOutlook = () => {
     openMailto(customerContactEmail, emailSubject, quotationText)
@@ -3970,34 +3977,53 @@ export default function InlineStepForms({
       {sendMethod === 'whatsapp' && (
         <>
           <div>
-            <label className="lt-label">Customer WhatsApp Number</label>
+            <label className="lt-label">Customer WhatsApp Number <span style={{ color: '#dc2626' }}>*</span></label>
             <input className="lt-input" style={{ width: '100%' }}
               value={customerContactPhone} onChange={e => setCustomerContactPhone(e.target.value)}
               placeholder="+94 7X XXX XXXX" autoFocus />
           </div>
-          {/* Download quotation PDF for WhatsApp attachment */}
-          {resolvedQuoteId && (
-            <button className="db-btn" type="button" onClick={handleDownloadPdf} disabled={pdfDownloading}
-              style={{ background: pdfDownloaded ? '#16a34a' : 'var(--bg-card)', border: `1px solid ${pdfDownloaded ? '#16a34a' : 'var(--border)'}`, color: pdfDownloaded ? '#fff' : 'var(--text-secondary)', width: '100%' }}>
-              {pdfDownloading
-                ? <><FileText size={13} style={{ marginRight: 6 }} /> Downloading...</>
-                : pdfDownloaded
-                  ? <><FileText size={13} style={{ marginRight: 6 }} /> Downloaded — attach to WhatsApp</>
-                  : <><FileText size={13} style={{ marginRight: 6 }} /> Download Quotation PDF</>
-              }
-            </button>
+          {customerContactPhone.replace(/\s/g, '').length >= 8 && (
+            <>
+              {/* Download quotation PDF for WhatsApp attachment */}
+              {resolvedQuoteId && (
+                <button className="db-btn" type="button" onClick={handleDownloadPdf} disabled={pdfDownloading}
+                  style={{ background: pdfDownloaded ? '#16a34a' : 'var(--bg-card)', border: `1px solid ${pdfDownloaded ? '#16a34a' : 'var(--border)'}`, color: pdfDownloaded ? '#fff' : 'var(--text-secondary)', width: '100%' }}>
+                  {pdfDownloading
+                    ? <><FileText size={13} style={{ marginRight: 6 }} /> Downloading...</>
+                    : pdfDownloaded
+                      ? <><FileText size={13} style={{ marginRight: 6 }} /> Downloaded — attach to WhatsApp</>
+                      : <><FileText size={13} style={{ marginRight: 6 }} /> Download Quotation PDF</>
+                  }
+                </button>
+              )}
+              {/* Open WhatsApp with pre-filled message */}
+              <button className="db-btn" type="button"
+                onClick={() => {
+                  const phone = customerContactPhone.replace(/[\s\-()]/g, '').replace(/^\+/, '')
+                  const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(quotationText)}`
+                  window.open(waUrl, '_blank')
+                }}
+                style={{ background: '#25d366', borderColor: '#25d366', color: '#fff', width: '100%' }}>
+                <MessageCircle size={13} style={{ marginRight: 6 }} /> Open in WhatsApp
+              </button>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', padding: '0 2px', lineHeight: 1.4 }}>
+                {resolvedQuoteId
+                  ? 'Download the PDF first, then open WhatsApp and attach it to the chat before sending.'
+                  : 'Opens WhatsApp Web with the quotation text pre-filled.'}
+              </div>
+              <div style={{ padding: '10px 14px', background: 'rgba(37,211,102,0.06)', border: '1px solid rgba(37,211,102,0.2)', borderRadius: 8 }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <input type="checkbox" checked={waConfirmed} onChange={e => setWaConfirmed(e.target.checked)} style={{ marginTop: 2 }} />
+                  <span>
+                    I confirm that I have sent this quotation to the customer via WhatsApp.
+                    <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                      Download the PDF, open WhatsApp, attach the file, verify the content, send it, then check this box.
+                    </span>
+                  </span>
+                </label>
+              </div>
+            </>
           )}
-          <div style={{ padding: '10px 14px', background: 'rgba(37,211,102,0.06)', border: '1px solid rgba(37,211,102,0.2)', borderRadius: 8 }}>
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)' }}>
-              <input type="checkbox" checked={waConfirmed} onChange={e => setWaConfirmed(e.target.checked)} style={{ marginTop: 2 }} />
-              <span>
-                I confirm that I have sent this quotation to the customer via WhatsApp.
-                <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                  Download the PDF and send it along with the quotation message via WhatsApp.
-                </span>
-              </span>
-            </label>
-          </div>
         </>
       )}
 

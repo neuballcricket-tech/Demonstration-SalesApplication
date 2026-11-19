@@ -549,8 +549,8 @@ export default function Workspace({
           default:                    title = `${stage.label} — ${inq.customer_name}`
         }
 
-        // Attach saved rate request data for quotation-prep work items
-        const rateRequest = inq.workflow_stage === 'quotation-prep' && inq.inq_id
+        // Attach saved rate request data for quotation-prep and quotation-sent work items
+        const rateRequest = (inq.workflow_stage === 'quotation-prep' || inq.workflow_stage === 'quotation-sent') && inq.inq_id
           ? completedRateRequests.find(rr => rr.inq_id === inq.inq_id)
           : undefined
 
