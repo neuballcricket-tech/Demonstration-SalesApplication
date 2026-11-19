@@ -4,7 +4,8 @@
       "Bash(docker tag:*)",
       "Bash(docker push:*)",
       "Read(//d/Neuball/FreightOS/**)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [
       "Edit(//d/Neuball/FreightOS/**)",

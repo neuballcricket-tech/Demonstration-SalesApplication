@@ -1394,6 +1394,7 @@ export function apiDeleteQuotation(quoteId: number): Promise<Record<string, unkn
 
 /** Unsent quotation record from GET /quotations/unsent. */
 export interface UnsentQuotation {
+  quote_id: number
   inq_id: number
   status: string
   quote_date: string
