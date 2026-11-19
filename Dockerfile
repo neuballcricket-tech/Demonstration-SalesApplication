@@ -1,35 +1,56 @@
 # ============================================================
 # Stage 1 — Build the React frontend
 # ============================================================
-FROM node:20-alpine AS frontend-builder
+FROM node:20-alpine AS builder
 
 WORKDIR /build
 COPY FrontEnd/dashinterface/package.json FrontEnd/dashinterface/package-lock.json ./
 RUN npm ci
 
 COPY FrontEnd/dashinterface/ ./
-# Build without VITE_API_BASE so the app defaults to relative /api paths
-RUN npm run build
+
+# No VITE_API_BASE → defaults to "/api" (proxied by nginx)
+# No VITE_WS_URL  → auto-detects from window.location (proxied by nginx)
+RUN npx vite build
 
 
 # ============================================================
-# Stage 2 — Python backend + built frontend
+# Stage 2 — Serve with nginx + reverse proxy to backend
 # ============================================================
-FROM python:3.12-slim
+FROM nginx:alpine
 
-WORKDIR /app
+# Copy built assets
+COPY --from=builder /build/dist /usr/share/nginx/html
 
-# Install Python dependencies first (layer cache)
-COPY BackEnd/requirments.txt ./
-RUN pip install --no-cache-dir -r requirments.txt
+# Nginx config: SPA + API proxy + WebSocket proxy
+RUN printf 'server {\n\
+    listen 80;\n\
+    root /usr/share/nginx/html;\n\
+    index index.html;\n\
+\n\
+    # Proxy API requests — strip /api prefix and forward to backend\n\
+    location /api/ {\n\
+        proxy_pass http://72.60.199.165:8002/;\n\
+        proxy_set_header Host $host;\n\
+        proxy_set_header X-Real-IP $remote_addr;\n\
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n\
+    }\n\
+\n\
+    # Proxy WebSocket\n\
+    location /ws {\n\
+        proxy_pass http://72.60.199.165:8002/ws;\n\
+        proxy_http_version 1.1;\n\
+        proxy_set_header Upgrade $http_upgrade;\n\
+        proxy_set_header Connection "upgrade";\n\
+        proxy_set_header Host $host;\n\
+    }\n\
+\n\
+    # SPA fallback\n\
+    location / {\n\
+        try_files $uri $uri/ /index.html;\n\
+    }\n\
+}\n' > /etc/nginx/conf.d/default.conf
 
-# Copy backend source
-COPY BackEnd/ ./
+EXPOSE 80
 
-# Copy the built frontend into /app/static so FastAPI can serve it
-COPY --from=frontend-builder /build/dist ./static
-
-EXPOSE 5000
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000"]
-
+CMD ["nginx", "-g", "daemon off;"]
