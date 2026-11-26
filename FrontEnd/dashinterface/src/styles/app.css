@@ -1,0 +1,132 @@
+@layer theme, base, legacy, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "../index.css" layer(legacy);
+@import "../dashboard.css" layer(legacy);
+@plugin "tailwindcss-react-aria-components";
+
+/* Preflight is intentionally off until every screen is migrated (it would restyle legacy screens). */
+
+@theme static {
+  --color-*: initial;
+  --color-white: #fff;
+  --color-black: #000;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --color-primary: #2c2c82;
+  --color-primary-hover: #24246e;
+  --color-primary-strong: #1f1f6b;
+  --color-primary-subtle: #eef0fb;
+  --color-accent: #0c7690;
+  --color-accent-on-dark: #5eead4;
+
+  --color-fg: #111827;
+  --color-fg-label: #374151;
+  --color-fg-muted: #6b7280;
+
+  --color-line: #c7cad6;
+  --color-line-popover: #d1d5db;
+  --color-line-soft: #e2e8f0;
+
+  --color-surface: #fff;
+  --color-surface-hover: #f1f5f9;
+  --color-canvas: #f8fafc;
+  --color-disabled: #f3f4f6;
+
+  --color-danger: #b91c1c;
+  --color-success: #15803d;
+  --color-warning: #b45309;
+
+  --color-warning-bg: #fff7ed;
+  --color-warning-fg: #9a3412;
+  --color-warning-line: #fed7aa;
+  --color-success-bg: #f0fdf4;
+  --color-success-fg: #166534;
+  --color-success-line: #bbf7d0;
+  --color-info-bg: #eef2ff;
+  --color-info-fg: #3730a3;
+  --color-info-line: #c7d2fe;
+  --color-danger-bg: #fef2f2;
+  --color-danger-line: #fecaca;
+  --color-orange-bg: #fff7ed;
+  --color-orange-fg: #c2410c;
+  --color-orange-line: #fed7aa;
+
+  --text-label: 11px;
+  --text-control: 13px;
+  --text-body: 14px;
+  --text-title: 18px;
+
+  --radius-control: 4px;
+  --radius-option: 2px;
+  --radius-day: 3px;
+  --radius-card: 6px;
+
+  --shadow-popover: 0 6px 16px -6px rgba(17, 24, 39, 0.25);
+  --shadow-focus: 0 0 0 2px rgba(44, 44, 130, 0.25);
+
+  --font-sans: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Layering scale, used as e.g. `z-(--z-modal)` */
+@layer base {
+  :root {
+    --z-popover: 1000;
+    --z-modal: 1100;
+    --z-popover-modal: 1150;
+    --z-tooltip: 1200;
+    --z-toast: 1300;
+  }
+}
+
+/* Global interaction rules: beat legacy styles, but a utility can still override them. */
+@layer components {
+  button,
+  a[href],
+  [role='button'],
+  [role='option'],
+  [role='tab'],
+  [role='menuitem'],
+  [role='checkbox'],
+  [role='radio'],
+  [role='switch'],
+  summary,
+  label:has(input),
+  .is-clickable {
+    cursor: pointer;
+  }
+
+  :disabled,
+  [aria-disabled='true'],
+  [data-disabled] {
+    cursor: not-allowed;
+  }
+
+  :is(button, a, input, select, textarea, [tabindex]):focus-visible {
+    outline: none;
+    box-shadow: var(--shadow-focus);
+    border-color: var(--color-primary);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* A <button> that should look like the <div> it replaced */
+  .is-clickable-reset {
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    text-align: inherit;
+  }
+}

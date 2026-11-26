@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import './dashboard.css'
 import TopBar from './components/layout/TopBar'
 import Sidebar from './components/layout/Sidebar'
 import Dashboard from './components/pages/Dashboard'
