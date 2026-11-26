@@ -13,10 +13,11 @@ import {
 } from "../../../types"
 import { apiGetQuotationFile, type KycPendingClient, type QuotationOptionRow, type UnsentQuotation } from "../../../api"
 import type { CompletedRateRequest } from "../../../types"
-import { EXPECTED_HAULAGE, INCOTERM_TERMS, UNLOC_RE, expectedPaymentUnloc, incotermPaymentTerm, routeFromForm, computeAdvisories } from "./inttraValidation"
+import { EXPECTED_HAULAGE, INCOTERM_TERMS, UNLOC_RE, expectedPaymentUnloc, incotermPaymentTerm, routeFromForm, computeAdvisories, parseBackendErrors, backendFieldToFormKey, mergeValidationIssues, type BackendValidationResult } from "./inttraValidation"
 import type { WorkspaceItem, BlContainerRow, MblContainerRow, QuotationOptionOverride } from "./types"
 import { empName, openMailto, buildRateSection, generateQuotationPdf } from "./utils"
 import { lookupQuotationId } from "./useWorkspaceActions"
+import PortCombobox from "../../shared/PortCombobox"
 
 export interface InlineStepFormsProps {
   selectedItem: WorkspaceItem
@@ -81,6 +82,8 @@ export interface InlineStepFormsProps {
   inttraField: (key: string) => string; setInttraField: (key: string, value: string) => void
   inttraLoading: boolean
   inttraError: string | null
+  backendValidation: BackendValidationResult | null
+  validationLoading: boolean
   onSubmitInttraBooking: () => void
   siContent: string; setSiContent: (v: string) => void
   siFileName: string; setSiFileName: (v: string) => void
@@ -193,7 +196,7 @@ export default function InlineStepForms({
   paField, setPaField, paCopied, setPaCopied,
   releasePhase, setReleasePhase, releaseDraft, setReleaseDraft, mkReleaseOrderDraft,
   roFields, setRoFields, linerBooked, setLinerBooked, procBookingTab, setProcBookingTab,
-  inttraField, setInttraField, inttraLoading, inttraError, onSubmitInttraBooking,
+  inttraField, setInttraField, inttraLoading, inttraError, backendValidation, validationLoading, onSubmitInttraBooking,
   siContent, setSiContent, siFileName, setSiFileName, siMode, setSiMode, inttraSiLoading,
   siField, setSiField, siIsNvocc, siEmailShow, setSiEmailShow,
   siEmailDraft, setSiEmailDraft, siLinerEmail, setSiLinerEmail,
@@ -2114,32 +2117,72 @@ export default function InlineStepForms({
         </>
       ) : (
         <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* Error banner */}
-          {inttraError && (
-            <div style={{ padding: '10px 12px', background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, fontSize: 12, color: '#dc2626' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, marginBottom: inttraError.includes('\n') ? 6 : 0 }}>
-                <AlertTriangle size={14} /> {inttraError.includes('\n') ? 'Booking validation failed' : inttraError}
-              </div>
-              {inttraError.includes('\n') && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginLeft: 20 }}>
-                  {inttraError.split('\n').map((line, i) => {
-                    const colonIdx = line.indexOf(': ')
-                    const fieldPath = colonIdx > -1 ? line.slice(0, colonIdx) : null
-                    const message = colonIdx > -1 ? line.slice(colonIdx + 2) : line
-                    return (
+          {/* Error banner — structured parsing of backend errors */}
+          {inttraError && (() => {
+            const parsed = parseBackendErrors(inttraError)
+            if (parsed && parsed.length > 0) {
+              const errs = parsed.filter(i => i.severity === 'error')
+              const warns = parsed.filter(i => i.severity === 'warning')
+              return (
+                <>
+                  {errs.length > 0 && (
+                    <div style={{ padding: '10px 12px', background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, fontSize: 12, color: '#dc2626' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, marginBottom: 6 }}>
+                        <AlertTriangle size={14} /> Booking validation failed ({errs.length} error{errs.length > 1 ? 's' : ''})
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginLeft: 20 }}>
+                        {errs.map((e, i) => (
+                          <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'baseline', fontSize: 11, lineHeight: 1.4 }}>
+                            <span style={{ color: '#ef4444' }}>•</span>
+                            <span>
+                              {e.field && <span style={{ fontFamily: 'monospace', fontSize: 10, background: 'rgba(220,38,38,0.08)', padding: '1px 4px', borderRadius: 3, marginRight: 4 }}>{backendFieldToFormKey(e.field) ?? e.field}</span>}
+                              {e.message}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {warns.length > 0 && (
+                    <div style={{ padding: '10px 12px', background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.15)', borderRadius: 8, fontSize: 12, color: '#a16207' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, marginBottom: 6 }}>
+                        <AlertTriangle size={14} /> {warns.length} warning{warns.length > 1 ? 's' : ''}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginLeft: 20 }}>
+                        {warns.map((w, i) => (
+                          <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'baseline', fontSize: 11, lineHeight: 1.4 }}>
+                            <span style={{ color: '#ca8a04' }}>•</span>
+                            <span>
+                              {w.field && <span style={{ fontFamily: 'monospace', fontSize: 10, background: 'rgba(234,179,8,0.08)', padding: '1px 4px', borderRadius: 3, marginRight: 4 }}>{backendFieldToFormKey(w.field) ?? w.field}</span>}
+                              {w.message}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )
+            }
+            // Fallback: plain string display
+            return (
+              <div style={{ padding: '10px 12px', background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, fontSize: 12, color: '#dc2626' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, marginBottom: inttraError.includes('\n') ? 6 : 0 }}>
+                  <AlertTriangle size={14} /> {inttraError.includes('\n') ? 'Booking validation failed' : inttraError}
+                </div>
+                {inttraError.includes('\n') && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginLeft: 20 }}>
+                    {inttraError.split('\n').map((line, i) => (
                       <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'baseline', fontSize: 11, lineHeight: 1.4 }}>
                         <span style={{ color: '#ef4444' }}>•</span>
-                        <span>
-                          {fieldPath && <span style={{ fontFamily: 'monospace', fontSize: 10, background: 'rgba(220,38,38,0.08)', padding: '1px 4px', borderRadius: 3, marginRight: 4 }}>{fieldPath}</span>}
-                          {message}
-                        </span>
+                        <span>{line}</span>
                       </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {/* ── Contact ── */}
           <div>
@@ -2304,8 +2347,8 @@ export default function InlineStepForms({
             const fl = { fontSize: 11, fontWeight: 600 as const, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' as const }
             const modes = ['MaritimeTransport','RailTransport','RoadTransport','InlandWaterTransport','Rail_WaterTransport','Rail_RoadTransport','Road_WaterTransport']
             const means = ['OceanVessel','ContainerShip','BulkCarrier','FeederVessel','Ship','Rail','Road','RailOrRoad','Barge','Truck','Other','NotSpecified']
-            const addLeg = () => { setInttraField('legCount', String(lc + 1)); setInttraField(`leg_${lc}_stage`, 'MainCarriage'); setInttraField(`leg_${lc}_scac`, ''); setInttraField(`leg_${lc}_vessel`, ''); setInttraField(`leg_${lc}_voyage`, ''); setInttraField(`leg_${lc}_mode`, 'MaritimeTransport'); setInttraField(`leg_${lc}_means`, 'OceanVessel') }
-            const removeLeg = (idx: number) => { for (let i = idx; i < lc - 1; i++) { for (const k of ['stage','scac','vessel','voyage','mode','means']) setInttraField(`leg_${i}_${k}`, inttraField(`leg_${i+1}_${k}`)) } setInttraField('legCount', String(lc - 1)) }
+            const addLeg = () => { setInttraField('legCount', String(lc + 1)); setInttraField(`leg_${lc}_stage`, 'MainCarriage'); setInttraField(`leg_${lc}_scac`, ''); setInttraField(`leg_${lc}_vessel`, ''); setInttraField(`leg_${lc}_voyage`, ''); setInttraField(`leg_${lc}_mode`, 'MaritimeTransport'); setInttraField(`leg_${lc}_means`, 'OceanVessel'); setInttraField(`leg_${lc}_startLoc`, ''); setInttraField(`leg_${lc}_endLoc`, '') }
+            const removeLeg = (idx: number) => { for (let i = idx; i < lc - 1; i++) { for (const k of ['stage','scac','vessel','voyage','mode','means','startLoc','endLoc']) setInttraField(`leg_${i}_${k}`, inttraField(`leg_${i+1}_${k}`)) } setInttraField('legCount', String(lc - 1)) }
             return (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -2321,10 +2364,12 @@ export default function InlineStepForms({
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
                       <div><label style={fl}>Stage *</label><select className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`leg_${i}_stage`)} onChange={e => setInttraField(`leg_${i}_stage`, e.target.value)}><option value="MainCarriage">Main Carriage</option><option value="PreCarriage">Pre-Carriage</option><option value="OnCarriage">On-Carriage</option></select></div>
                       <div><label style={fl}>Carrier SCAC</label><input className="lt-input" style={{ width: '100%', fontSize: 11 }} maxLength={4} value={inttraField(`leg_${i}_scac`)} onChange={e => setInttraField(`leg_${i}_scac`, e.target.value)} /></div>
-                      <div><label style={fl}>Vessel Name</label><input className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`leg_${i}_vessel`)} onChange={e => setInttraField(`leg_${i}_vessel`, e.target.value)} /></div>
-                      <div><label style={fl}>Voyage Number</label><input className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`leg_${i}_voyage`)} onChange={e => setInttraField(`leg_${i}_voyage`, e.target.value)} /></div>
+                      <div><label style={fl}>Vessel Name</label><input className="lt-input" style={{ width: '100%', fontSize: 11 }} maxLength={35} value={inttraField(`leg_${i}_vessel`)} onChange={e => setInttraField(`leg_${i}_vessel`, e.target.value)} /></div>
+                      <div><label style={fl}>Voyage Number</label><input className="lt-input" style={{ width: '100%', fontSize: 11 }} maxLength={17} value={inttraField(`leg_${i}_voyage`)} onChange={e => setInttraField(`leg_${i}_voyage`, e.target.value)} /></div>
                       <div><label style={fl}>Mode</label><select className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`leg_${i}_mode`)} onChange={e => setInttraField(`leg_${i}_mode`, e.target.value)}>{modes.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
                       <div><label style={fl}>Means</label><select className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`leg_${i}_means`)} onChange={e => setInttraField(`leg_${i}_means`, e.target.value)}>{means.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
+                      <div><label style={fl}>Load Port</label><PortCombobox value={inttraField(`leg_${i}_startLoc`) || inttraField('placeOfReceipt')} onChange={v => setInttraField(`leg_${i}_startLoc`, v)} placeholder="POL (default: Place of Receipt)" style={{ width: '100%', fontSize: 10 }} /></div>
+                      <div><label style={fl}>Discharge Port</label><PortCombobox value={inttraField(`leg_${i}_endLoc`) || inttraField('placeOfDelivery')} onChange={v => setInttraField(`leg_${i}_endLoc`, v)} placeholder="POD (default: Place of Delivery)" style={{ width: '100%', fontSize: 10 }} /></div>
                     </div>
                   </div>
                 ))}
@@ -2341,8 +2386,8 @@ export default function InlineStepForms({
             const pmTerms = ['Prepaid','Collect','PayableElsewhere']
             const addParty = () => { setInttraField('partyCount', String(pc + 1)); setInttraField(`party_${pc}_role`, ''); setInttraField(`party_${pc}_name`, ''); setInttraField(`party_${pc}_inttraId`, ''); setInttraField(`party_${pc}_alias`, ''); setInttraField(`party_${pc}_address`, ''); setInttraField(`party_${pc}_city`, ''); setInttraField(`party_${pc}_country`, ''); setInttraField(`party_${pc}_chargeCount`, '0') }
             const removeParty = (idx: number) => { for (let i = idx; i < pc - 1; i++) { for (const k of ['role','name','inttraId','alias','address','city','country','chargeCount']) setInttraField(`party_${i}_${k}`, inttraField(`party_${i+1}_${k}`)); const cc = parseInt(inttraField(`party_${i+1}_chargeCount`)) || 0; for (let c = 0; c < cc; c++) { setInttraField(`party_${i}_charge_${c}_type`, inttraField(`party_${i+1}_charge_${c}_type`)); setInttraField(`party_${i}_charge_${c}_term`, inttraField(`party_${i+1}_charge_${c}_term`)) } } setInttraField('partyCount', String(pc - 1)) }
-            const addCharge = (pi: number) => { const cc = parseInt(inttraField(`party_${pi}_chargeCount`)) || 0; setInttraField(`party_${pi}_chargeCount`, String(cc + 1)); setInttraField(`party_${pi}_charge_${cc}_type`, 'OceanFreight'); setInttraField(`party_${pi}_charge_${cc}_term`, 'Prepaid') }
-            const removeCharge = (pi: number, ci: number) => { const cc = parseInt(inttraField(`party_${pi}_chargeCount`)) || 0; for (let c = ci; c < cc - 1; c++) { setInttraField(`party_${pi}_charge_${c}_type`, inttraField(`party_${pi}_charge_${c+1}_type`)); setInttraField(`party_${pi}_charge_${c}_term`, inttraField(`party_${pi}_charge_${c+1}_term`)) } setInttraField(`party_${pi}_chargeCount`, String(cc - 1)) }
+            const addCharge = (pi: number) => { const cc = parseInt(inttraField(`party_${pi}_chargeCount`)) || 0; setInttraField(`party_${pi}_chargeCount`, String(cc + 1)); setInttraField(`party_${pi}_charge_${cc}_type`, 'OceanFreight'); setInttraField(`party_${pi}_charge_${cc}_term`, 'Prepaid'); setInttraField(`party_${pi}_charge_${cc}_locOverride`, '') }
+            const removeCharge = (pi: number, ci: number) => { const cc = parseInt(inttraField(`party_${pi}_chargeCount`)) || 0; for (let c = ci; c < cc - 1; c++) { setInttraField(`party_${pi}_charge_${c}_type`, inttraField(`party_${pi}_charge_${c+1}_type`)); setInttraField(`party_${pi}_charge_${c}_term`, inttraField(`party_${pi}_charge_${c+1}_term`)); setInttraField(`party_${pi}_charge_${c}_locOverride`, inttraField(`party_${pi}_charge_${c+1}_locOverride`)) } setInttraField(`party_${pi}_chargeCount`, String(cc - 1)) }
             return (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -2405,7 +2450,7 @@ export default function InlineStepForms({
                               <select className="lt-input" style={{ flex: 1, fontSize: 10 }} value={cTerm} onChange={e => setInttraField(`party_${i}_charge_${c}_term`, e.target.value)}>
                                 {pmTerms.map(pt => <option key={pt} value={pt}>{pt}</option>)}
                               </select>
-                              {payLoc && <span style={{ fontSize: 9, fontFamily: 'monospace', color: '#0891b2', background: 'rgba(8,145,178,0.08)', padding: '1px 5px', borderRadius: 4, whiteSpace: 'nowrap' }}>@ {payLoc}</span>}
+                              <PortCombobox value={inttraField(`party_${i}_charge_${c}_locOverride`) || payLoc || ''} onChange={v => setInttraField(`party_${i}_charge_${c}_locOverride`, v)} placeholder={payLoc ? `Auto: ${payLoc}` : 'Location'} style={{ width: 90, fontSize: 10 }} />
                               <button type="button" onClick={() => removeCharge(i, c)} style={{ fontSize: 12, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>×</button>
                             </div>
                           )
@@ -2582,19 +2627,57 @@ export default function InlineStepForms({
             if (!hasPkg) missing.push('Package Details (description, HS code, weight)')
             if (!hasEq) missing.push('Equipment (count, size, haulage)')
             if (!hasLeg) missing.push('Transport Leg (carrier SCAC)')
-            const disabled = inttraLoading || missing.length > 0
-            const advisories = computeAdvisories(inttraField)
+            const localIssues = computeAdvisories(inttraField)
+            const backendIssues = backendValidation
+              ? [...backendValidation.errors, ...backendValidation.warnings]
+              : undefined
+            const merged = mergeValidationIssues(localIssues, backendIssues)
+            const errors = merged.filter(i => i.severity === 'error')
+            const warnings = merged.filter(i => i.severity === 'warning')
+            const hasBlockingErrors = errors.length > 0 || backendValidation?.can_submit === false
+            const disabled = inttraLoading || missing.length > 0 || hasBlockingErrors
             return (
               <div style={{ marginTop: 4 }}>
-                {advisories.length > 0 && (
-                  <div style={{ fontSize: 11, color: '#7c3aed', background: 'rgba(124,58,237,0.04)', border: '1px solid rgba(124,58,237,0.12)', borderRadius: 6, padding: '6px 10px', marginBottom: 8 }}>
-                    <strong style={{ display: 'block', marginBottom: 3 }}>Advisories</strong>
-                    {advisories.map((a, idx) => <div key={idx} style={{ display: 'flex', gap: 4, alignItems: 'baseline' }}><span style={{ color: '#a78bfa' }}>•</span> {a}</div>)}
+                {/* Merged validation errors — BLOCKING */}
+                {errors.length > 0 && (
+                  <div style={{ fontSize: 11, color: '#dc2626', background: 'rgba(220,38,38,0.05)', border: '1px solid rgba(220,38,38,0.18)', borderRadius: 6, padding: '6px 10px', marginBottom: 8 }}>
+                    <strong style={{ display: 'block', marginBottom: 3 }}>Validation Errors</strong>
+                    {errors.map((e, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: 4, alignItems: 'baseline' }}>
+                        <span style={{ color: '#ef4444' }}>•</span>
+                        <span>
+                          {e.field && <span style={{ fontFamily: 'monospace', fontSize: 10, background: 'rgba(220,38,38,0.08)', padding: '1px 3px', borderRadius: 3, marginRight: 4 }}>{backendFieldToFormKey(e.field) ?? e.field}</span>}
+                          {e.message}
+                          {e.source !== 'LOCAL' && <span style={{ fontSize: 9, opacity: 0.6, marginLeft: 4 }}>[{e.source === 'PYDANTIC' ? 'Schema' : 'Backend'}]</span>}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Merged warnings — NON-BLOCKING */}
+                {warnings.length > 0 && (
+                  <div style={{ fontSize: 11, color: '#a16207', background: 'rgba(234,179,8,0.05)', border: '1px solid rgba(234,179,8,0.15)', borderRadius: 6, padding: '6px 10px', marginBottom: 8 }}>
+                    <strong style={{ display: 'block', marginBottom: 3 }}>Warnings</strong>
+                    {warnings.map((w, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: 4, alignItems: 'baseline' }}>
+                        <span style={{ color: '#ca8a04' }}>•</span>
+                        <span>
+                          {w.field && <span style={{ fontFamily: 'monospace', fontSize: 10, background: 'rgba(234,179,8,0.08)', padding: '1px 3px', borderRadius: 3, marginRight: 4 }}>{backendFieldToFormKey(w.field) ?? w.field}</span>}
+                          {w.message}
+                          {w.source !== 'LOCAL' && <span style={{ fontSize: 9, opacity: 0.6, marginLeft: 4 }}>[{w.source === 'PYDANTIC' ? 'Schema' : 'Backend'}]</span>}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 )}
                 {missing.length > 0 && (
                   <div style={{ fontSize: 11, color: '#ca8a04', background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.15)', borderRadius: 6, padding: '6px 10px', marginBottom: 8 }}>
                     <strong>Missing required fields:</strong> {missing.join(' · ')}
+                  </div>
+                )}
+                {validationLoading && (
+                  <div style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
+                    <Loader2 size={12} className="animate-spin" /> Validating with backend...
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
