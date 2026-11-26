@@ -73,13 +73,12 @@ export const FIELD_LABEL: CSSProperties = {
 export const INPUT_STYLE: CSSProperties = {
   width: '100%',
   minHeight: 32,
-  padding: '0 10px',
+  padding: '6px 10px',
   fontSize: 13,
   borderRadius: 'var(--radius-control)',
   border: '1px solid var(--color-line)',
   background: '#fff',
   color: 'var(--text)',
-  outline: 'none',
 }
 
 /* ---- Tables ---- */

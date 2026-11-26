@@ -1336,7 +1336,7 @@ textarea.lt-input { height: auto; min-height: var(--control-h-md); padding: 6px 
 .help-role-tag.action {
   background: rgba(13,148,136,0.07); color: #0d9488;
   font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
-  font-size: 9.5px;
+  font-size: 11px;
 }
 
 /* ============ QUICK COMMANDS SIDEBAR (qc-*) ============ */
