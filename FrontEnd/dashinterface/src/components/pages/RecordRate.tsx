@@ -73,6 +73,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
   const [bulkRows, setBulkRows] = useState<BulkTariffPreviewRow[]>([])
   const [bulkUploading, setBulkUploading] = useState(false)
   const [bulkSaving, setBulkSaving] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [bulkNote, setBulkNote] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const now = new Date()
@@ -180,16 +181,19 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
 
   const removeBulkRow = (idx: number) => setBulkRows(prev => prev.filter((_, i) => i !== idx))
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saving) return
     const summarise = (arr: (TariffContainerRate | ContractedContainerRate)[]) =>
       arr.filter(c => c.rate !== '').map(c => `${c.containerType || '?'}: ${c.rate} ${c.currency}`).join(', ')
     const containers = rrType === 'Tariff Rate' ? rrTariffContainers : rrType === 'Contracted' ? rrContractedContainers : rrNacContainers
-    onFlash(`Rate recorded: ${rrType} · ${linerName} · ${laneName} · ${summarise(containers)}`)
 
-    // Fire API POSTs in background — one per container row that has a rate
+    // One POST per container row that has a rate
+    type SaveJob = { row: TariffContainerRate | ContractedContainerRate; request: () => Promise<unknown> }
+    let jobs: SaveJob[]
     if (rrType === 'Tariff Rate') {
-      rrTariffContainers.filter(c => c.rate !== '').forEach(ct => {
-        apiCreateTariffRate({
+      jobs = rrTariffContainers.filter(c => c.rate !== '').map(ct => ({
+        row: ct,
+        request: () => apiCreateTariffRate({
           lin_id: rrLinerId !== '' ? rrLinerId : undefined,
           tr_ln_id: 1,
           updated_by: 6,
@@ -205,11 +209,12 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
           free_time: rrFreeTime.trim() || undefined,
           note: rrNote || undefined,
           special_remark: rrSpecialRemark || undefined,
-        }).catch(err => console.error('[RecordRate] tariff POST failed:', err))
-      })
+        }),
+      }))
     } else if (rrType === 'Contracted') {
-      rrContractedContainers.filter(c => c.rate !== '').forEach(cc => {
-        apiCreateContractedRate({
+      jobs = rrContractedContainers.filter(c => c.rate !== '').map(cc => ({
+        row: cc,
+        request: () => apiCreateContractedRate({
           lin_id: rrLinerId !== '' ? rrLinerId : undefined,
           tr_ln_id: 1,
           contract_ref_id: rrContractId || undefined,
@@ -233,13 +238,14 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
                 .map(name => dbClientList.find(c => c.name === name)?.cli_id)
                 .filter((id): id is number => id !== undefined)
             : undefined,
-        }).catch(err => console.error('[RecordRate] contracted POST failed:', err))
-      })
+        }),
+      }))
     } else {
       // NAC
       const cliId = dbClientList.find(c => c.name === rrNacCustomerName)?.cli_id
-      rrNacContainers.filter(c => c.rate !== '').forEach(nc => {
-        apiCreateNacRate({
+      jobs = rrNacContainers.filter(c => c.rate !== '').map(nc => ({
+        row: nc,
+        request: () => apiCreateNacRate({
           cli_id: cliId,
           lin_id: rrLinerId !== '' ? rrLinerId : undefined,
           tr_ln_id: 1,
@@ -258,11 +264,33 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
           max_weight: nc.weight.trim() ? parseInt(nc.weight) : undefined,
           note: rrNote || undefined,
           special_remark: rrSpecialRemark || undefined,
-        }).catch(err => console.error('[RecordRate] NAC POST failed:', err))
-      })
+        }),
+      }))
     }
 
-    resetForm()
+    setSaving(true)
+    try {
+      const results = await Promise.allSettled(jobs.map(j => j.request()))
+      const failed = jobs.filter((_, i) => results[i].status === 'rejected')
+      if (failed.length === 0) {
+        onFlash(`Rate recorded: ${rrType} · ${linerName} · ${laneName} · ${summarise(containers)}`)
+        resetForm()
+        return
+      }
+      // Keep only the rows that did not save, so pressing Save again cannot create duplicates
+      const failedRows = new Set<object>(failed.map(j => j.row))
+      const keepUnsaved = <T extends { rate: number | '' }>(rows: T[]) => rows.filter(r => r.rate === '' || failedRows.has(r))
+      if (rrType === 'Tariff Rate') setRrTariffContainers(rows => keepUnsaved(rows))
+      else if (rrType === 'Contracted') setRrContractedContainers(rows => keepUnsaved(rows))
+      else setRrNacContainers(rows => keepUnsaved(rows))
+      const reasons = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected').map(r => r.reason)
+      console.error('[RecordRate] rate save failed:', reasons)
+      const firstReason = reasons[0] instanceof Error ? reasons[0].message : String(reasons[0])
+      const saved = jobs.length - failed.length
+      onFlash(`${saved} of ${jobs.length} rate row(s) saved, ${failed.length} failed. Fix and press Confirm & Save again. (${firstReason.slice(0, 140)})`)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const canSave = rrType === 'Tariff Rate'
@@ -921,10 +949,11 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
               </button>
               <button
                 className="db-btn primary"
-                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, ...(saving ? { opacity: 0.6, cursor: 'wait' } : {}) }}
                 onClick={handleSave}
+                disabled={saving}
               >
-                <Check size={12} /> Confirm & Save
+                <Check size={12} /> {saving ? 'Saving…' : 'Confirm & Save'}
               </button>
             </div>
           </>
