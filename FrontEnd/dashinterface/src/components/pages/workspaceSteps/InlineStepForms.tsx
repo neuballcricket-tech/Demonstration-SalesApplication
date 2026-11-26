@@ -9,7 +9,7 @@ import { MOCK_OPEN_VOYAGES } from "../../../mockData"
 import {
   ROLE_LABELS, daysUntil, linerDisplay, type UserRole,
   type Booking, type LinerRecord, type ReleaseOrderFields,
-  type Inquiry, type ContainerLine,
+  type Inquiry,
 } from "../../../types"
 import { apiGetQuotationFile, type KycPendingClient, type QuotationOptionRow, type UnsentQuotation } from "../../../api"
 import type { CompletedRateRequest } from "../../../types"
@@ -49,7 +49,7 @@ export interface InlineStepFormsProps {
   selectedRateOptionIds: Set<number>; setSelectedRateOptionIds: React.Dispatch<React.SetStateAction<Set<number>>>
   bestRateOptionId: number | null; setBestRateOptionId: (v: number | null) => void
   optionOverrides: Record<number, QuotationOptionOverride>; setOptionOverrides: React.Dispatch<React.SetStateAction<Record<number, QuotationOptionOverride>>>
-  quotationContent: string; setQuotationContent: (v: string) => void
+  quotationContent: string; setQuotationContent: React.Dispatch<React.SetStateAction<string>>
   quoteCopied: boolean; setQuoteCopied: (v: boolean) => void
   cutoffLiner: string; setCutoffLiner: (v: string) => void
   cutoffMode: "paste" | "upload"; setCutoffMode: (v: "paste" | "upload") => void
@@ -461,7 +461,7 @@ export default function InlineStepForms({
         <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', borderBottom: '1px solid var(--border)' }}>
           <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Customer</div>
           <div style={{ padding: '8px 10px', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
-            {pqInq.customer_name}{pqInq.tier ? ` (${pqInq.tier})` : ''}
+            {pqInq.customer_name}
           </div>
         </div>
 
@@ -3834,15 +3834,6 @@ export default function InlineStepForms({
     const tmp = document.createElement('div')
     tmp.innerHTML = unsentQuote.body_html
     quotationText = (tmp.textContent || tmp.innerText || '').replace(/\n{3,}/g, '\n\n').trim()
-  }
-  const stcContainer = actionModal.sourceData.container as ContainerLine | undefined
-  const stcRr = actionModal.sourceData.rateRequest as CompletedRateRequest | undefined
-  const stcOptions = stcRr?.options?.filter(o => o.rate && selectedRateOptionIds.has(o.option_id)) ?? []
-  const canAttachQuotation = stcOptions.length > 0
-  const computeFinal = (optId: number, baseRate: number) => {
-    const ovr = optionOverrides[optId]
-    if (!ovr) return baseRate
-    return ovr.isPercentage ? baseRate * (1 + ovr.margin / 100) : baseRate + ovr.margin
   }
   const emailSubject = `Quotation for ${stcInquiry.customer_name} — ${stcInquiry.id}`
 

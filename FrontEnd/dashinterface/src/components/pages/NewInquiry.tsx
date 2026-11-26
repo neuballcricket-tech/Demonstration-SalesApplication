@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Plus, Save, X } from 'lucide-react'
+import { ArrowLeft, Plus, Save } from 'lucide-react'
 import {
   SBUS, INQUIRY_PRIORITIES, COMMODITY_TYPES, CONTAINER_TYPES, CONTAINER_TYPE_LABELS,
   emptyContainerLine, linerDisplay,
@@ -114,8 +114,8 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
       ...(matchedCli ? { cli_id: matchedCli.cli_id } : {}),
       ...(matchedCp  ? { cpid:   matchedCp.cp_id   } : {}),
       request: autoRequest,
-      origin: niOrigin.trim() || undefined,
-      destination: firstContainer?.destination.trim() || undefined,
+      origin: niOrigin.trim(),
+      destination: firstContainer?.destination.trim() ?? '',
       delivery_type: niDelivery,
       sbu: niSbu,
       employee_id: activeEmployee.id,

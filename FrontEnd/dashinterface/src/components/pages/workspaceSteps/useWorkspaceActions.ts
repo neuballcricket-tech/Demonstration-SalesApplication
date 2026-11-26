@@ -11,12 +11,12 @@ import {
   type ActivityEntry, type WorkflowStage,
   type ContainerLine, type LinerRecord, type ClientRecord,
   type ReleaseOrderFields, type VesselSchedule,
-  type QuoteStatus, type KycStatus,
+  type QuoteStatus, type KycStatus, type UserRole,
 } from '../../../types'
 import type { CompletedRateRequest } from '../../../types'
 import {
   apiCreateKycRequest, apiCreateQuotation, apiPatchQuotation,
-  apiMarkQuotationSent, apiFetchQuotation, apiRecordQuotationResponse,
+  apiMarkQuotationSent, apiRecordQuotationResponse,
   apiUpdateKycStage, apiUploadQuotationDocument,
   type KycPendingClient, type KycRequestRecord,
   type QuotationOptionPayload, type QuotationOptionRow,
@@ -62,7 +62,7 @@ export interface UseWorkspaceActionsParams {
   clientList: ClientRecord[]
   linerList: LinerRecord[]
   vesselSchedules: VesselSchedule[]
-  activeRole: string
+  activeRole: UserRole
   activeEmployee: { id: number; name: string }
   roleSteps: StepDef[]
   actionModal: WorkspaceItem | null
@@ -370,7 +370,7 @@ export function useWorkspaceActions(p: UseWorkspaceActionsParams) {
     setBkContractNo, setBkAgreedRate, setBkRateRemark, setBkDeliveryTerm,
     setBkHsCode, setBkBlType, setBkBookingType, setBkReeferTemp, setBkDeliveryAgent,
     setBkSpecificRouting, setBkRaNumber,
-    setRoFields, setReleasePhase, setReleaseDraft, setRoRefCollapsed,
+    setRoFields, setReleasePhase, setReleaseDraft,
     setCutoffBookingId, setCutoffLiner, setCutoffMode, setCutoffContent, setCutoffFileName,
     setCutoffNotes, setCutoffSiDate, setCutoffBlDate, setCutoffVgmDate, setCutoffFilingDate,
     setSiContent, setSiFileName, setSiMode, setInttraSiLoading,
@@ -383,7 +383,7 @@ export function useWorkspaceActions(p: UseWorkspaceActionsParams) {
     setSiForm, setSiIsNvocc, setSiEmailShow, setSiEmailDraft, setSiLinerEmail,
     setHblForm, setHblContainers, setHblCollapsed,
     setMblForm, setMblContainers, setMblSelectedHblIds, setMblHblSearch,
-    setPaForm, setBkgForm, setBlActiveTab, setPaCopied,
+    setPaForm, setBkgForm,
     onAdvanceWorkflow, onConfirmBooking, onMarkRaAssigned, onRevertBookingRequest,
     onAttachReleaseOrder, onReleaseBooking, onAcknowledgeProcurement, onCreateBooking,
     onSetBookingSiCutoff, onSetBookingBlCutoff, onSetBookingVgmCutoff, onSetBookingFilingCutoff,
@@ -415,7 +415,7 @@ export function useWorkspaceActions(p: UseWorkspaceActionsParams) {
           ref_type: 'inquiry',
           ref_id: inquiry.id,
           customer_name: inquiry.customer_name,
-          pushed_to: stageRoleLabel(nextStageObj),
+          pushed_to: nextStageObj.roles[0],
           notes: `${inquiry.request} · ${inquiry.origin} → ${inquiry.destination}`,
         })
         // All inquiries go directly to Rate Check; open it immediately
@@ -1153,7 +1153,6 @@ CLSynergy (Pvt) Ltd`
       }
       case 'create-bl': {
         const blBkg = item.sourceData.booking as Booking
-        const blInq = inquiries.find(i => i.customer_name.toLowerCase() === item.customerName.toLowerCase())
         const blVessel = vesselSchedules
           .filter(vs => vs.vessel_name === blBkg.vessel_name && vs.voyage_number === blBkg.voyage_number)
           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
@@ -1391,9 +1390,13 @@ CLSynergy (Pvt) Ltd`
       const nxt = cur ? roleSteps.find(s => s.stepNumber === cur.stepNumber + 1) : null
       return nxt ? { label: `Go to ${nxt.label}`, onClick: () => setActiveStep(nxt.key) } : undefined
     })()
+    // Every kind except attach-release-order is only reachable with actionModal set
+    // (see effectiveKind above), so `modal` is actionModal whenever it is open.
+    const modal = actionModal ?? selectedItem
+    if (!modal) return
     switch (effectiveKind) {
       case 'send-kyc': {
-        const { customer, inquiry: kycInquiry, kycClient: pendingKycClient } = actionModal.sourceData
+        const { customer, inquiry: kycInquiry, kycClient: pendingKycClient } = modal.sourceData
         // Resolve backend cli_id: prefer kycClient.cli_id, fall back to clientList name lookup
         let cli_id: number | undefined
         if (pendingKycClient?.cli_id) {
@@ -1449,9 +1452,9 @@ CLSynergy (Pvt) Ltd`
           } catch (err) { console.error('[Workspace] KYC request failed:', err) }
           setKycSending(false)
         } else {
-          console.warn('[Workspace] KYC submit skipped — cli_id is undefined. sourceData:', actionModal.sourceData)
+          console.warn('[Workspace] KYC submit skipped — cli_id is undefined. sourceData:', modal.sourceData)
         }
-        const customerName = pendingKycClient?.name ?? customer?.name ?? actionModal.customerName
+        const customerName = pendingKycClient?.name ?? customer?.name ?? modal.customerName
         if (!pendingKycClient) {
           // Legacy flow: update local customer record and advance inquiry
           if (customer) onUpdateCustomerKyc(customer.name, 'pending_customer')
@@ -1471,9 +1474,9 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'verify-kyc': {
-        const { kycRequest } = actionModal.sourceData
+        const { kycRequest } = modal.sourceData
         const kycCliId = kycRequest?.cli_id
-        const kycCustomerName = kycRequest?.name ?? actionModal.customerName
+        const kycCustomerName = kycRequest?.name ?? modal.customerName
         const approved = formDecision === 'approve'
         if (approved) {
           // Mark KYC completed in backend
@@ -1524,7 +1527,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'prepare-quotation': {
-        const { inquiry, rateRequest: saveRr, container: pqContainer } = actionModal.sourceData as {
+        const { inquiry, rateRequest: saveRr, container: pqContainer } = modal.sourceData as {
           inquiry: Inquiry; rateRequest?: CompletedRateRequest; container?: ContainerLine
         }
         // Create quotation record in backend (status = in_prep).
@@ -1579,7 +1582,7 @@ CLSynergy (Pvt) Ltd`
             .then(created => {
               if (created.quote_id) {
                 setLastQuotationId(created.quote_id)
-                saveQuotationId(inquiry.inq_id, created.quote_id)
+                if (inquiry.inq_id != null) saveQuotationId(inquiry.inq_id, created.quote_id)
 
                 // Generate PDF and upload document to backend
                 if (saveRr) {
@@ -1613,7 +1616,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'send-to-customer': {
-        const { inquiry } = actionModal.sourceData
+        const { inquiry } = modal.sourceData
         // Update sent_via on the quotation record, then mark as sent.
         // PATCH must happen before marking sent (backend blocks PATCH once status = 'sent').
         const sendQuoteId = lastQuotationId ?? lookupQuotationId(inquiry.inq_id) ?? inquiry.quotation_id
@@ -1646,10 +1649,10 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'customer-response': {
-        const { inquiry } = actionModal.sourceData
+        const { inquiry } = modal.sourceData
         // Record customer response in backend quotation record
         // Use quoteId from sentQuotations (sourceData) if available; fall back to legacy lookup
-        const quoteId = actionModal.sourceData.quoteId ?? lastQuotationId ?? lookupQuotationId(inquiry.inq_id) ?? inquiry.quotation_id
+        const quoteId = modal.sourceData.quoteId ?? lastQuotationId ?? lookupQuotationId(inquiry.inq_id) ?? inquiry.quotation_id
         if (quoteId && customerDecision === 'accepted' && selectedOptionRateId != null) {
           apiRecordQuotationResponse(quoteId, 'accepted', selectedOptionRateId)
             .catch(err => console.error('[Workspace] record quotation response failed:', err))
@@ -1684,7 +1687,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'booking-request': {
-        const { inquiry, acceptedQuotation: aqSubmit } = actionModal.sourceData
+        const { inquiry, acceptedQuotation: aqSubmit } = modal.sourceData
         const ctnSummary = bkContainers.map(c => `${c.qty}x${c.type}`).join(', ')
         // Resolve liner ID: prefer accepted quotation's lin_id, fallback to name lookup
         const resolvedLinId = aqSubmit?.lin_id ?? linerList.find(l => l.name.toLowerCase() === bkShippingLine.toLowerCase())?.lin_id
@@ -1776,7 +1779,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'review-booking-request': {
-        const { booking: rbBkg } = actionModal.sourceData
+        const { booking: rbBkg } = modal.sourceData
         // Assign the RA number — booking moves to proc-booking step for liner confirmation
         onMarkRaAssigned(rbBkg.id, bkRaNumber, [bkVessel, bkVoyage].filter(Boolean).join(' / ') || '', bkShippingLine)
         const rbNoteParts = [
@@ -1830,7 +1833,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'confirm-liner-booking': {
-        const { booking: cbBkg } = actionModal.sourceData
+        const { booking: cbBkg } = modal.sourceData
         if (linerBooked === 'yes') {
           onConfirmBooking(cbBkg.id, cbBkg.vessel_name, cbBkg.voyage_number)
           onLogActivity({
@@ -1861,7 +1864,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'confirm-booking': {
-        const { booking } = actionModal.sourceData
+        const { booking } = modal.sourceData
         onConfirmBooking(booking.id, formVessel, formVoyage)
         const confirmNotes = [
           `Vessel: ${formVessel || 'TBD'}, Voyage: ${formVoyage || 'TBD'}`,
@@ -1880,7 +1883,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'release-booking': {
-        const { booking } = actionModal.sourceData
+        const { booking } = modal.sourceData
         onReleaseBooking(booking.id, formNote)
         const sendVia = sendMethod === 'email'
           ? `via Email to ${customerContactEmail}`
@@ -1899,7 +1902,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'record-cutoff': {
-        const { booking } = actionModal.sourceData
+        const { booking } = modal.sourceData
         if (cutoffSiDate)     onSetBookingSiCutoff(booking.id, cutoffSiDate)
         if (cutoffBlDate)     onSetBookingBlCutoff(booking.id, cutoffBlDate)
         if (cutoffVgmDate)    onSetBookingVgmCutoff(booking.id, cutoffVgmDate)
@@ -1923,7 +1926,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'request-si': {
-        const { booking } = actionModal.sourceData
+        const { booking } = modal.sourceData
         onMarkSiRequested(booking.id)
         const sendVia = sendMethod === 'email'
           ? `via Email to ${customerContactEmail}`
@@ -1943,7 +1946,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'submit-si': {
-        const { booking } = actionModal.sourceData
+        const { booking } = modal.sourceData
         onMarkSiSubmitted(booking.id)
         const method = 'manually'
         onLogActivity({
@@ -1960,7 +1963,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'save-draft-bl': {
-        const { booking } = actionModal.sourceData
+        const { booking } = modal.sourceData
         onMarkDraftBlSent(booking.id, jobRefNumber)
         onLogActivity({
           actor_role: activeRole,
@@ -1976,7 +1979,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'generate-si': {
-        const { booking } = actionModal.sourceData
+        const { booking } = modal.sourceData
         onMarkLinerBlGenerated(booking.id)
         if (siIsNvocc) {
           onLogActivity({
@@ -2054,7 +2057,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'send-pre-advice': {
-        const { booking } = actionModal.sourceData
+        const { booking } = modal.sourceData
         onMarkPreAdviceSent(booking.id)
         const sendVia = sendMethod === 'email'
           ? `via Email to ${paField('door_agent_email')}`
@@ -2073,7 +2076,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'send-pre-alert': {
-        const { booking } = actionModal.sourceData
+        const { booking } = modal.sourceData
         // Auto-open Outlook with the pre-alert email
         const praSubject = `Pre-Alert — ${paField('hbl_number') || paField('mbl_number') || 'N/A'} — ${paField('vessel')} ${paField('voyage')}`
         const praBody = [
@@ -2120,7 +2123,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'bl-approval': {
-        const { booking } = actionModal.sourceData
+        const { booking } = modal.sourceData
         const approved = blDecision === 'approved'
         const baBlType = booking.delivery_type === 'door-to-door' ? 'House BL' : 'Master BL'
         onSetBlStatus(booking.id, blDecision)
@@ -2145,7 +2148,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'record-master-bl': {
-        const { booking } = actionModal.sourceData
+        const { booking } = modal.sourceData
         onRecordMasterBl(booking.id, { master_bl_number: masterBlNumber, shipper: masterBlShipper, consignee: masterBlConsignee })
         onLogActivity({
           actor_role: activeRole,
@@ -2161,7 +2164,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'create-house-bl': {
-        const { booking } = actionModal.sourceData
+        const { booking } = modal.sourceData
         onCreateHouseBl(booking.id, { house_bl_number: houseBlNumber, shipper: houseBlShipper, consignee: houseBlConsignee })
         const hbSendVia = sendMethod === 'email'
           ? `via Email to ${customerContactEmail}`
@@ -2180,7 +2183,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'approve-quote': {
-        const { quote } = actionModal.sourceData
+        const { quote } = modal.sourceData
         const approved = formDecision === 'approve'
         onSetQuoteStatus(quote.id, approved ? 'Approved' : 'Lost')
         onLogActivity({

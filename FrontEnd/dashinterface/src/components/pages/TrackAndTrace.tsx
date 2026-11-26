@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Radar, Search, Loader2, Ship, MapPin, Package, Anchor, ChevronDown, ChevronRight } from 'lucide-react'
+import { Radar, Search, Loader2, Ship, MapPin, Package, ChevronDown, ChevronRight } from 'lucide-react'
 import { apiTrackingEvents } from '../../api'
 import type { TrackingContainer, TrackingEvent, TrackingEventDateTime } from '../../types'
 
@@ -18,13 +18,6 @@ function parseTrackingDate(dt: TrackingEventDateTime | null): Date | null {
   const h = parseInt(v.slice(8, 10), 10)
   const min = parseInt(v.slice(10, 12), 10)
   return new Date(y, m, d, h, min)
-}
-
-function fmtDateTime(dt: TrackingEventDateTime | null): string {
-  const d = parseTrackingDate(dt)
-  if (!d) return '—'
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) +
-    ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
 function fmtDateShort(dt: TrackingEventDateTime | null): string {

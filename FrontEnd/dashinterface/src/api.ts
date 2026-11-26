@@ -67,7 +67,7 @@ async function postFile<T>(path: string, file: File): Promise<T> {
   form.append('file', file)
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
-    headers: { ...authHeaders() },   // NO Content-Type — the browser sets it with the boundary
+    // No Content-Type header — the browser sets it with the multipart boundary
     body: form,
   })
   if (!res.ok) {

@@ -10,7 +10,7 @@ import {
 } from '../../types'
 import { useRole } from '../../RoleContext'
 import { FIELD_LABEL, INPUT_STYLE } from './pageStyles'
-import { apiFetchAllRates, apiGetPorts, apiGetLiners, apiGetTradeLanes, apiGetEmployeesDb, apiGetAuthEmployees, apiCreateVesselRate, apiCreateFakRate, apiCreateSpecialRate, apiCreateRateRequest, apiPatchRateRequestCs, apiPatchRateRequestProc, apiAddRateRequestOption, apiGetIncomingRateRequests, apiGetAggregateScheduleRates, apiGetEnrichedScheduleRates } from '../../api'
+import { apiFetchAllRates, apiGetPorts, apiGetLiners, apiGetTradeLanes, apiGetEmployeesDb, apiGetAuthEmployees, apiCreateVesselRate, apiCreateFakRate, apiCreateSpecialRate, apiCreateRateRequest, apiPatchRateRequestProc, apiAddRateRequestOption, apiGetIncomingRateRequests, apiGetAggregateScheduleRates, apiGetEnrichedScheduleRates } from '../../api'
 
 type ManualRateTab = 'vessel-spot' | 'fak' | 'special'
 const MR_TAB_LABELS: Record<ManualRateTab, string> = { 'vessel-spot': 'Spot Rate', fak: 'FAK', special: 'Special Rate' }
@@ -209,17 +209,6 @@ function getRowAllKeys(row: SelectablePivotRow, rateTypes: string[]): string[] {
   return keys
 }
 
-function isRowSelected(row: SelectablePivotRow, rateTypes: string[], selected: Set<string>): boolean {
-  const keys = getRowAllKeys(row, rateTypes)
-  return keys.length > 0 && keys.every(k => selected.has(k))
-}
-
-function isRowPartial(row: SelectablePivotRow, rateTypes: string[], selected: Set<string>): boolean {
-  const keys = getRowAllKeys(row, rateTypes)
-  if (keys.length === 0) return false
-  const count = keys.filter(k => selected.has(k)).length
-  return count > 0 && count < keys.length
-}
 
 function toggleRow(row: SelectablePivotRow, rateTypes: string[], selected: Set<string>): Set<string> {
   const keys = getRowAllKeys(row, rateTypes)
@@ -244,7 +233,7 @@ function countPivotRates(pivot: SelectablePivotResult): number {
 // SelectablePivotRateTable — rate types as columns, container types as sub-cols
 // ---------------------------------------------------------------------------
 
-function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onToggleGroup, onToggleRow, onToggleSchedule, onAttachManualRate, emptyMessage }: {
+function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onToggleGroup, onToggleSchedule, onAttachManualRate, emptyMessage }: {
   pivot: SelectablePivotResult
   selectedIds: Set<string>
   selectedScheduleIds: Set<number>
@@ -627,9 +616,9 @@ export default function RateCheck({
 
   // DB rate state
   const [dbRates, setDbRates] = useState<UnifiedRate[]>([])
-  const [dbLoading, setDbLoading] = useState(false)
+  const [, setDbLoading] = useState(false)
   const [dbSearched, setDbSearched] = useState(false)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectedIds] = useState<Set<string>>(new Set())
 
   // Skip procurement flag (cs-sales only)
   const [skipProcurement] = useState(false)
@@ -642,7 +631,7 @@ export default function RateCheck({
   const [linerList, setLinerList] = useState<LinerRecord[]>([])
   const [tradeLaneList, setTradeLaneList] = useState<TradeLaneRecord[]>([])
   const [employeeList, setEmployeeList] = useState<EmployeeRecord[]>([])
-  const [procurementEmployees, setProcurementEmployees] = useState<EmployeeRecord[]>([])
+  const [, setProcurementEmployees] = useState<EmployeeRecord[]>([])
 
   // Helpers to derive prefill values from inquiry / container
   const prefillDest = container?.destination || inquiry.destination
@@ -709,8 +698,7 @@ export default function RateCheck({
   // Aggregate schedule + rates data (procurement view)
   const [aggregateData, setAggregateData] = useState<AggregateScheduleRatesResponse | null>(null)
   const [aggregateLoading, setAggregateLoading] = useState(false)
-  const [dbRatesOpen, setDbRatesOpen] = useState(true)
-  const [openScheduleCards, setOpenScheduleCards] = useState<Set<string>>(new Set())
+  const [, setOpenScheduleCards] = useState<Set<string>>(new Set())
   // Aggregate rate selections — keys are "schedule_id:rate_type:rate_id" e.g. "3:tariff_rates:42"
   const [selectedAggregateRateIds, setSelectedAggregateRateIds] = useState<Set<string>>(new Set())
   // Schedule-level selections (independent of rate keys — works for rate-less schedules too)
@@ -744,7 +732,6 @@ export default function RateCheck({
   // NAC visibility for cs-sales variant
   const canSeeNac = isProcurement || activeRole === 'Procurement' || activeRole === 'Admin' || (custData?.assigned_salesperson_id === activeEmployee.id)
   const visibleRates = canSeeNac ? dbRates : dbRates.filter(r => r.source_type !== 'NAC')
-  const nacHidden = dbRates.length - visibleRates.length
 
   // Enriched pivot for CS/Sales tabular view
   const enrichedPivot = useMemo<SelectablePivotResult>(

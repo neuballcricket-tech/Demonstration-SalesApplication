@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import {
   WORKFLOW_STAGES, stageRoleLabel, isSpotInquiry, daysUntil,
   type Inquiry, type Booking, type Quote, type Customer,
-  type ActivityEntry, type ContainerLine, type WorkflowStage,
+  type ActivityEntry, type ContainerLine,
   type UserRole,
 } from '../../../types'
 import type { KycPendingClient, KycRequestRecord } from '../../../api'

@@ -109,8 +109,8 @@ export default function ModalStepForms(props: ModalStepFormsProps) {
     actionModal, setActionModal,
     formDecision, setFormDecision, formNote, setFormNote,
     formVessel, setFormVessel, formVoyage, setFormVoyage,
-    quotationContent, setQuotationContent, quoteCopied, setQuoteCopied,
-    selectedRateOptionIds, setSelectedRateOptionIds, bestRateOptionId, setBestRateOptionId,
+    quotationContent,
+    selectedRateOptionIds, bestRateOptionId,
     optionOverrides,
     sendMethod, setSendMethod, waConfirmed, setWaConfirmed, emailConfirmed, setEmailConfirmed,
     draftCollapsed, setDraftCollapsed, customerContactEmail, setCustomerContactEmail,
@@ -123,7 +123,7 @@ export default function ModalStepForms(props: ModalStepFormsProps) {
     houseBlConsignee, setHouseBlConsignee,
     jobRefNumber, setJobRefNumber,
     siIsNvocc, siField, hblField, mblField,
-    customers, linerList, activeEmployee,
+    linerList, activeEmployee,
     handleModalSubmit,
   } = props
 

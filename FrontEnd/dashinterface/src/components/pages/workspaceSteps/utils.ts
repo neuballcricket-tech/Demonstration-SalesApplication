@@ -17,11 +17,6 @@ export function openMailto(to: string, subject: string, body: string): void {
   window.open(url, '_blank')
 }
 
-/** Pad or truncate a string to exactly `w` characters. */
-function col(text: string, w: number): string {
-  if (text.length >= w) return text.slice(0, w)
-  return text + ' '.repeat(w - text.length)
-}
 
 /** Short date format for the quotation text table. */
 function fmtD(d: string | null | undefined): string {
@@ -266,7 +261,7 @@ export function buildQuotationHtml(
   options: CompletedRateOption[],
   selectedIds: Set<number>,
   bestId: number | null,
-  overrides: Record<number, QuotationOptionOverride>,
+  _overrides: Record<number, QuotationOptionOverride>,
   liners: LinerRecord[],
   employeeName: string,
   computeFinal: (optId: number, baseRate: number) => number,
