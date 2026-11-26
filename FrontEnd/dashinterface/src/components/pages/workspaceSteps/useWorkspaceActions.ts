@@ -32,6 +32,11 @@ import { NVOCC_LINES } from './constants'
 // ---------------------------------------------------------------------------
 const QUOTE_CACHE_KEY = 'ws_inq_quote_map'
 
+/** Short, user-facing text for an API error. */
+function errorText(err: unknown): string {
+  return (err instanceof Error ? err.message : String(err)).slice(0, 160)
+}
+
 function saveQuotationId(inqId: number, quoteId: number) {
   try {
     const raw = sessionStorage.getItem(QUOTE_CACHE_KEY)
@@ -1409,7 +1414,12 @@ CLSynergy (Pvt) Ltd`
             : undefined
           cli_id = kycInquiry?.cli_id ?? kycClientRecord?.cli_id
         }
-        if (cli_id) {
+        if (!cli_id) {
+          console.warn('[Workspace] KYC submit skipped — cli_id is undefined. sourceData:', modal.sourceData)
+          onFlash(`Could not send the KYC request: ${modal.customerName} has no saved client record yet`)
+          return  // keep the form open with the user's input
+        }
+        {
           setKycSending(true)
           try {
             console.log('[Workspace] Creating KYC request for cli_id:', cli_id)
@@ -1450,10 +1460,13 @@ CLSynergy (Pvt) Ltd`
             }
             // Re-fetch KYC data so frontend picks up the backend's stage advancement
             onRefreshKycRequests()
-          } catch (err) { console.error('[Workspace] KYC request failed:', err) }
-          setKycSending(false)
-        } else {
-          console.warn('[Workspace] KYC submit skipped — cli_id is undefined. sourceData:', modal.sourceData)
+          } catch (err) {
+            console.error('[Workspace] KYC request failed:', err)
+            onFlash(`Could not send the KYC request: ${errorText(err)}`)
+            return  // keep the form open with the user's input
+          } finally {
+            setKycSending(false)
+          }
         }
         const customerName = pendingKycClient?.name ?? customer?.name ?? modal.customerName
         if (!pendingKycClient) {
@@ -1482,8 +1495,13 @@ CLSynergy (Pvt) Ltd`
         if (approved) {
           // Mark KYC completed in backend
           if (kycCliId) {
-            apiUpdateKycStage(kycCliId, 'kyc_completed')
-              .catch(err => console.error('[Workspace] update KYC stage failed:', err))
+            try {
+              await apiUpdateKycStage(kycCliId, 'kyc_completed')
+            } catch (err) {
+              console.error('[Workspace] update KYC stage failed:', err)
+              onFlash(`Could not verify KYC for ${kycCustomerName}: ${errorText(err)}`)
+              return  // keep the form open with the user's input
+            }
           }
           // Remove from Finance's review queue locally
           if (kycRequest) {
@@ -1506,8 +1524,13 @@ CLSynergy (Pvt) Ltd`
         } else {
           // Reject — reset to uninitiated so CS's pending queue picks it up again
           if (kycCliId) {
-            apiUpdateKycStage(kycCliId, 'kyc_uninitiated')
-              .catch(err => console.error('[Workspace] update KYC stage (reject) failed:', err))
+            try {
+              await apiUpdateKycStage(kycCliId, 'kyc_uninitiated')
+            } catch (err) {
+              console.error('[Workspace] update KYC stage (reject) failed:', err)
+              onFlash(`Could not return KYC for ${kycCustomerName} to CS: ${errorText(err)}`)
+              return  // keep the form open with the user's input
+            }
           }
           // Remove from Finance's review queue locally
           if (kycRequest) {
@@ -1573,31 +1596,39 @@ CLSynergy (Pvt) Ltd`
             ? buildQuotationHtml(inquiry, pqContainer, saveRr.options, selectedRateOptionIds, bestRateOptionId, optionOverrides, linerList, activeEmployee.name, pqComputeFinal)
             : undefined
 
-          apiCreateQuotation({
-            inq_id: inquiry.inq_id,
-            quote_date: today,
-            sent_via: 'email',           // placeholder — updated to actual method in send step
-            options: quotationOptions,
-            acceptence_deadline: deadline,
-          })
-            .then(created => {
-              if (created.quote_id) {
-                setLastQuotationId(created.quote_id)
-                if (inquiry.inq_id != null) saveQuotationId(inquiry.inq_id, created.quote_id)
-
-                // Generate PDF and upload document to backend
-                if (saveRr) {
-                  generateQuotationPdfBlob(inquiry, pqContainer, saveRr.options, selectedRateOptionIds, bestRateOptionId, optionOverrides, linerList, activeEmployee.name, pqComputeFinal)
-                    .then(pdfBlob => {
-                      const fileName = `Quotation_${inquiry.id.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`
-                      return apiUploadQuotationDocument(created.quote_id, pdfBlob, fileName, pqBodyHtml, { quotation_options: quotationOptions })
-                    })
-                    .then(docRes => console.log('[Workspace] Quotation document uploaded:', docRes.s3_url))
-                    .catch(err => console.error('[Workspace] quotation document upload failed:', err))
-                }
-              }
+          let created: Awaited<ReturnType<typeof apiCreateQuotation>>
+          try {
+            created = await apiCreateQuotation({
+              inq_id: inquiry.inq_id,
+              quote_date: today,
+              sent_via: 'email',           // placeholder — updated to actual method in send step
+              options: quotationOptions,
+              acceptence_deadline: deadline,
             })
-            .catch(err => console.error('[Workspace] create quotation failed:', err))
+          } catch (err) {
+            console.error('[Workspace] create quotation failed:', err)
+            onFlash(`Could not save the quotation: ${errorText(err)}`)
+            return  // keep the form open with the user's input
+          }
+          if (created.quote_id) {
+            setLastQuotationId(created.quote_id)
+            if (inquiry.inq_id != null) saveQuotationId(inquiry.inq_id, created.quote_id)
+
+            // Generate PDF and upload document in the background (can take a few seconds);
+            // the quotation itself is already saved, but tell the user if the upload fails.
+            if (saveRr) {
+              generateQuotationPdfBlob(inquiry, pqContainer, saveRr.options, selectedRateOptionIds, bestRateOptionId, optionOverrides, linerList, activeEmployee.name, pqComputeFinal)
+                .then(pdfBlob => {
+                  const fileName = `Quotation_${inquiry.id.replace(/[^a-zA-Z0-9-]/g, '_')}.pdf`
+                  return apiUploadQuotationDocument(created.quote_id, pdfBlob, fileName, pqBodyHtml, { quotation_options: quotationOptions })
+                })
+                .then(docRes => console.log('[Workspace] Quotation document uploaded:', docRes.s3_url))
+                .catch(err => {
+                  console.error('[Workspace] quotation document upload failed:', err)
+                  onFlash(`Quotation saved, but the PDF upload failed: ${errorText(err)}`)
+                })
+            }
+          }
         }
         // Advance to quotation-sent — both CS and Sales go through the same Send Quote step
         onAdvanceWorkflow(inquiry.id, 'quotation-sent')
@@ -1623,9 +1654,14 @@ CLSynergy (Pvt) Ltd`
         const sendQuoteId = lastQuotationId ?? lookupQuotationId(inquiry.inq_id) ?? inquiry.quotation_id
         if (sendQuoteId) {
           const actualSentVia = sendMethod === 'email' ? 'email' : 'whatsapp'
-          apiPatchQuotation(sendQuoteId, { sent_via: actualSentVia })
-            .then(() => apiMarkQuotationSent(sendQuoteId))
-            .catch(err => console.error('[Workspace] update/send quotation failed:', err))
+          try {
+            await apiPatchQuotation(sendQuoteId, { sent_via: actualSentVia })
+            await apiMarkQuotationSent(sendQuoteId)
+          } catch (err) {
+            console.error('[Workspace] update/send quotation failed:', err)
+            onFlash(`Could not mark the quotation as sent: ${errorText(err)}`)
+            return  // keep the form open with the user's input
+          }
         }
 
         // Email delivery endpoint not yet implemented on backend — skip apiSendQuotation call.
@@ -1655,8 +1691,13 @@ CLSynergy (Pvt) Ltd`
         // Use quoteId from sentQuotations (sourceData) if available; fall back to legacy lookup
         const quoteId = modal.sourceData.quoteId ?? lastQuotationId ?? lookupQuotationId(inquiry.inq_id) ?? inquiry.quotation_id
         if (quoteId && customerDecision === 'accepted' && selectedOptionRateId != null) {
-          apiRecordQuotationResponse(quoteId, 'accepted', selectedOptionRateId)
-            .catch(err => console.error('[Workspace] record quotation response failed:', err))
+          try {
+            await apiRecordQuotationResponse(quoteId, 'accepted', selectedOptionRateId)
+          } catch (err) {
+            console.error('[Workspace] record quotation response failed:', err)
+            onFlash(`Could not record the customer's acceptance: ${errorText(err)}`)
+            return  // keep the form open with the user's input
+          }
         }
         if (customerDecision === 'accepted') {
           onAdvanceWorkflow(inquiry.id, 'booking-request')

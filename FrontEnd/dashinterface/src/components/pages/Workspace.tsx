@@ -1220,7 +1220,7 @@ export default function Workspace({
     actionModal && selectedItem && getItemKey(actionModal) === getItemKey(selectedItem) ? actionModal : null
   // ---------------------------------------------------------------------------
 
-  const { handleAction, handleModalSubmit } = useWorkspaceActions({
+  const { handleAction, handleModalSubmit: runModalSubmit } = useWorkspaceActions({
     customers, inquiries, activityLog, clientList, linerList, vesselSchedules,
     activeRole, activeEmployee,
     roleSteps, actionModal, selectedItem, pendingVesselForBooking,
@@ -1288,6 +1288,19 @@ export default function Workspace({
     onLogActivity, onFlash, onStartRateCheck,
     onSetKycPendingClients, onSetKycRequests, onRefreshKycRequests,
   })
+
+  // Every step's submit button goes through this guard, so a double click (or a click while a
+  // previous submit is still waiting on the backend) can never send the same request twice.
+  const modalSubmitInFlight = useRef(false)
+  const handleModalSubmit = async () => {
+    if (modalSubmitInFlight.current) return
+    modalSubmitInFlight.current = true
+    try {
+      await runModalSubmit()
+    } finally {
+      modalSubmitInFlight.current = false
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Render
