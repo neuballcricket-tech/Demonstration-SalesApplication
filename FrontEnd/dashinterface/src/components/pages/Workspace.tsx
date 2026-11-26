@@ -1212,6 +1212,12 @@ export default function Workspace({
   }, [selectedItemId, filteredItems, IMMEDIATE_FIRE_KINDS])
 
   const getItemKey = (item: WorkspaceItem) => `${item.type}-${item.refId}-${item.actionKind}-${(item.sourceData as { containerIdx?: number } | undefined)?.containerIdx ?? 0}`
+  // actionModal is set when an item is clicked, but switching steps (or a completed item
+  // dropping out of the list) auto-selects another item without updating it. The inline
+  // form must only use actionModal when it belongs to the selected item; otherwise it would
+  // read the previous item's data (and crash when that item has a different shape).
+  const inlineActionModal =
+    actionModal && selectedItem && getItemKey(actionModal) === getItemKey(selectedItem) ? actionModal : null
   // ---------------------------------------------------------------------------
 
   const { handleAction, handleModalSubmit } = useWorkspaceActions({
@@ -1433,7 +1439,7 @@ export default function Workspace({
 
             <InlineStepForms
               selectedItem={selectedItem}
-              actionModal={actionModal}
+              actionModal={inlineActionModal}
               kycBrNumber={kycBrNumber}
               setKycBrNumber={setKycBrNumber}
               kycParentOrg={kycParentOrg}

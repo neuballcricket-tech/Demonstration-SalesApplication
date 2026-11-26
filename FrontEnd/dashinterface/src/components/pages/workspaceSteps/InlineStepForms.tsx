@@ -2570,6 +2570,21 @@ export default function InlineStepForms({
           </div>
         </div>
       )}
+
+      {/* Submit (this step renders inline only, so it needs its own button) */}
+      {(() => {
+        const gsDisabled = siIsNvocc && (!siField('shipper_name').trim() || !siField('consignee_name').trim())
+        return (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <button className="db-btn primary" onClick={handleModalSubmit} disabled={gsDisabled}
+              style={gsDisabled ? { opacity: 0.4, cursor: 'not-allowed' } : { background: '#0891b2', borderColor: '#0891b2' }}>
+              {siIsNvocc
+                ? <><FileText size={12} /> Generate SI Document</>
+                : <><Check size={12} /> Confirm SI Submitted</>}
+            </button>
+          </div>
+        )
+      })()}
     </div>
   )
 })() : selectedItem.actionKind === 'save-vessel-schedule' && actionModal ? (() => {
@@ -3573,6 +3588,19 @@ export default function InlineStepForms({
         <input className="lt-input" style={{ width: '100%' }} value={formNote}
           onChange={e => setFormNote(e.target.value)} placeholder="Internal notes..." />
       </div>
+
+      {/* Submit (this step renders inline only, so it needs its own button) */}
+      {(() => {
+        const blDisabled = !mblField('shipperName').trim() || !mblField('consigneeName').trim()
+        return (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <button className="db-btn primary" onClick={handleModalSubmit} disabled={blDisabled}
+              style={blDisabled ? { opacity: 0.4, cursor: 'not-allowed' } : { background: '#0d9488', borderColor: '#0d9488' }}>
+              <FileText size={12} /> Record Master BL
+            </button>
+          </div>
+        )
+      })()}
     </div>
   )
 })() : (selectedItem.actionKind === 'booking-request' || selectedItem.actionKind === 'review-booking-request') && actionModal ? (() => {
