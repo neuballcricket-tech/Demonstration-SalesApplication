@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import SearchCombobox, { type SearchItem } from './SearchCombobox'
+import { Field } from '../ui'
 
 const clients: SearchItem[] = [
   { label: 'Acme Ltd', sublabel: 'Colombo' },
@@ -102,5 +103,16 @@ describe('SearchCombobox', () => {
     expect(screen.getByRole('combobox')).toHaveAttribute('id', 'cust')
     // The first child is RAC's collection <template>; the root is the RAC ComboBox element
     expect(container.querySelector('[data-rac]')).toHaveStyle({ maxWidth: '300px' })
+  })
+
+  it('is named exactly by its Field label when aria-labelledby is given, not by the placeholder', () => {
+    render(
+      <Field label="Customer">
+        {ids => <SearchCombobox id={ids.id} aria-labelledby={ids['aria-labelledby']} items={clients} value="" onChange={() => {}} placeholder="Type or select customer" />}
+      </Field>,
+    )
+    const input = screen.getByRole('combobox', { name: 'Customer' })
+    expect(input).toHaveAttribute('placeholder', 'Type or select customer')
+    expect(screen.queryByRole('combobox', { name: 'Type or select customer' })).not.toBeInTheDocument()
   })
 })

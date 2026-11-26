@@ -21,7 +21,7 @@ interface SearchComboboxProps {
   onChange: (value: string) => void
   placeholder?: string
   id?: string
-  /** Names the input from a visible label (e.g. Field's), taking precedence over the placeholder-based aria-label. */
+  /** Names the input from a visible label (e.g. Field's). When set, the placeholder-based aria-label is dropped so the name is exactly the label. */
   'aria-labelledby'?: string
   style?: React.CSSProperties
   autoFocus?: boolean
@@ -49,7 +49,7 @@ export default function SearchCombobox({
       value={value}
       onChange={onChange}
       placeholder={placeholder}
-      aria-label={placeholder}
+      aria-label={ariaLabelledby ? undefined : placeholder}
       aria-labelledby={ariaLabelledby}
       id={id}
       style={style}

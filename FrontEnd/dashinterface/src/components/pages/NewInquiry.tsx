@@ -44,6 +44,11 @@ function Section({ title, action, children }: { title: string; action?: ReactNod
   )
 }
 
+/** Positive match confirmation, shown at the right of the label row so nothing below it moves. */
+function ExistingTag() {
+  return <span className="absolute right-0 top-0 text-label text-success">✓ existing</span>
+}
+
 /** Sub-heading that splits a section's grid. */
 function SubHead({ children }: { children: ReactNode }) {
   return (
@@ -219,31 +224,37 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
 
         {/* ═══════════════ INQUIRY DETAILS ═══════════════ */}
         <Section title="Inquiry Details">
-          <Field label="Customer" required hint={matchedCli ? '✓ existing' : undefined} className="col-span-full">
+          <Field label="Customer" required className="relative col-span-full">
             {ids => (
-              <SearchCombobox
-                id={ids.id}
-                aria-labelledby={ids['aria-labelledby']}
-                value={niCustomer}
-                onChange={val => { setNiCustomer(val); setNiContactPerson('') }}
-                items={clientList.map(cl => ({ label: cl.name, sublabel: cl.city ?? undefined }))}
-                placeholder="Type or select customer name"
-                autoFocus
-              />
+              <>
+                <SearchCombobox
+                  id={ids.id}
+                  aria-labelledby={ids['aria-labelledby']}
+                  value={niCustomer}
+                  onChange={val => { setNiCustomer(val); setNiContactPerson('') }}
+                  items={clientList.map(cl => ({ label: cl.name, sublabel: cl.city ?? undefined }))}
+                  placeholder="Type or select customer name"
+                  autoFocus
+                />
+                {matchedCli && <ExistingTag />}
+              </>
             )}
           </Field>
 
           {/* Contact Person + Designation (designation hidden when matchedCp) */}
-          <Field label="Contact Person" hint={matchedCp ? '✓ existing' : undefined} className={cn(matchedCp && 'col-span-full')}>
+          <Field label="Contact Person" className={cn('relative', matchedCp && 'col-span-full')}>
             {ids => (
-              <SearchCombobox
-                id={ids.id}
-                aria-labelledby={ids['aria-labelledby']}
-                value={niContactPerson}
-                onChange={setNiContactPerson}
-                items={contactItems}
-                placeholder="Name of the person making the inquiry"
-              />
+              <>
+                <SearchCombobox
+                  id={ids.id}
+                  aria-labelledby={ids['aria-labelledby']}
+                  value={niContactPerson}
+                  onChange={setNiContactPerson}
+                  items={contactItems}
+                  placeholder="Name of the person making the inquiry"
+                />
+                {matchedCp && <ExistingTag />}
+              </>
             )}
           </Field>
           {!matchedCp && (

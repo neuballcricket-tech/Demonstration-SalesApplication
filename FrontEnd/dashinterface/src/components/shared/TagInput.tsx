@@ -13,7 +13,7 @@ interface TagInputProps {
   formatLabel?: (value: string) => string
   /** Lands on the text input, so a `<label htmlFor>` (e.g. from `Field`) points at it. */
   id?: string
-  /** Names the input from a visible label, taking precedence over the placeholder-based aria-label. */
+  /** Names the input from a visible label. When set, the placeholder-based aria-label is dropped so the name is exactly the label. */
   'aria-labelledby'?: string
 }
 
@@ -118,7 +118,7 @@ export default function TagInput({ values, onChange, suggestions, placeholder, f
         onChange={setInput}
         onPick={addValue}
         placeholder={values.length === 0 ? inputName : ''}
-        aria-label={inputName}
+        aria-label={ariaLabelledby ? undefined : inputName}
         aria-labelledby={ariaLabelledby}
         id={id}
         menuTrigger="focus"

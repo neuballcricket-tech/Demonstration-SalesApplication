@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import PortCombobox from './PortCombobox'
+import { Field } from '../ui'
 
 // Stand-in for public/ports.json (UNLOCODE -> "Port/Country").
 const PORTS_JSON = { LKGAL: 'Galle/Sri Lanka', NLRTM: 'Rotterdam/Netherlands' }
@@ -190,5 +191,15 @@ describe('PortCombobox', () => {
   it('applies style to the root', () => {
     const { container } = render(<PortCombobox value="" onChange={() => {}} style={{ maxWidth: 200 }} />)
     expect(container.firstElementChild).toHaveStyle({ maxWidth: '200px' })
+  })
+
+  it('is named exactly by its Field label when aria-labelledby is given, not by the placeholder', () => {
+    render(
+      <Field label="Origin">
+        {ids => <PortCombobox id={ids.id} aria-labelledby={ids['aria-labelledby']} value="" onChange={() => {}} placeholder="Origin port" />}
+      </Field>,
+    )
+    expect(screen.getByRole('combobox', { name: 'Origin' })).toHaveAttribute('placeholder', 'Origin port')
+    expect(screen.queryByRole('combobox', { name: 'Origin port' })).not.toBeInTheDocument()
   })
 })

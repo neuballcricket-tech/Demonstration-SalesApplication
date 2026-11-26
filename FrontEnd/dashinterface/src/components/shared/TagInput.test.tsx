@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import TagInput from './TagInput'
+import { Field } from '../ui'
 
 const liners = ['MAERSK', 'MSC', 'CMA CGM', 'maersk']
 const scac: Record<string, string> = { MAERSK: 'MAEU', MSC: 'MSCU' }
@@ -181,5 +182,17 @@ describe('TagInput', () => {
   it('has no inline outline style that would hide the focus ring', () => {
     render(<Harness />)
     expect(screen.getByRole('combobox').style.outline).toBe('')
+  })
+
+  it('is named exactly by its Field label when aria-labelledby is given, and by the placeholder otherwise', () => {
+    render(
+      <Field label="Pref. Liners">
+        {ids => <TagInput id={ids.id} aria-labelledby={ids['aria-labelledby']} values={[]} onChange={() => {}} suggestions={liners} placeholder="Type to add liners..." />}
+      </Field>,
+    )
+    expect(screen.getByRole('combobox', { name: 'Pref. Liners' })).toHaveAttribute('placeholder', 'Type to add liners...')
+    expect(screen.queryByRole('combobox', { name: 'Type to add liners...' })).not.toBeInTheDocument()
+    render(<Harness />)
+    expect(screen.getByRole('combobox', { name: 'Type to add liners...' })).toBeInTheDocument()
   })
 })
