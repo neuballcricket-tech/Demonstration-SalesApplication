@@ -486,6 +486,8 @@ export default function Workspace({
 
     // --- From Inquiries (by workflow_stage) ---
     // Multi-container inquiries are split: one work item per container.
+    // Exception: procurement-request creates ONE item per inquiry (procurement
+    // handles the whole inquiry, not individual containers).
     for (const inq of inquiries) {
       if (inq.status === 'completed' || !inq.workflow_stage) continue
       if (!inq.inq_id) continue // skip locally-created inquiries not yet persisted to the backend
@@ -521,6 +523,29 @@ export default function Workspace({
               containerIdx: 0,
             }]
 
+      // For procurement-request: summarise ALL containers into a single work item.
+      if (inq.workflow_stage === 'procurement-request') {
+        const allContainerLabels = containerEntries.map(e => `${e.container.quantity}x ${e.container.containerType}`).join(', ')
+        const dest = containerEntries[0]?.container.destination || inq.destination
+        const routeLabel = `${inq.origin} → ${dest}`
+        pending.push({
+          type: 'inquiry',
+          refId: inq.id,
+          customerName: inq.customer_name,
+          title: `Procurement escalation: ${routeLabel} · ${allContainerLabels}`,
+          subtitle: `${inq.request ?? ''} · ${routeLabel} · ${allContainerLabels} · ${inq.delivery_type === 'door-to-door' ? 'Door-to-Door' : 'Port-to-Port'}`,
+          urgentFlag: isSpotInquiry(inq.inquiry_text ?? ''),
+          createdAt: inq.created_at,
+          previousContext: findContext(inq.id),
+          actionLabel: 'Check Rates',
+          actionKind: 'check-inttra-rates',
+          sourceData: { inquiry: inq, nextStage: resolvedNextStage.id, container: containerEntries[0]?.container, containerIdx: 0, customer: cust },
+          kycIncomplete: inq.kyc_completed === false,
+          rfqRef: inq.rfq_ref,
+        })
+        continue // skip the per-container loop below
+      }
+
       for (const { container: cont, containerIdx: ci } of containerEntries) {
         const dest = cont.destination || inq.destination
         const containerLabel = `${cont.quantity}x ${cont.containerType}`
@@ -536,21 +561,21 @@ export default function Workspace({
             actionKind = 'check-rates'
             actionLabel = 'Check Rates (Database + Spot + INTTRA)'
             break
-          case 'procurement-request':
-            title = `Procurement escalation: ${routeLabel} · ${containerLabel}`
-            actionKind = 'check-inttra-rates'
-            actionLabel = 'Check Rates'
-            break
           case 'quotation-prep':
             title = `Prepare quotation for ${inq.customer_name} · ${containerLabel}`
             actionKind = 'prepare-quotation'
             actionLabel = 'Prepare Quotation'
             break
-          case 'quotation-sent':
+          case 'quotation-sent': {
+            // If this inquiry already appears in sentQuotations, skip — the
+            // sentQuotations loop below builds a richer "customer-response" item.
+            const alreadySent = sentQuotations.some(sq => sq.inq_id === inq.inq_id)
+            if (alreadySent) continue
             title = `Send quotation to ${inq.customer_name}`
             actionKind = 'send-to-customer'
             actionLabel = 'Send to Customer'
             break
+          }
           case 'customer-response':
             continue // customer-response items are built from GET /quotations/sent below
           case 'booking-request':
@@ -652,8 +677,12 @@ export default function Workspace({
 
     // --- From Accepted Quotations (booking-request items) ---
     // Each row from GET /quotations/accepted is one accepted quotation ready for booking.
+    // Deduplicate by inq_id — backend may return multiple accepted rows per inquiry.
+    const seenAcceptedInqIds = new Set<number>()
     if (!role || role === 'CS' || role === 'Sales') {
       for (const aq of acceptedQuotations) {
+        if (seenAcceptedInqIds.has(aq.inq_id)) continue
+        seenAcceptedInqIds.add(aq.inq_id)
         const matchInq = inquiries.find(i => i.inq_id === aq.inq_id)
         const displayId = matchInq?.id ?? `INQ-${aq.inq_id}`
         const containerLabel = `${aq.qty}x ${aq.container_type}`
@@ -1125,8 +1154,21 @@ export default function Workspace({
       }
     }
 
+    // --- Final deduplication pass ---
+    // Key = refId + actionKind + containerIdx (for multi-container inquiry items).
+    // This catches any remaining duplicates regardless of source.
+    const seen = new Set<string>()
+    const deduped: WorkspaceItem[] = []
+    for (const item of pending) {
+      const ci = item.sourceData?.containerIdx ?? ''
+      const key = `${item.refId}|${item.actionKind}|${ci}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      deduped.push(item)
+    }
+
     // Sort: urgent first, then by urgencySortKey (lower = more urgent), then newest first
-    pending.sort((a, b) => {
+    deduped.sort((a, b) => {
       if (a.urgentFlag !== b.urgentFlag) return a.urgentFlag ? -1 : 1
       // If both have urgencySortKey, sort by it (lower = more urgent)
       const aKey = a.urgencySortKey ?? Infinity
@@ -1137,7 +1179,7 @@ export default function Workspace({
       return b.createdAt.localeCompare(a.createdAt)
     })
 
-    return { pendingItems: pending }
+    return { pendingItems: deduped }
   }, [inquiries, bookings, quotes, customers, activityLog, activeRole, kycPendingClients, kycRequests, completedRateRequests, sentQuotations, acceptedQuotations]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------------------------------------------------------------------

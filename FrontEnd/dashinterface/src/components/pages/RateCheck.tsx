@@ -119,7 +119,11 @@ function pivotEnrichedData(data: AggregateScheduleRatesResponse): SelectablePivo
     const rates: Record<string, Record<string, SelectableRateCell[]>> = {}
 
     const add = (arr: AggregateRate[], rt: string, rtKey: string) => {
+      const seen = new Set<number>()
       for (const r of arr) {
+        // Deduplicate by rate_id — backend JOINs can produce repeated rows
+        if (seen.has(r.rate_id)) continue
+        seen.add(r.rate_id)
         allCntr.add(r.container_type)
         allRT.add(rt)
         if (!rates[rt]) rates[rt] = {}

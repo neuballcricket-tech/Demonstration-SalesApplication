@@ -360,7 +360,17 @@ export default function RateList() {
   const loadRates = () => {
     setLoading(true)
     apiFetchAllRates()
-      .then(data => { setRates(data); setLoaded(true) })
+      .then(data => {
+        // Deduplicate by id — backend JOINs can produce repeated rows
+        const seen = new Set<string>()
+        const deduped = data.filter(r => {
+          if (seen.has(r.id)) return false
+          seen.add(r.id)
+          return true
+        })
+        setRates(deduped)
+        setLoaded(true)
+      })
       .catch(err => { console.error('[RateList] apiFetchAllRates failed:', err); setLoaded(true) })
       .finally(() => setLoading(false))
   }

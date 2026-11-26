@@ -436,7 +436,12 @@ export default function InlineStepForms({
   const { inquiry: pqInq, container: pqCont, rateRequest: pqRr } = actionModal.sourceData as {
     inquiry: import('../../../types').Inquiry; container: import('../../../types').ContainerLine; rateRequest?: CompletedRateRequest
   }
-  const pqOptions = pqRr?.options.filter(o => o.rate) ?? []
+  const pqOptions = (() => {
+    const raw = pqRr?.options.filter(o => o.rate) ?? []
+    // Deduplicate by option_id — backend may return repeated rows
+    const seen = new Set<number>()
+    return raw.filter(o => { if (seen.has(o.option_id)) return false; seen.add(o.option_id); return true })
+  })()
   const pqDest = pqCont?.destination || pqInq.destination
   const pqContainerLabel = pqCont ? `${pqCont.quantity}× ${pqCont.containerType}` : ''
   const pqCommodity = pqCont?.commodityType || pqInq.commodity_type || ''

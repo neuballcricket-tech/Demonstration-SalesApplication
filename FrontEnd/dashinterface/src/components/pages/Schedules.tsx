@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { Search, Loader2, Globe, Ship, Filter, X, Plus, ArrowRight } from 'lucide-react'
-import { apiGetEnrichedScheduleRates, apiGetLiners, apiSearchSchedulesBulk } from '../../api'
+import { apiGetEnrichedScheduleRates, apiGetLiners, apiSearchSchedulesBulk, apiSaveSchedules } from '../../api'
 import type { AggregateScheduleRatesResponse, AggregateRate, LinerRecord, OceanSchedule } from '../../types'
 import { linerDisplay } from '../../types'
 import PortCombobox from '../shared/PortCombobox'
@@ -399,7 +399,7 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
 // Schedule search results table (INTTRA / live search)
 // ---------------------------------------------------------------------------
 
-function ScheduleSearchTable({ data }: { data: OceanSchedule[] }) {
+function ScheduleSearchTable({ data, linerList, onFlash }: { data: OceanSchedule[]; linerList: LinerRecord[]; onFlash: (msg: string) => void }) {
   const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—'
 
   const sorted = useMemo(() => [...data].sort((a, b) => {
@@ -409,14 +409,53 @@ function ScheduleSearchTable({ data }: { data: OceanSchedule[] }) {
 
   // Track checked "special rate" rows by index
   const [checked, setChecked] = useState<Set<number>>(new Set())
+  // Track selected rows for saving to DB
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [saving, setSaving] = useState(false)
   // Modal state for the special rate input placeholder
   const [modalIdx, setModalIdx] = useState<number | null>(null)
 
   // Reset checks when data changes
-  useEffect(() => { setChecked(new Set()); setModalIdx(null) }, [data])
+  useEffect(() => { setChecked(new Set()); setSelected(new Set()); setModalIdx(null) }, [data])
 
   const toggleCheck = (idx: number) =>
     setChecked(prev => { const n = new Set(prev); if (n.has(idx)) n.delete(idx); else n.add(idx); return n })
+
+  const toggleSelected = (idx: number) =>
+    setSelected(prev => { const n = new Set(prev); if (n.has(idx)) n.delete(idx); else n.add(idx); return n })
+
+  const toggleSelectAll = () =>
+    setSelected(prev => prev.size === sorted.length ? new Set() : new Set(sorted.map((_, i) => i)))
+
+  // Build SCAC → lin_id lookup from the liner list
+  const scacToLinId = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const l of linerList) {
+      if (l.scac) m.set(l.scac.toUpperCase(), l.lin_id)
+    }
+    return m
+  }, [linerList])
+
+  const handleSaveSelected = async () => {
+    if (selected.size === 0) return
+    setSaving(true)
+    try {
+      // Resolve lin_id from SCAC before saving
+      const schedulesToSave = sorted
+        .filter((_, i) => selected.has(i))
+        .map(s => ({
+          ...s,
+          linId: s.linId ?? (s.scac ? scacToLinId.get(s.scac.toUpperCase()) ?? null : null),
+        }))
+      const ids = await apiSaveSchedules(schedulesToSave)
+      onFlash(`Saved ${ids.length} schedule${ids.length !== 1 ? 's' : ''} to database`)
+      setSelected(new Set())
+    } catch {
+      onFlash('Failed to save schedules')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const thStyle: React.CSSProperties = {
     padding: '6px 6px', fontSize: 9, fontWeight: 700, color: '#fff',
@@ -433,18 +472,40 @@ function ScheduleSearchTable({ data }: { data: OceanSchedule[] }) {
 
   return (
     <>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, padding: '0 2px' }}>
-        {sorted.length} schedule{sorted.length !== 1 ? 's' : ''} found
+      {/* Count + Save button */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, padding: '0 2px' }}>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+          {sorted.length} schedule{sorted.length !== 1 ? 's' : ''} found
+          {selected.size > 0 && <span style={{ fontWeight: 600, color: '#0f8fa8' }}> · {selected.size} selected</span>}
+        </div>
+        <button
+          className="db-btn primary"
+          disabled={selected.size === 0 || saving}
+          onClick={handleSaveSelected}
+          style={{ fontSize: 11, padding: '5px 16px', display: 'flex', alignItems: 'center', gap: 5, opacity: selected.size === 0 ? 0.5 : 1 }}
+        >
+          {saving ? <Loader2 size={12} className="spin" /> : null}
+          Save {selected.size > 0 ? `${selected.size} ` : ''}Selected
+        </button>
       </div>
       <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto', maxHeight: 540 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
               <tr style={{ background: 'var(--accent, #0f8fa8)' }}>
-                {COLS.map((h, i) => (
+                {/* Select-all checkbox */}
+                <th style={{ ...thStyle, borderLeft: 'none', textAlign: 'center', width: 32 }}>
+                  <input
+                    type="checkbox"
+                    checked={sorted.length > 0 && selected.size === sorted.length}
+                    ref={el => { if (el) el.indeterminate = selected.size > 0 && selected.size < sorted.length }}
+                    onChange={toggleSelectAll}
+                    style={{ cursor: 'pointer', accentColor: '#fff' }}
+                  />
+                </th>
+                {COLS.map(h => (
                   <th key={h} style={{
                     ...thStyle,
-                    borderLeft: i === 0 ? 'none' : thStyle.borderLeft,
                     textAlign: h === 'SPECIAL RATE' || h === 'ACTION' ? 'center' : 'left',
                   }}>{h}</th>
                 ))}
@@ -452,11 +513,20 @@ function ScheduleSearchTable({ data }: { data: OceanSchedule[] }) {
             </thead>
             <tbody>
               {sorted.length === 0 && (
-                <tr><td colSpan={COLS.length} style={{ padding: 20, textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>No schedules found.</td></tr>
+                <tr><td colSpan={COLS.length + 1} style={{ padding: 20, textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>No schedules found.</td></tr>
               )}
               {sorted.map((s, i) => (
-                <tr key={`${s.scac}-${s.vesselName}-${s.voyageNumber}-${i}`} style={{ background: i % 2 ? 'rgba(100,116,139,0.04)' : 'transparent' }}>
-                  <td style={{ ...tdStyle, borderLeft: 'none', fontWeight: 600 }}>
+                <tr key={`${s.scac}-${s.vesselName}-${s.voyageNumber}-${i}`} style={{ background: selected.has(i) ? 'rgba(15,143,168,0.06)' : i % 2 ? 'rgba(100,116,139,0.04)' : 'transparent' }}>
+                  {/* Row selection checkbox */}
+                  <td style={{ ...tdStyle, borderLeft: 'none', textAlign: 'center', width: 32 }}>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(i)}
+                      onChange={() => toggleSelected(i)}
+                      style={{ cursor: 'pointer', accentColor: '#0f8fa8' }}
+                    />
+                  </td>
+                  <td style={{ ...tdStyle, fontWeight: 600 }}>
                     <div>{s.carrierName || s.scac || '—'}</div>
                     {s.scac && s.carrierName && <div style={{ fontSize: 8, color: 'var(--text-muted)' }}>{s.scac}</div>}
                   </td>
@@ -616,6 +686,12 @@ export default function Schedules({ onFlash }: SchedulesProps) {
   }, [linerList])
   const formatLinerLabel = (name: string) => linerLabelMap.get(name) ?? name
 
+  // Cargo ready date + weeks out + direct only — mirrors the API search tab
+  const todayDb = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  const [dbCargoReadyDate, setDbCargoReadyDate] = useState(todayDb)
+  const [dbWeeksOut, setDbWeeksOut] = useState(4)
+  const [dbDirectOnly, setDbDirectOnly] = useState(false)
+
   const [aggRaw, setAggRaw] = useState<AggregateScheduleRatesResponse>({})
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
@@ -634,7 +710,12 @@ export default function Schedules({ onFlash }: SchedulesProps) {
     if (!canSearch) return
     const portPairStr = validPairs.map(p => `${p.origin}:${p.destination}`).join(',')
     setLoading(true)
-    apiGetEnrichedScheduleRates({ port_pair: portPairStr })
+    apiGetEnrichedScheduleRates({
+      port_pair: portPairStr,
+      cargo_ready_date: dbCargoReadyDate || undefined,
+      weeks_out: dbWeeksOut || undefined,
+      direct_only: dbDirectOnly || undefined,
+    })
       .then(setAggRaw)
       .catch(() => { setAggRaw({}); onFlash('Failed to load schedule rates') })
       .finally(() => { setLoading(false); setSearched(true) })
@@ -775,6 +856,38 @@ export default function Schedules({ onFlash }: SchedulesProps) {
               formatLabel={formatLinerLabel}
             />
             <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>Leave empty to show all liners.</div>
+          </div>
+
+          {/* Date + options row — mirrors the API search tab */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end', marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6, letterSpacing: 0.3, textTransform: 'uppercase' }}>
+                Cargo Ready Date
+              </div>
+              <input
+                type="date"
+                value={dbCargoReadyDate}
+                onChange={e => setDbCargoReadyDate(e.target.value)}
+                style={{ width: 160, padding: '7px 10px', fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-card, #fff)', color: 'var(--text)', outline: 'none' }}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6, letterSpacing: 0.3, textTransform: 'uppercase' }}>
+                Weeks Out
+              </div>
+              <input
+                type="number"
+                value={dbWeeksOut}
+                onChange={e => setDbWeeksOut(Number(e.target.value))}
+                min={1}
+                max={12}
+                style={{ width: 80, padding: '7px 10px', fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-card, #fff)', color: 'var(--text)', outline: 'none' }}
+              />
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', paddingBottom: 4 }}>
+              <input type="checkbox" checked={dbDirectOnly} onChange={e => setDbDirectOnly(e.target.checked)} />
+              <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600 }}>Direct only</span>
+            </label>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -945,7 +1058,7 @@ export default function Schedules({ onFlash }: SchedulesProps) {
                 <Loader2 size={12} className="spin" /> Updating results...
               </div>
             )}
-            <ScheduleSearchTable data={searchResults} />
+            <ScheduleSearchTable data={searchResults} linerList={linerList} onFlash={onFlash} />
           </>
         )}
         {!searchSearched && !searchLoading && (
