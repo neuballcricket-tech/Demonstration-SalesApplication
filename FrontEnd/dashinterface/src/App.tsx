@@ -97,7 +97,10 @@ function mapInquiryRows(rows: InquiryRow[]): Inquiry[] {
   const result: Inquiry[] = []
   for (const [inq_id, group] of grouped) {
     const h = group[0]
-    const containers: ContainerLine[] = group.map(r => ({
+    // The backend join currently returns some inquiries' container rows more than once
+    // (identical rows); keep one row per container so work items aren't duplicated.
+    const uniqueRows = group.filter((r, i) => r.cont_id == null || group.findIndex(x => x.cont_id === r.cont_id) === i)
+    const containers: ContainerLine[] = uniqueRows.map(r => ({
       containerType: (BE_CONTAINER_TYPE[r.container_type ?? ''] ?? r.container_type ?? '20GP') as ContainerLine['containerType'],
       quantity: r.qty ?? 1,
       weight: r.commodity_weight ?? '',
