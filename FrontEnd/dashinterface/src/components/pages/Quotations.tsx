@@ -124,8 +124,8 @@ export default function Quotations({
                   style={{
                     display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
                     padding: '12px 14px',
-                    background: 'rgba(15,143,168,0.03)',
-                    border: '1px solid rgba(15,143,168,0.15)',
+                    background: 'rgba(44,44,130,0.03)',
+                    border: '1px solid rgba(44,44,130,0.15)',
                     borderRadius: 8,
                   }}
                 >
@@ -237,8 +237,8 @@ export default function Quotations({
                   </div>
                   <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                     <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>${sell.toLocaleString()}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>cost ${cost.toLocaleString()} + {q.margin_pct}%</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{empName(q.created_by)} · {q.created_at}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>cost ${cost.toLocaleString()} + {q.margin_pct}%</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{empName(q.created_by)} · {q.created_at}</div>
                   </div>
                 </div>
 
@@ -246,7 +246,7 @@ export default function Quotations({
                 <div style={{ overflowX: 'auto', borderTop: '1px solid var(--border)', paddingTop: 8 }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                     <thead>
-                      <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 9, letterSpacing: '0.05em' }}>
+                      <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.05em' }}>
                         <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--border)' }}>Line</th>
                         <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--border)' }}>Rate Type</th>
                         <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--border)' }}>Base</th>
@@ -456,7 +456,7 @@ function CopyQuotationModal({
         {/* Quote summary pill */}
         <div style={{
           padding: '8px 12px', marginBottom: 10,
-          background: 'rgba(15,143,168,0.03)', border: '1px solid rgba(15,143,168,0.12)',
+          background: 'rgba(44,44,130,0.03)', border: '1px solid rgba(44,44,130,0.12)',
           borderRadius: 8, fontSize: 12, color: 'var(--text-secondary)',
         }}>
           <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{quote.id}</span>
@@ -602,7 +602,7 @@ function QuoteBuilderModal({
               {customers.map(c => <option key={c.id} value={c.name} />)}
             </datalist>
             {cust && (
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
                 {cust.tier} · {cust.payment_terms} · floor {cust.min_margin_pct}%
                 {cust.blacklisted && <span style={{ color: '#dc2626', marginLeft: 6 }}>· blacklisted</span>}
                 {cust.credit_hold && <span style={{ color: '#d97706', marginLeft: 6 }}>· credit hold</span>}
@@ -626,7 +626,7 @@ function QuoteBuilderModal({
         </div>
 
         {/* Big Schedule stub hint (Phase 7.1) */}
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, padding: '6px 10px', background: 'rgba(15,143,168,0.03)', border: '1px solid rgba(15,143,168,0.12)', borderRadius: 6 }}>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, padding: '6px 10px', background: 'rgba(44,44,130,0.03)', border: '1px solid rgba(44,44,130,0.12)', borderRadius: 6 }}>
           📡 Big Schedule lines available for this route: {BIG_SCHEDULE_LINES.join(', ')} (stub data — real integration in Phase 2)
         </div>
 
@@ -641,7 +641,7 @@ function QuoteBuilderModal({
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
               <thead>
-                <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 9, letterSpacing: '0.05em' }}>
+                <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.05em' }}>
                   <th style={{ padding: '6px 4px' }}>Line</th>
                   <th style={{ padding: '6px 4px' }}>Type</th>
                   <th style={{ padding: '6px 4px' }}>Base $</th>
@@ -703,10 +703,10 @@ function QuoteBuilderModal({
               {EMPLOYEES.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
             </select>
           </div>
-          <div style={{ background: 'rgba(15,143,168,0.03)', border: '1px solid rgba(15,143,168,0.12)', borderRadius: 8, padding: '10px 14px' }}>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quote total</div>
+          <div style={{ background: 'rgba(44,44,130,0.03)', border: '1px solid rgba(44,44,130,0.12)', borderRadius: 8, padding: '10px 14px' }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quote total</div>
             <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>${sell.toLocaleString()}</div>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>cost ${cost.toLocaleString()} + {margin}%</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>cost ${cost.toLocaleString()} + {margin}%</div>
           </div>
         </div>
 

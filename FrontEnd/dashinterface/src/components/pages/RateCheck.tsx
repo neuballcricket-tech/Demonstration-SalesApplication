@@ -11,6 +11,7 @@ import {
 import { useRole } from '../../RoleContext'
 import { FIELD_LABEL, INPUT_STYLE } from './pageStyles'
 import { apiFetchAllRates, apiGetPorts, apiGetLiners, apiGetTradeLanes, apiGetEmployeesDb, apiGetAuthEmployees, apiCreateVesselRate, apiCreateFakRate, apiCreateSpecialRate, apiCreateRateRequest, apiPatchRateRequestProc, apiAddRateRequestOption, apiGetIncomingRateRequests, apiGetAggregateScheduleRates, apiGetEnrichedScheduleRates, BACKEND_ACTOR_ID } from '../../api'
+import { COLOR } from '../ui/tokens'
 
 type ManualRateTab = 'vessel-spot' | 'fak' | 'special'
 const MR_TAB_LABELS: Record<ManualRateTab, string> = { 'vessel-spot': 'Spot Rate', fak: 'FAK', special: 'Special Rate' }
@@ -305,11 +306,11 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
   ]
 
   const thBase: React.CSSProperties = {
-    padding: '5px 4px', fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.3,
+    padding: '5px 4px', fontSize: 11, fontWeight: 700, color: '#fff', letterSpacing: 0.3,
     textAlign: 'center', whiteSpace: 'nowrap', borderLeft: '1px solid rgba(255,255,255,0.2)',
   }
   const tdBase: React.CSSProperties = {
-    padding: '5px 4px', fontSize: 10, color: 'var(--text)', verticalAlign: 'middle',
+    padding: '5px 4px', fontSize: 11, color: 'var(--text)', verticalAlign: 'middle',
     borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)',
   }
 
@@ -333,7 +334,7 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
             : `${filtered.length} of ${rows.length} (filtered)`}
         </div>
         {activeCount > 0 && (
-          <button onClick={clearAll} style={{ fontSize: 10, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
+          <button onClick={clearAll} style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
             <X size={10} /> Clear filters
           </button>
         )}
@@ -352,14 +353,14 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
                 style={{
                   fontSize: 11, padding: '3px 10px', borderRadius: 14, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', gap: 4,
-                  border: hasActive ? '1px solid #0f8fa8' : '1px solid var(--border)',
-                  background: hasActive ? 'rgba(15,143,168,0.08)' : 'transparent',
-                  color: hasActive ? '#0f8fa8' : 'var(--text-secondary)',
+                  border: hasActive ? `1px solid ${COLOR.primary}` : '1px solid var(--border)',
+                  background: hasActive ? 'rgba(44,44,130,0.08)' : 'transparent',
+                  color: hasActive ? COLOR.primary : 'var(--text-secondary)',
                   fontWeight: hasActive ? 600 : 400,
                 }}>
                 <Filter size={10} />
                 {f.label}
-                {hasActive && <span style={{ fontSize: 9, background: '#0f8fa8', color: '#fff', borderRadius: 8, padding: '0 5px', fontWeight: 700 }}>{f.active.size}</span>}
+                {hasActive && <span style={{ fontSize: 11, background: COLOR.primary, color: '#fff', borderRadius: 8, padding: '0 5px', fontWeight: 700 }}>{f.active.size}</span>}
               </button>
               {isOpen && (
                 <div style={{
@@ -368,19 +369,19 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
                   boxShadow: '0 4px 16px rgba(0,0,0,0.12)', minWidth: 180, maxHeight: 240, overflowY: 'auto', padding: '4px 0',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 10px', borderBottom: '1px solid var(--border)' }}>
-                    <button onClick={() => f.set(new Set(entries.map(e => e[0])))} style={{ fontSize: 10, color: '#0f8fa8', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Select all</button>
-                    <button onClick={() => f.set(new Set())} style={{ fontSize: 10, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>Clear</button>
+                    <button onClick={() => f.set(new Set(entries.map(e => e[0])))} style={{ fontSize: 11, color: COLOR.primary, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Select all</button>
+                    <button onClick={() => f.set(new Set())} style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>Clear</button>
                   </div>
                   {entries.map(([val, count]) => (
                     <label key={val} style={{
                       display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', cursor: 'pointer',
-                      fontSize: 11, color: 'var(--text)', background: f.active.has(val) ? 'rgba(15,143,168,0.04)' : 'transparent',
+                      fontSize: 11, color: 'var(--text)', background: f.active.has(val) ? 'rgba(44,44,130,0.04)' : 'transparent',
                     }}>
                       <input type="checkbox" checked={f.active.has(val)} onChange={() => {
                         f.set(prev => { const n = new Set(prev); if (n.has(val)) n.delete(val); else n.add(val); return n })
                       }} />
                       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
-                      <span style={{ fontSize: 9, color: 'var(--text-muted)', flexShrink: 0 }}>{count}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{count}</span>
                     </label>
                   ))}
                 </div>
@@ -396,9 +397,9 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
           <table style={{ borderCollapse: 'collapse', minWidth: SCHED_COL_COUNT * 80 + rateCols * 58 }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
               {/* Row 1: group headers */}
-              <tr style={{ background: 'var(--accent, #0f8fa8)' }}>
+              <tr style={{ background: 'var(--accent, #2c2c82)' }}>
                 <th rowSpan={2} style={{
-                  padding: '5px 4px', fontSize: 8, fontWeight: 700, color: '#fff',
+                  padding: '5px 4px', fontSize: 11, fontWeight: 700, color: '#fff',
                   letterSpacing: 0.3, textAlign: 'center', whiteSpace: 'nowrap',
                   borderBottom: '1px solid rgba(255,255,255,0.2)',
                   borderRight: '1px solid rgba(255,255,255,0.2)',
@@ -407,7 +408,7 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
                   SELECT
                 </th>
                 <th colSpan={8} style={{
-                  padding: '5px 8px', fontSize: 10, fontWeight: 700, color: '#fff',
+                  padding: '5px 8px', fontSize: 11, fontWeight: 700, color: '#fff',
                   letterSpacing: 0.5, textAlign: 'center',
                   borderBottom: '1px solid rgba(255,255,255,0.2)',
                 }}>
@@ -415,7 +416,7 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
                 </th>
                 {onAttachManualRate && (
                   <th rowSpan={2} style={{
-                    padding: '5px 4px', fontSize: 8, fontWeight: 700, color: '#fff',
+                    padding: '5px 4px', fontSize: 11, fontWeight: 700, color: '#fff',
                     letterSpacing: 0.3, textAlign: 'center', whiteSpace: 'nowrap',
                     borderBottom: '1px solid rgba(255,255,255,0.2)',
                     borderLeft: '1px solid rgba(255,255,255,0.2)',
@@ -425,7 +426,7 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
                 )}
                 {rateTypes.map(rt => (
                   <th key={rt} colSpan={1 + containerTypes.length} style={{
-                    padding: '5px 4px', fontSize: 10, fontWeight: 700,
+                    padding: '5px 4px', fontSize: 11, fontWeight: 700,
                     color: '#fff', letterSpacing: 0.5, textAlign: 'center',
                     borderLeft: '2px solid rgba(255,255,255,0.5)',
                     borderBottom: '1px solid rgba(255,255,255,0.2)',
@@ -436,7 +437,7 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
                 ))}
               </tr>
               {/* Row 2: sub-headers */}
-              <tr style={{ background: 'var(--accent, #0f8fa8)' }}>
+              <tr style={{ background: 'var(--accent, #2c2c82)' }}>
                 {['CARRIER', 'VESSEL / VOYAGE', 'ORIGIN', 'DEST', 'ETD', 'ETA', 'TT', 'CUTOFF'].map((h) => (
                   <th key={h} style={{
                     ...thBase,
@@ -452,7 +453,7 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
                     }}>{'\u2713'}</th>
                     {containerTypes.map((ct, ctIdx) => (
                       <th key={`${rt}-${ct}`} style={{
-                        ...thBase, fontSize: 8,
+                        ...thBase, fontSize: 11,
                         borderLeft: ctIdx === 0 ? '1px solid rgba(255,255,255,0.3)' : thBase.borderLeft,
                         background: RATE_COLORS_RC[rt] ?? '#64748b',
                       }}>{ct}</th>
@@ -470,23 +471,23 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
                 const hasAnySelection = rateTypes.some(rt => isGroupSelected(row, rt, selectedIds) || isGroupPartial(row, rt, selectedIds))
                 const schedSelected = selectedScheduleIds.has(row.scheduleId)
                 return (
-                  <tr key={row.scheduleId} style={{ background: (hasAnySelection || schedSelected) ? 'rgba(15,143,168,0.06)' : bg }}>
+                  <tr key={row.scheduleId} style={{ background: (hasAnySelection || schedSelected) ? 'rgba(44,44,130,0.06)' : bg }}>
                     <td style={{
                       ...tdBase, borderLeft: 'none', width: 32, textAlign: 'center', verticalAlign: 'middle',
-                      background: schedSelected ? 'rgba(15,143,168,0.08)' : undefined,
+                      background: schedSelected ? 'rgba(44,44,130,0.08)' : undefined,
                     }}>
                       <input
                         type="checkbox"
                         checked={schedSelected}
                         onChange={() => onToggleSchedule(row.scheduleId)}
-                        style={{ cursor: 'pointer', accentColor: '#0f8fa8' }}
+                        style={{ cursor: 'pointer', accentColor: COLOR.primary }}
                       />
                     </td>
                     <td style={{ ...tdBase, fontWeight: 600 }}>{row.linerName || '—'}</td>
                     <td style={tdBase}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                         <Ship size={9} style={{ opacity: 0.5, flexShrink: 0 }} />
-                        <span style={{ fontSize: 10 }}>{row.vesselName || '—'}{row.voyageNumber ? ` / ${row.voyageNumber}` : ''}</span>
+                        <span style={{ fontSize: 11 }}>{row.vesselName || '—'}{row.voyageNumber ? ` / ${row.voyageNumber}` : ''}</span>
                       </div>
                     </td>
                     <td style={tdBase}>{row.originCity || row.origin || '—'}</td>
@@ -496,7 +497,7 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
                     <td style={{ ...tdBase, fontWeight: 600, textAlign: 'center' }}>
                       {row.totalDuration != null ? `${row.totalDuration}d` : '—'}
                     </td>
-                    <td style={{ ...tdBase, fontSize: 9 }}>{fmtDate(row.bkCutoff)}</td>
+                    <td style={{ ...tdBase, fontSize: 11 }}>{fmtDate(row.bkCutoff)}</td>
                     {onAttachManualRate && (
                       <td style={{ ...tdBase, textAlign: 'center', width: 32 }}>
                         <button
@@ -522,7 +523,7 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
                           <td style={{
                             ...tdBase, width: 28, textAlign: 'center', verticalAlign: 'middle',
                             borderLeft: '2px solid var(--border)',
-                            background: checked ? 'rgba(15,143,168,0.08)' : undefined,
+                            background: checked ? 'rgba(44,44,130,0.08)' : undefined,
                           }}>
                             {hasRates && (
                               <input
@@ -530,7 +531,7 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
                                 checked={checked}
                                 ref={el => { if (el) el.indeterminate = partial && !checked }}
                                 onChange={() => onToggleGroup(row, rt)}
-                                style={{ cursor: 'pointer', accentColor: '#0f8fa8' }}
+                                style={{ cursor: 'pointer', accentColor: COLOR.primary }}
                               />
                             )}
                           </td>
@@ -548,13 +549,13 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
                                   ...tdBase,
                                   textAlign: 'center',
                                   borderLeft: ctIdx === 0 ? '1px solid var(--border)' : tdBase.borderLeft,
-                                  background: checked ? 'rgba(15,143,168,0.04)' : undefined,
+                                  background: checked ? 'rgba(44,44,130,0.04)' : undefined,
                                   padding: '4px 3px',
                                 }}
                               >
                                 {display ? (
                                   <>
-                                    <div style={{ fontWeight: 700, fontSize: 10, whiteSpace: 'nowrap' }}>
+                                    <div style={{ fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>
                                       {display.currency} {display.rate.toLocaleString()}
                                     </div>
                                     {cells!.length > 1 && (
@@ -562,7 +563,7 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
                                     )}
                                     {display.note && (
                                       <div style={{
-                                        fontSize: 8, color: '#94a3b8', lineHeight: 1.2, marginTop: 1,
+                                        fontSize: 11, color: '#94a3b8', lineHeight: 1.2, marginTop: 1,
                                         maxWidth: 72, overflow: 'hidden', textOverflow: 'ellipsis',
                                         whiteSpace: 'nowrap', margin: '1px auto 0',
                                       }}>
@@ -571,7 +572,7 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
                                     )}
                                   </>
                                 ) : (
-                                  <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>—</span>
+                                  <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
                                 )}
                               </td>
                             )
@@ -1401,12 +1402,12 @@ export default function RateCheck({
     return (
       <div key={e.id} style={{ padding: '6px 0', borderBottom: '1px dashed var(--border)' }}>
         <div style={{ fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: `${accent}18`, color: accent, border: `1px solid ${accent}30` }}>{typeLabel}</span>
+          <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: `${accent}18`, color: accent, border: `1px solid ${accent}30` }}>{typeLabel}</span>
           {e.liner}
           {e.tab === 'vessel-spot' && e.vesselName && <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 11 }}>{e.vesselName}{e.voyage ? ` / ${e.voyage}` : ''}</span>}
         </div>
         {e.scheduleId != null && e.scheduleSummary && (
-          <div style={{ fontSize: 10, color: '#0f8fa8', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{ fontSize: 11, color: COLOR.primary, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
             <Ship size={9} /> Linked to: {e.scheduleSummary}
           </div>
         )}
@@ -1421,7 +1422,7 @@ export default function RateCheck({
           )
         })}
         {surNames.length > 0 && (
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, fontStyle: 'italic' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, fontStyle: 'italic' }}>
             Inclusive of {surNames.join(', ')}
           </div>
         )}
@@ -1495,7 +1496,7 @@ export default function RateCheck({
     return (
       <div className="ws-doc-preview">
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-          <FileDown size={14} style={{ color: isProcurement ? '#d97706' : '#0f8fa8' }} />
+          <FileDown size={14} style={{ color: isProcurement ? '#d97706' : COLOR.primary }} />
           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>Rate Brief</span>
         </div>
         <div className="ws-doc-body">
@@ -1580,14 +1581,14 @@ export default function RateCheck({
     if (hasDbSelections) {
       return {
         label: `Go to Quotation (${selectedIds.size} rate${selectedIds.size !== 1 ? 's' : ''})`,
-        color: '#0f8fa8',
+        color: COLOR.primary,
         icon: <ChevronRight size={12} />,
       }
     }
     if (!isProcurement && hasAggregateSelections) {
       return {
         label: `Go to Quotation (${selectedAggregateRateIds.size} rate${selectedAggregateRateIds.size !== 1 ? 's' : ''})`,
-        color: '#0f8fa8',
+        color: COLOR.primary,
         icon: <ChevronRight size={12} />,
       }
     }
@@ -1650,28 +1651,28 @@ export default function RateCheck({
               paddingRight: 20, marginRight: 24,
               display: 'flex', flexDirection: 'column', gap: 14,
             }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)' }}>
                 Inquiry · {inquiry.id}
               </div>
 
               {/* Customer */}
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Customer</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Customer</div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{inquiry.customer_name}</div>
                 {custData?.tier && <div style={{ fontSize: 11, color: 'var(--accent-light)', marginTop: 1 }}>{custData.tier}</div>}
               </div>
 
               {/* Route */}
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Route</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Route</div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{inquiry.origin}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', margin: '2px 0 2px 2px' }}>↓</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 2px 2px' }}>↓</div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{dest}</div>
               </div>
 
               {/* Container(s) */}
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>
                   {allContainers.length > 1 ? 'Containers' : 'Container'}
                 </div>
                 {inquiry.containers && inquiry.containers.length > 0 ? (
@@ -1711,7 +1712,7 @@ export default function RateCheck({
 
               {/* Cargo Ready Date */}
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Cargo Ready</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Cargo Ready</div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: inquiry.cargo_ready_date ? 'var(--text)' : 'var(--text-muted)' }}>
                   {inquiry.cargo_ready_date || 'Not set'}
                 </div>
@@ -1719,7 +1720,7 @@ export default function RateCheck({
 
               {/* Service mode */}
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Service Mode</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Service Mode</div>
                 <div style={{ fontSize: 12, color: 'var(--text)' }}>
                   {inquiry.delivery_type === 'door-to-door' ? 'Door-to-Door' : 'Port-to-Port'}
                 </div>
@@ -1728,7 +1729,7 @@ export default function RateCheck({
               {/* Incoterm */}
               {inquiry.incoterm && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Incoterm</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Incoterm</div>
                   <div style={{ fontSize: 12, color: 'var(--text)' }}>{inquiry.incoterm}</div>
                 </div>
               )}
@@ -1736,7 +1737,7 @@ export default function RateCheck({
               {/* Priority */}
               {inquiry.priority && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Priority</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Priority</div>
                   <div style={{ fontSize: 12, color: 'var(--text)' }}>{inquiry.priority}</div>
                 </div>
               )}
@@ -1744,7 +1745,7 @@ export default function RateCheck({
               {/* Target rate */}
               {inquiry.preferred_rate != null && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Target Rate</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Target Rate</div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#16a34a' }}>
                     USD {inquiry.preferred_rate.toLocaleString()}
                   </div>
@@ -1754,7 +1755,7 @@ export default function RateCheck({
               {/* Preferred liners */}
               {inquiry.preferred_liners && inquiry.preferred_liners.length > 0 && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Preferred Liners</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Preferred Liners</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {inquiry.preferred_liners.map(l => (
                       <span key={l} style={{ fontSize: 11, fontWeight: 600, color: '#6366f1' }}>{l}</span>
@@ -1766,7 +1767,7 @@ export default function RateCheck({
               {/* Request */}
               {inquiry.request && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Request</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Request</div>
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{inquiry.request}</div>
                 </div>
               )}
@@ -1775,7 +1776,7 @@ export default function RateCheck({
             {/* ── RIGHT: Rate options ── */}
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
               {/* ---- Banner ---- */}
-              <div style={{ padding: '10px 14px', background: isProcurement ? 'rgba(15,143,168,0.06)' : 'rgba(8,145,178,0.06)', border: `1px solid ${isProcurement ? 'rgba(15,143,168,0.18)' : 'rgba(8,145,178,0.18)'}`, borderRadius: 8, fontSize: 12, color: isProcurement ? '#0f8fa8' : '#0891b2', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ padding: '10px 14px', background: isProcurement ? 'rgba(44,44,130,0.06)' : 'rgba(8,145,178,0.06)', border: `1px solid ${isProcurement ? 'rgba(44,44,130,0.18)' : 'rgba(8,145,178,0.18)'}`, borderRadius: 8, fontSize: 12, color: isProcurement ? COLOR.primary : '#0891b2', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <FileText size={14} />
                 {isProcurement
                   ? <>Schedule rates for: <strong style={{ marginLeft: 4 }}>{inquiry.origin} → {dest}</strong>{containerLabel && <span style={{ color: '#6366f1' }}> · {containerLabel}</span>}</>
@@ -1792,7 +1793,7 @@ export default function RateCheck({
                       SCHEDULES &amp; RATES
                     </span>
                     {selectedAggregateRateIds.size > 0 && (
-                      <span style={{ fontSize: 10, fontWeight: 600, color: '#16a34a' }}>{selectedAggregateRateIds.size} selected</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#16a34a' }}>{selectedAggregateRateIds.size} selected</span>
                     )}
                     <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
                   </div>
@@ -1845,13 +1846,13 @@ export default function RateCheck({
                       SCHEDULES &amp; RATES FROM CS
                     </span>
                     {selectedAggregateRateIds.size > 0 && (
-                      <span style={{ fontSize: 10, fontWeight: 600, color: '#16a34a' }}>{selectedAggregateRateIds.size} selected</span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: '#16a34a' }}>{selectedAggregateRateIds.size} selected</span>
                     )}
                     <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
                   </div>
 
                   {incomingRemark && (
-                    <div style={{ padding: '6px 10px', background: 'rgba(15,143,168,0.06)', border: '1px solid rgba(15,143,168,0.14)', borderRadius: 6, fontSize: 11, color: 'var(--text-secondary)' }}>
+                    <div style={{ padding: '6px 10px', background: 'rgba(44,44,130,0.06)', border: '1px solid rgba(44,44,130,0.14)', borderRadius: 6, fontSize: 11, color: 'var(--text-secondary)' }}>
                       <span style={{ fontWeight: 600 }}>CS Note:</span> {incomingRemark}
                     </div>
                   )}
@@ -1866,7 +1867,7 @@ export default function RateCheck({
 
                   {/* No schedules */}
                   {!aggregateLoading && !aggregateData && incomingSchedules.length === 0 && (
-                    <div style={{ padding: '14px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, background: 'rgba(15,143,168,0.04)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                    <div style={{ padding: '14px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, background: 'rgba(44,44,130,0.04)', border: '1px solid var(--border)', borderRadius: 8 }}>
                       No vessel schedules attached by CS.
                     </div>
                   )}
@@ -1891,7 +1892,7 @@ export default function RateCheck({
 
                   {/* No rates found for loaded schedules */}
                   {!aggregateLoading && aggregateData && aggregatePivot.rows.length === 0 && (
-                    <div style={{ padding: '14px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, background: 'rgba(15,143,168,0.04)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                    <div style={{ padding: '14px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, background: 'rgba(44,44,130,0.04)', border: '1px solid var(--border)', borderRadius: 8 }}>
                       No matching rates found for the attached schedules.
                     </div>
                   )}
@@ -1902,7 +1903,7 @@ export default function RateCheck({
                       <div style={{
                         display: 'grid', gridTemplateColumns: '1fr 100px 80px 80px 70px 90px',
                         background: 'var(--bg-card)', borderBottom: '1px solid var(--border)',
-                        fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.3,
+                        fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.3,
                       }}>
                         <div style={{ padding: '6px 10px' }}>Carrier / Vessel</div>
                         <div style={{ padding: '6px 8px' }}>Route</div>
@@ -1922,7 +1923,7 @@ export default function RateCheck({
                           }}>
                             <div style={{ padding: '6px 10px' }}>
                               <div style={{ fontWeight: 600, color: 'var(--text)' }}>{sch.liner_name || sch.scac || '—'}</div>
-                              <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{sch.vessel_name}{sch.voyage_number ? ` / ${sch.voyage_number}` : ''}</div>
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{sch.vessel_name}{sch.voyage_number ? ` / ${sch.voyage_number}` : ''}</div>
                             </div>
                             <div style={{ padding: '6px 8px', color: 'var(--text-secondary)' }}>{sch.origin_unloc} → {sch.destination_unloc}</div>
                             <div style={{ padding: '6px 8px', color: 'var(--text-secondary)' }}>{fmtDate(sch.origin_departure_date)}</div>
@@ -1930,7 +1931,7 @@ export default function RateCheck({
                             <div style={{ padding: '6px 8px', color: 'var(--text-secondary)' }}>{transitDays}</div>
                             <div style={{ padding: '6px 8px' }}>
                               <span style={{
-                                fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                                fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
                                 background: isDirect ? 'rgba(22,163,74,0.1)' : 'rgba(217,119,6,0.1)',
                                 color: isDirect ? '#16a34a' : '#d97706',
                               }}>
@@ -1963,7 +1964,7 @@ export default function RateCheck({
                     style={{
                       display: 'flex', alignItems: 'center', gap: 5, fontSize: 12,
                       marginRight: 'auto',
-                      background: 'rgba(15,143,168,0.06)', borderColor: '#0f8fa8', color: '#0f8fa8',
+                      background: 'rgba(44,44,130,0.06)', borderColor: COLOR.primary, color: COLOR.primary,
                     }}
                     onClick={handleEscalate}
                     disabled={submitting}
@@ -2014,22 +2015,22 @@ export default function RateCheck({
               paddingRight: 20, marginRight: 24,
               display: 'flex', flexDirection: 'column', gap: 14,
             }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)' }}>
                 Inquiry · {inquiry.id}
               </div>
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Customer</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Customer</div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{inquiry.customer_name}</div>
                 {custData?.tier && <div style={{ fontSize: 11, color: 'var(--accent-light)', marginTop: 1 }}>{custData.tier}</div>}
               </div>
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Route</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Route</div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{inquiry.origin}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', margin: '2px 0 2px 2px' }}>↓</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 2px 2px' }}>↓</div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{dest}</div>
               </div>
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>
                   {allContainers.length > 1 ? 'Containers' : 'Container'}
                 </div>
                 {inquiry.containers && inquiry.containers.length > 0 ? (
@@ -2066,32 +2067,32 @@ export default function RateCheck({
               </div>
               <div style={{ height: 1, background: 'var(--border)' }} />
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Cargo Ready</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Cargo Ready</div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: inquiry.cargo_ready_date ? 'var(--text)' : 'var(--text-muted)' }}>
                   {inquiry.cargo_ready_date || 'Not set'}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Service Mode</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Service Mode</div>
                 <div style={{ fontSize: 12, color: 'var(--text)' }}>
                   {inquiry.delivery_type === 'door-to-door' ? 'Door-to-Door' : 'Port-to-Port'}
                 </div>
               </div>
               {inquiry.incoterm && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Incoterm</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Incoterm</div>
                   <div style={{ fontSize: 12, color: 'var(--text)' }}>{inquiry.incoterm}</div>
                 </div>
               )}
               {inquiry.priority && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Priority</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Priority</div>
                   <div style={{ fontSize: 12, color: 'var(--text)' }}>{inquiry.priority}</div>
                 </div>
               )}
               {inquiry.preferred_rate != null && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Target Rate</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Target Rate</div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: '#16a34a' }}>
                     USD {inquiry.preferred_rate.toLocaleString()}
                   </div>
@@ -2099,7 +2100,7 @@ export default function RateCheck({
               )}
               {inquiry.preferred_liners && inquiry.preferred_liners.length > 0 && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Preferred Liners</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Preferred Liners</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {inquiry.preferred_liners.map(l => (
                       <span key={l} style={{ fontSize: 11, fontWeight: 600, color: '#6366f1' }}>{l}</span>
@@ -2109,7 +2110,7 @@ export default function RateCheck({
               )}
               {inquiry.request && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Request</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Request</div>
                   <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{inquiry.request}</div>
                 </div>
               )}
@@ -2123,12 +2124,12 @@ export default function RateCheck({
                 {linkedSchedule && (
                   <div style={{
                     padding: '8px 12px',
-                    background: 'rgba(15,143,168,0.06)',
-                    border: '1px solid rgba(15,143,168,0.18)',
+                    background: 'rgba(44,44,130,0.06)',
+                    border: '1px solid rgba(44,44,130,0.18)',
                     borderRadius: 8,
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   }}>
-                    <div style={{ fontSize: 12, color: '#0f8fa8', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ fontSize: 12, color: COLOR.primary, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <Ship size={13} />
                       <strong>Linked to Schedule:</strong>{' '}
                       {linkedSchedule.linerName || '—'} / {linkedSchedule.vesselName || '—'}
@@ -2525,10 +2526,10 @@ export default function RateCheck({
                         {displayRates.filter(r => selectedIds.has(r.id)).map(rate => {
                           const badgeColor = RATE_SOURCE_COLORS[rate.source_type] || '#64748b'
                           return (
-                            <div key={rate.id} style={{ padding: '5px 8px', border: '1px solid var(--border)', borderRadius: 6, background: 'rgba(15,143,168,0.03)' }}>
+                            <div key={rate.id} style={{ padding: '5px 8px', border: '1px solid var(--border)', borderRadius: 6, background: 'rgba(44,44,130,0.03)' }}>
                               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 5 }}>
                                 {rate.liner_name || 'N/A'}
-                                <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 5px', borderRadius: 3, background: `${badgeColor}18`, color: badgeColor, border: `1px solid ${badgeColor}30` }}>
+                                <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 5px', borderRadius: 3, background: `${badgeColor}18`, color: badgeColor, border: `1px solid ${badgeColor}30` }}>
                                   {rate.source_type}
                                 </span>
                               </div>
@@ -2555,7 +2556,7 @@ export default function RateCheck({
                             <div key={entry.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--card)' }}>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                                  <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 5px', borderRadius: 3, background: `${accent}18`, color: accent, border: `1px solid ${accent}30` }}>{MR_TAB_LABELS[entry.tab]}</span>
+                                  <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 5px', borderRadius: 3, background: `${accent}18`, color: accent, border: `1px solid ${accent}30` }}>{MR_TAB_LABELS[entry.tab]}</span>
                                   {entry.liner}
                                 </div>
                                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
@@ -2564,12 +2565,12 @@ export default function RateCheck({
                                   {entry.isCancelled && <span style={{ color: '#dc2626', fontWeight: 600, marginLeft: 4 }}>CANCELLED</span>}
                                 </div>
                                 {entrySurNames.length > 0 && (
-                                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1, fontStyle: 'italic' }}>
+                                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1, fontStyle: 'italic' }}>
                                     Inclusive of {entrySurNames.join(', ')}
                                   </div>
                                 )}
                                 {entry.scheduleId != null && entry.scheduleSummary && (
-                                  <div style={{ fontSize: 10, color: '#0f8fa8', marginTop: 1, display: 'flex', alignItems: 'center', gap: 3 }}>
+                                  <div style={{ fontSize: 11, color: COLOR.primary, marginTop: 1, display: 'flex', alignItems: 'center', gap: 3 }}>
                                     <Ship size={8} /> Linked: {entry.scheduleSummary}
                                   </div>
                                 )}
@@ -2621,7 +2622,7 @@ export default function RateCheck({
                 }}
               >
                 <PanelRight size={16} style={{ color: 'var(--text-muted)' }} />
-                <span style={{ writingMode: 'vertical-rl', fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>BRIEF</span>
+                <span style={{ writingMode: 'vertical-rl', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>BRIEF</span>
               </button>
             )}
           </div>
@@ -2643,8 +2644,8 @@ export default function RateCheck({
 
             {/* CS/Sales: escalation / skip info on review */}
             {!isProcurement && !hasDbSelections && !hasAggregateSelections && (
-              <div style={{ padding: '14px', background: skipProcurement ? 'rgba(217,119,6,0.06)' : 'rgba(15,143,168,0.06)', border: `1px solid ${skipProcurement ? 'rgba(217,119,6,0.18)' : 'rgba(15,143,168,0.18)'}`, borderRadius: 8 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: skipProcurement ? '#d97706' : '#0f8fa8', marginBottom: 4 }}>
+              <div style={{ padding: '14px', background: skipProcurement ? 'rgba(217,119,6,0.06)' : 'rgba(44,44,130,0.06)', border: `1px solid ${skipProcurement ? 'rgba(217,119,6,0.18)' : 'rgba(44,44,130,0.18)'}`, borderRadius: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: skipProcurement ? '#d97706' : COLOR.primary, marginBottom: 4 }}>
                   {skipProcurement ? 'Skip Procurement' : 'Escalate to Procurement'}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>

@@ -5,6 +5,7 @@ import type { AggregateScheduleRatesResponse, AggregateRate, LinerRecord, OceanS
 import { linerDisplay } from '../../types'
 import PortCombobox from '../shared/PortCombobox'
 import TagInput from '../shared/TagInput'
+import { COLOR } from '../ui/tokens'
 
 // ---------------------------------------------------------------------------
 // Pivot aggregate response: one row per schedule, rate types as columns
@@ -192,11 +193,11 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
   ]
 
   const thBase: React.CSSProperties = {
-    padding: '5px 4px', fontSize: 9, fontWeight: 700, color: '#fff', letterSpacing: 0.3,
+    padding: '5px 4px', fontSize: 11, fontWeight: 700, color: '#fff', letterSpacing: 0.3,
     textAlign: 'center', whiteSpace: 'nowrap', borderLeft: '1px solid rgba(255,255,255,0.2)',
   }
   const tdBase: React.CSSProperties = {
-    padding: '5px 4px', fontSize: 10, color: 'var(--text)', verticalAlign: 'middle',
+    padding: '5px 4px', fontSize: 11, color: 'var(--text)', verticalAlign: 'middle',
     borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)',
   }
 
@@ -221,7 +222,7 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
             : `${filtered.length} of ${rows.length} (filtered)`}
         </div>
         {activeCount > 0 && (
-          <button onClick={clearAll} style={{ fontSize: 10, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
+          <button onClick={clearAll} style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
             <X size={10} /> Clear filters
           </button>
         )}
@@ -240,14 +241,14 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
                 style={{
                   fontSize: 11, padding: '3px 10px', borderRadius: 14, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', gap: 4,
-                  border: hasActive ? '1px solid #0f8fa8' : '1px solid var(--border)',
-                  background: hasActive ? 'rgba(15,143,168,0.08)' : 'transparent',
-                  color: hasActive ? '#0f8fa8' : 'var(--text-secondary)',
+                  border: hasActive ? `1px solid ${COLOR.primary}` : '1px solid var(--border)',
+                  background: hasActive ? 'rgba(44,44,130,0.08)' : 'transparent',
+                  color: hasActive ? COLOR.primary : 'var(--text-secondary)',
                   fontWeight: hasActive ? 600 : 400,
                 }}>
                 <Filter size={10} />
                 {f.label}
-                {hasActive && <span style={{ fontSize: 9, background: '#0f8fa8', color: '#fff', borderRadius: 8, padding: '0 5px', fontWeight: 700 }}>{f.active.size}</span>}
+                {hasActive && <span style={{ fontSize: 11, background: COLOR.primary, color: '#fff', borderRadius: 8, padding: '0 5px', fontWeight: 700 }}>{f.active.size}</span>}
               </button>
               {isOpen && (
                 <div style={{
@@ -256,19 +257,19 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
                   boxShadow: '0 4px 16px rgba(0,0,0,0.12)', minWidth: 180, maxHeight: 240, overflowY: 'auto', padding: '4px 0',
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 10px', borderBottom: '1px solid var(--border)' }}>
-                    <button onClick={() => f.set(new Set(entries.map(e => e[0])))} style={{ fontSize: 10, color: '#0f8fa8', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Select all</button>
-                    <button onClick={() => f.set(new Set())} style={{ fontSize: 10, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>Clear</button>
+                    <button onClick={() => f.set(new Set(entries.map(e => e[0])))} style={{ fontSize: 11, color: COLOR.primary, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Select all</button>
+                    <button onClick={() => f.set(new Set())} style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>Clear</button>
                   </div>
                   {entries.map(([val, count]) => (
                     <label key={val} style={{
                       display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', cursor: 'pointer',
-                      fontSize: 11, color: 'var(--text)', background: f.active.has(val) ? 'rgba(15,143,168,0.04)' : 'transparent',
+                      fontSize: 11, color: 'var(--text)', background: f.active.has(val) ? 'rgba(44,44,130,0.04)' : 'transparent',
                     }}>
                       <input type="checkbox" checked={f.active.has(val)} onChange={() => {
                         f.set(prev => { const n = new Set(prev); if (n.has(val)) n.delete(val); else n.add(val); return n })
                       }} />
                       <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
-                      <span style={{ fontSize: 9, color: 'var(--text-muted)', flexShrink: 0 }}>{count}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{count}</span>
                     </label>
                   ))}
                 </div>
@@ -283,9 +284,9 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
         <div style={{ overflowX: 'auto', maxHeight: 600 }}>
           <table style={{ borderCollapse: 'collapse', minWidth: SCHED_COL_COUNT * 80 + rateCols * 76 }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-              <tr style={{ background: 'var(--accent, #0f8fa8)' }}>
+              <tr style={{ background: 'var(--accent, #2c2c82)' }}>
                 <th colSpan={SCHED_COL_COUNT} style={{
-                  padding: '5px 8px', fontSize: 10, fontWeight: 700, color: '#fff',
+                  padding: '5px 8px', fontSize: 11, fontWeight: 700, color: '#fff',
                   letterSpacing: 0.5, textAlign: 'center',
                   borderBottom: '1px solid rgba(255,255,255,0.2)',
                 }}>
@@ -293,7 +294,7 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
                 </th>
                 {rateTypes.map(rt => (
                   <th key={rt} colSpan={containerTypes.length} style={{
-                    padding: '5px 4px', fontSize: 10, fontWeight: 700,
+                    padding: '5px 4px', fontSize: 11, fontWeight: 700,
                     color: '#fff', letterSpacing: 0.5, textAlign: 'center',
                     borderLeft: '2px solid rgba(255,255,255,0.5)',
                     borderBottom: '1px solid rgba(255,255,255,0.2)',
@@ -303,7 +304,7 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
                   </th>
                 ))}
               </tr>
-              <tr style={{ background: 'var(--accent, #0f8fa8)' }}>
+              <tr style={{ background: 'var(--accent, #2c2c82)' }}>
                 {['CARRIER', 'VESSEL / VOYAGE', 'ORIGIN', 'DEST', 'ETD', 'ETA', 'TT', 'CUTOFF'].map((h, i) => (
                   <th key={h} style={{
                     ...thBase,
@@ -315,7 +316,7 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
                   containerTypes.map((ct, ctIdx) => (
                     <th key={`${rt}-${ct}`} style={{
                       ...thBase,
-                      fontSize: 8,
+                      fontSize: 11,
                       borderLeft: ctIdx === 0 ? '2px solid rgba(255,255,255,0.5)' : thBase.borderLeft,
                       background: RATE_COLORS[rt] ?? '#64748b',
                     }}>
@@ -337,7 +338,7 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
                     <td style={tdBase}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                         <Ship size={9} style={{ opacity: 0.5, flexShrink: 0 }} />
-                        <span style={{ fontSize: 10 }}>{row.vesselName || '—'}{row.voyageNumber ? ` / ${row.voyageNumber}` : ''}</span>
+                        <span style={{ fontSize: 11 }}>{row.vesselName || '—'}{row.voyageNumber ? ` / ${row.voyageNumber}` : ''}</span>
                       </div>
                     </td>
                     <td style={tdBase}>{row.originCity || row.origin || '—'}</td>
@@ -347,7 +348,7 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
                     <td style={{ ...tdBase, fontWeight: 600, textAlign: 'center' }}>
                       {row.totalDuration != null ? `${row.totalDuration}d` : '—'}
                     </td>
-                    <td style={{ ...tdBase, fontSize: 9 }}>{fmtDate(row.bkCutoff)}</td>
+                    <td style={{ ...tdBase, fontSize: 11 }}>{fmtDate(row.bkCutoff)}</td>
                     {rateTypes.map(rt =>
                       containerTypes.map((ct, ctIdx) => {
                         const cell = row.rates[rt]?.[ct]
@@ -364,12 +365,12 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
                           >
                             {cell ? (
                               <>
-                                <div style={{ fontWeight: 700, fontSize: 10, whiteSpace: 'nowrap' }}>
+                                <div style={{ fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>
                                   {cell.currency} {cell.rate.toLocaleString()}
                                 </div>
                                 {cell.note && (
                                   <div style={{
-                                    fontSize: 8, color: '#94a3b8', lineHeight: 1.2, marginTop: 1,
+                                    fontSize: 11, color: '#94a3b8', lineHeight: 1.2, marginTop: 1,
                                     maxWidth: 72, overflow: 'hidden', textOverflow: 'ellipsis',
                                     whiteSpace: 'nowrap', margin: '1px auto 0',
                                   }}>
@@ -378,7 +379,7 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
                                 )}
                               </>
                             ) : (
-                              <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>—</span>
+                              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
                             )}
                           </td>
                         )
@@ -419,12 +420,12 @@ function ScheduleSearchTable({ data }: { data: OceanSchedule[] }) {
     setChecked(prev => { const n = new Set(prev); if (n.has(idx)) n.delete(idx); else n.add(idx); return n })
 
   const thStyle: React.CSSProperties = {
-    padding: '6px 6px', fontSize: 9, fontWeight: 700, color: '#fff',
+    padding: '6px 6px', fontSize: 11, fontWeight: 700, color: '#fff',
     letterSpacing: 0.3, textAlign: 'left', whiteSpace: 'nowrap',
     borderLeft: '1px solid rgba(255,255,255,0.2)',
   }
   const tdStyle: React.CSSProperties = {
-    padding: '5px 6px', fontSize: 10, color: 'var(--text)',
+    padding: '5px 6px', fontSize: 11, color: 'var(--text)',
     verticalAlign: 'middle', borderBottom: '1px solid var(--border)',
     borderLeft: '1px solid var(--border)',
   }
@@ -440,7 +441,7 @@ function ScheduleSearchTable({ data }: { data: OceanSchedule[] }) {
         <div style={{ overflowX: 'auto', maxHeight: 540 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-              <tr style={{ background: 'var(--accent, #0f8fa8)' }}>
+              <tr style={{ background: 'var(--accent, #2c2c82)' }}>
                 {COLS.map((h, i) => (
                   <th key={h} style={{
                     ...thStyle,
@@ -458,9 +459,9 @@ function ScheduleSearchTable({ data }: { data: OceanSchedule[] }) {
                 <tr key={`${s.scac}-${s.vesselName}-${s.voyageNumber}-${i}`} style={{ background: i % 2 ? 'rgba(100,116,139,0.04)' : 'transparent' }}>
                   <td style={{ ...tdStyle, borderLeft: 'none', fontWeight: 600 }}>
                     <div>{s.carrierName || s.scac || '—'}</div>
-                    {s.scac && s.carrierName && <div style={{ fontSize: 8, color: 'var(--text-muted)' }}>{s.scac}</div>}
+                    {s.scac && s.carrierName && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.scac}</div>}
                   </td>
-                  <td style={{ ...tdStyle, fontSize: 9 }}>{s.serviceName || '—'}</td>
+                  <td style={{ ...tdStyle, fontSize: 11 }}>{s.serviceName || '—'}</td>
                   <td style={tdStyle}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                       <Ship size={9} style={{ opacity: 0.5, flexShrink: 0 }} />
@@ -469,11 +470,11 @@ function ScheduleSearchTable({ data }: { data: OceanSchedule[] }) {
                   </td>
                   <td style={tdStyle}>
                     {s.originCityName || s.originUnloc || '—'}
-                    {s.originUnloc && s.originCityName && <div style={{ fontSize: 8, color: 'var(--text-muted)' }}>{s.originUnloc}</div>}
+                    {s.originUnloc && s.originCityName && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.originUnloc}</div>}
                   </td>
                   <td style={tdStyle}>
                     {s.destinationCityName || s.destinationUnloc || '—'}
-                    {s.destinationUnloc && s.destinationCityName && <div style={{ fontSize: 8, color: 'var(--text-muted)' }}>{s.destinationUnloc}</div>}
+                    {s.destinationUnloc && s.destinationCityName && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.destinationUnloc}</div>}
                   </td>
                   <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{fmtDate(s.originDepartureDate)}</td>
                   <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{fmtDate(s.destinationArrivalDate)}</td>
@@ -483,20 +484,20 @@ function ScheduleSearchTable({ data }: { data: OceanSchedule[] }) {
                   <td style={tdStyle}>
                     {s.scheduleType ? (
                       <span style={{
-                        fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+                        fontSize: 11, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
                         background: s.scheduleType === 'direct' ? 'rgba(22,163,74,0.1)' : 'rgba(217,119,6,0.1)',
                         color: s.scheduleType === 'direct' ? '#16a34a' : '#d97706',
                       }}>{s.scheduleType === 'direct' ? 'Direct' : 'T/S'}</span>
                     ) : '—'}
                   </td>
-                  <td style={{ ...tdStyle, fontSize: 9, whiteSpace: 'nowrap' }}>{fmtDate(s.bkCutoff)}</td>
+                  <td style={{ ...tdStyle, fontSize: 11, whiteSpace: 'nowrap' }}>{fmtDate(s.bkCutoff)}</td>
                   {/* Special Rate checkbox */}
                   <td style={{ ...tdStyle, textAlign: 'center' }}>
                     <input
                       type="checkbox"
                       checked={checked.has(i)}
                       onChange={() => toggleCheck(i)}
-                      style={{ cursor: 'pointer', accentColor: '#0f8fa8' }}
+                      style={{ cursor: 'pointer', accentColor: COLOR.primary }}
                     />
                   </td>
                   {/* Action button */}
@@ -505,9 +506,9 @@ function ScheduleSearchTable({ data }: { data: OceanSchedule[] }) {
                       type="button"
                       onClick={() => setModalIdx(i)}
                       style={{
-                        fontSize: 9, fontWeight: 600, padding: '3px 10px', borderRadius: 4,
-                        border: '1px solid #0f8fa8', background: 'rgba(15,143,168,0.06)',
-                        color: '#0f8fa8', cursor: 'pointer', whiteSpace: 'nowrap',
+                        fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 4,
+                        border: `1px solid ${COLOR.primary}`, background: 'rgba(44,44,130,0.06)',
+                        color: COLOR.primary, cursor: 'pointer', whiteSpace: 'nowrap',
                       }}
                     >
                       Input Rate
@@ -700,8 +701,8 @@ export default function Schedules({ onFlash }: SchedulesProps) {
   const tabStyle = (active: boolean): React.CSSProperties => ({
     padding: '8px 20px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
     border: 'none', background: 'none',
-    color: active ? '#0f8fa8' : 'var(--text-muted)',
-    borderBottom: active ? '2px solid #0f8fa8' : '2px solid transparent',
+    color: active ? COLOR.primary : 'var(--text-muted)',
+    borderBottom: active ? `2px solid ${COLOR.primary}` : '2px solid transparent',
     marginBottom: -2, transition: 'color 0.15s, border-color 0.15s',
   })
 
@@ -709,7 +710,7 @@ export default function Schedules({ onFlash }: SchedulesProps) {
     <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
       {/* Page title */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-        <Globe size={18} style={{ color: '#0f8fa8' }} />
+        <Globe size={18} style={{ color: COLOR.primary }} />
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Ocean Schedules</h2>
       </div>
 
@@ -756,7 +757,7 @@ export default function Schedules({ onFlash }: SchedulesProps) {
             ))}
             <button type="button" onClick={addPair}
               style={{
-                fontSize: 11, color: '#0f8fa8', background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 11, color: COLOR.primary, background: 'none', border: 'none', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0', fontWeight: 600,
               }}>
               <Plus size={12} /> Add port pair
@@ -774,7 +775,7 @@ export default function Schedules({ onFlash }: SchedulesProps) {
               placeholder="Type to add liners..."
               formatLabel={formatLinerLabel}
             />
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>Leave empty to show all liners.</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Leave empty to show all liners.</div>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -855,7 +856,7 @@ export default function Schedules({ onFlash }: SchedulesProps) {
             ))}
             <button type="button" onClick={addSearchPair}
               style={{
-                fontSize: 11, color: '#0f8fa8', background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: 11, color: COLOR.primary, background: 'none', border: 'none', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0', fontWeight: 600,
               }}>
               <Plus size={12} /> Add port pair
@@ -874,7 +875,7 @@ export default function Schedules({ onFlash }: SchedulesProps) {
               placeholder="Type carrier name or SCAC code..."
               formatLabel={formatScacLabel}
             />
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
               Select one or more carriers to search their schedules.
             </div>
           </div>

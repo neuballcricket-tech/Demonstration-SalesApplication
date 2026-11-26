@@ -8,6 +8,7 @@ import {
 import { apiGetPorts, apiGetLiners, apiGetTradeLanes, apiGetEmployeesDb, apiGetClientsDb, apiCreateTariffRate, apiCreateContractedRate, apiCreateNacRate, apiPreviewBulkTariffRates, apiBulkCreateTariffRates, BACKEND_ACTOR_ID, type BulkTariffPreviewRow } from '../../api'
 import TagInput from '../shared/TagInput'
 import { FIELD_LABEL, INPUT_STYLE } from './pageStyles'
+import { COLOR } from '../ui/tokens'
 
 interface TariffContainerRate {
   containerType: string
@@ -320,7 +321,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
         </button>
         <div>
           <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            {mode === 'review' ? <><FileText size={18} style={{ color: '#0f8fa8' }} /> Review Rate</> : <><DollarSign size={18} style={{ color: '#0f8fa8' }} /> Record Rate</>}
+            {mode === 'review' ? <><FileText size={18} style={{ color: COLOR.primary }} /> Review Rate</> : <><DollarSign size={18} style={{ color: COLOR.primary }} /> Record Rate</>}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
             {mode === 'review'
@@ -573,7 +574,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             {/* — Container Rates — */}
             <div style={{ ...secHead, justifyContent: 'space-between' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={secDot(RATE_SOURCE_COLORS['Tariff Rate'])} />Container Rates</span>
-              <button type="button" className="db-btn" style={{ fontSize: 10, padding: '2px 8px', display: 'flex', alignItems: 'center', gap: 3 }} onClick={addTariffContainer}><Plus size={11} /> Add</button>
+              <button type="button" className="db-btn" style={{ fontSize: 11, padding: '2px 8px', display: 'flex', alignItems: 'center', gap: 3 }} onClick={addTariffContainer}><Plus size={11} /> Add</button>
             </div>
             <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 1fr 0.65fr 28px', gap: 8 }}>
@@ -691,7 +692,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             {/* — Container Rates — */}
             <div style={{ ...secHead, justifyContent: 'space-between' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={secDot(RATE_SOURCE_COLORS['Contracted'])} />Container Rates</span>
-              <button type="button" className="db-btn" style={{ fontSize: 10, padding: '2px 8px', display: 'flex', alignItems: 'center', gap: 3 }} onClick={addContractedContainer}><Plus size={11} /> Add</button>
+              <button type="button" className="db-btn" style={{ fontSize: 11, padding: '2px 8px', display: 'flex', alignItems: 'center', gap: 3 }} onClick={addContractedContainer}><Plus size={11} /> Add</button>
             </div>
             <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.65fr 0.75fr 0.85fr 0.6fr 28px', gap: 8 }}>
@@ -800,7 +801,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             {/* — Container Rates — */}
             <div style={{ ...secHead, justifyContent: 'space-between' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={secDot(RATE_SOURCE_COLORS['NAC'])} />Container Rates</span>
-              <button type="button" className="db-btn" style={{ fontSize: 10, padding: '2px 8px', display: 'flex', alignItems: 'center', gap: 3 }} onClick={addNacContainer}><Plus size={11} /> Add</button>
+              <button type="button" className="db-btn" style={{ fontSize: 11, padding: '2px 8px', display: 'flex', alignItems: 'center', gap: 3 }} onClick={addNacContainer}><Plus size={11} /> Add</button>
             </div>
             <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 6 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.65fr 0.75fr 0.85fr 0.6fr 28px', gap: 8 }}>
@@ -876,7 +877,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
           const containerRows = (arr: (TariffContainerRate | ContractedContainerRate)[]) =>
             arr.filter(c => c.rate !== '').map((c, i) => (
               <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 10, background: 'var(--bg)', marginTop: i > 0 ? 6 : 0 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Container {i + 1}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Container {i + 1}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 16px', fontSize: 12 }}>
                   <span style={{ color: 'var(--text-muted)' }}>Type</span><strong>{c.containerType || '—'}</strong>
                   {'contractedVolume' in c && c.contractedVolume && <><span style={{ color: 'var(--text-muted)' }}>Contracted TUs</span><strong>{c.contractedVolume}</strong></>}

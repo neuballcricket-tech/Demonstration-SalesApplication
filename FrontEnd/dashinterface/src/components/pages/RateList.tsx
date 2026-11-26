@@ -54,7 +54,7 @@ const colType: ColDef = {
     return (
       <td style={TD}>
         <span style={{
-          fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
+          fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
           background: c + '15', color: c, textTransform: 'uppercase', letterSpacing: '0.3px', whiteSpace: 'nowrap',
         }}>
           {r.source_type}
@@ -117,8 +117,8 @@ const colSoldStatus: ColDef = {
   key: 'sold', label: 'Sold',
   render: r => (
     <td style={TD}>
-      {r.is_sold === true && <span className="db-badge danger" style={{ fontSize: 10 }}>Sold</span>}
-      {r.is_sold === false && <span className="db-badge accent" style={{ fontSize: 10 }}>Available</span>}
+      {r.is_sold === true && <span className="db-badge danger" style={{ fontSize: 11 }}>Sold</span>}
+      {r.is_sold === false && <span className="db-badge accent" style={{ fontSize: 11 }}>Available</span>}
       {r.is_sold == null && <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>}
     </td>
   ),
@@ -140,7 +140,7 @@ const colServiceScope: ColDef = {
     return (
       <td style={TD}>
         <span style={{
-          fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4,
+          fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 4,
           background: c + '12', color: c, letterSpacing: '0.3px',
         }}>
           {r.service_scope}
@@ -491,7 +491,7 @@ export default function RateList() {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
-              <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.06em' }}>
+              <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.06em' }}>
                 {columns.map(col => (
                   <th key={col.key} style={TH}>{col.label}</th>
                 ))}
@@ -549,7 +549,7 @@ export default function RateList() {
                 <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
                   {viewing.rate != null ? `$${viewing.rate.toLocaleString()}` : 'No rate'}
                   <span style={{
-                    fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
+                    fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
                     background: RATE_SOURCE_COLORS[viewing.source_type] + '15',
                     color: RATE_SOURCE_COLORS[viewing.source_type],
                     textTransform: 'uppercase',
@@ -622,7 +622,7 @@ export default function RateList() {
                 <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
                   Edit Rate
                   <span style={{
-                    fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
+                    fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
                     background: RATE_SOURCE_COLORS[editing.source_type] + '15',
                     color: RATE_SOURCE_COLORS[editing.source_type],
                     textTransform: 'uppercase',

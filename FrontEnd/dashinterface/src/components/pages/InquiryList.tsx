@@ -421,7 +421,7 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
                         </td>
                         <td style={{ padding: '12px 8px', color: 'var(--text-secondary)', fontSize: 11 }}>
                           <div style={{ whiteSpace: 'nowrap' }}>{c.quantity}x {c.containerType}</div>
-                          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{c.isFcl ? 'FCL' : 'LCL'}{c.weight !== '' && c.weight !== 0 ? ` · ${c.weight} kg` : ''}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{c.isFcl ? 'FCL' : 'LCL'}{c.weight !== '' && c.weight !== 0 ? ` · ${c.weight} kg` : ''}</div>
                         </td>
                         <td style={{ padding: '12px 8px', color: 'var(--text-secondary)', fontSize: 11 }}>
                           {c.commodityType}{c.commodityName ? ` — ${c.commodityName}` : ''}
@@ -753,7 +753,7 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
                       color: roleColor,
                       border: `1px solid ${roleColor}30`,
                       borderRadius: 4,
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: 700,
                       letterSpacing: '0.04em',
                       whiteSpace: 'nowrap',

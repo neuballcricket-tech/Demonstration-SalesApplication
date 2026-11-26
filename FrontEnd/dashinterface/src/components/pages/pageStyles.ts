@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { COLOR } from '../ui/tokens'
 
 // ---------------------------------------------------------------------------
 // General Style Guide — shared inline-style constants
@@ -29,7 +30,7 @@ export const PAGE_TITLE_ROW: CSSProperties = {
   marginBottom: 16,
 }
 
-export const PAGE_TITLE_ICON: CSSProperties = { color: '#0f8fa8' }
+export const PAGE_TITLE_ICON: CSSProperties = { color: COLOR.primary }
 
 export const PAGE_TITLE_H2: CSSProperties = {
   margin: 0,

@@ -6,6 +6,7 @@ import {
 } from '../../types'
 import { useRole } from '../../RoleContext'
 import { PAGE_WRAPPER, PAGE_TITLE_ROW, PAGE_TITLE_ICON, PAGE_TITLE_H2, CARD, SECTION_LABEL, INPUT_STYLE, TABLE_TH } from './pageStyles'
+import { COLOR } from '../ui/tokens'
 
 interface FollowupsProps {
   inquiries: Inquiry[]
@@ -119,7 +120,7 @@ export default function Followups({
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
                     <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 13 }}>{i.customer_name}</span>
-                    <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{i.id}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{i.id}</span>
                     <span className="lt-pill overdue">SPOT · 15-min window</span>
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -162,7 +163,7 @@ export default function Followups({
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6, gap: 12 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
                       <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 13 }}>{i.customer_name}</span>
-                      <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{i.id}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{i.id}</span>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {i.origin} → {i.destination}
                       </span>
@@ -239,7 +240,7 @@ export default function Followups({
       {/* Section 1b: Recent follow-ups history */}
       <div style={{ ...CARD, marginBottom: 18 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <History size={14} style={{ color: '#0f8fa8' }} />
+          <History size={14} style={{ color: COLOR.primary }} />
           <div>
             <div style={SECTION_LABEL}>Recent Follow-ups</div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{followups.length} records · most recent first</div>

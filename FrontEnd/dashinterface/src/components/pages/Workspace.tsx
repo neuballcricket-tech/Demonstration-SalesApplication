@@ -17,6 +17,7 @@ import ModalStepForms from './workspaceSteps/ModalStepForms'
 import VesselCreatedPrompt from './workspaceSteps/VesselCreatedPrompt'
 import { useWorkspaceActions } from './workspaceSteps/useWorkspaceActions'
 import { generateReleaseOrderDraft } from './workspaceSteps/utils'
+import { COLOR } from '../ui/tokens'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -1332,7 +1333,7 @@ export default function Workspace({
             <button
               onClick={() => onGoTo('new-inquiry')}
               title="New Inquiry"
-              style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: '#0f8fa8', color: '#fff', border: 'none', fontSize: 17, fontWeight: 600, cursor: 'pointer', lineHeight: 1 }}
+              style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: COLOR.primary, color: '#fff', border: 'none', fontSize: 17, fontWeight: 600, cursor: 'pointer', lineHeight: 1 }}
             >+</button>
           )}
           {effectiveStep === 'proc-rates' && (
@@ -1359,8 +1360,8 @@ export default function Workspace({
                 {group.rfqRef != null && (
                   <div style={{
                     padding: '7px 11px', margin: '10px 0 5px',
-                    background: 'rgba(15,143,168,0.07)', borderLeft: '3px solid #0f8fa8',
-                    borderRadius: 4, fontSize: 11, fontWeight: 700, color: '#0f8fa8',
+                    background: 'rgba(44,44,130,0.07)', borderLeft: `3px solid ${COLOR.primary}`,
+                    borderRadius: 4, fontSize: 11, fontWeight: 700, color: COLOR.primary,
                     textTransform: 'uppercase', letterSpacing: '0.04em',
                   }}>
                     RFQ-{group.rfqRef} · {group.items[0].customerName} · {group.items.length} route{group.items.length !== 1 ? 's' : ''}
@@ -1386,7 +1387,7 @@ export default function Workspace({
                     {item.kycIncomplete && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b', marginLeft: item.urgentFlag ? 0 : 'auto', flexShrink: 0 }} title="KYC pending" />}
                   </div>
                   <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>{item.subtitle}</div>
-                  <span className={TYPE_BADGE_CLASS[item.type]} style={{ fontSize: 10 }}>{item.actionLabel}</span>
+                  <span className={TYPE_BADGE_CLASS[item.type]} style={{ fontSize: 11 }}>{item.actionLabel}</span>
                 </div>
               )
                 })}
@@ -1416,10 +1417,10 @@ export default function Workspace({
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
               <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, color: '#94a3b8' }}>{selectedItem.refId}</span>
               {selectedItem.urgentFlag && (
-                <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.04em', background: 'rgba(220,38,38,0.08)', color: '#dc2626' }}>Urgent</span>
+                <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.04em', background: 'rgba(220,38,38,0.08)', color: '#dc2626' }}>Urgent</span>
               )}
               {selectedItem.kycIncomplete && (
-                <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.04em', background: 'rgba(245,158,11,0.1)', color: '#b45309' }}>KYC Pending</span>
+                <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.04em', background: 'rgba(245,158,11,0.1)', color: '#b45309' }}>KYC Pending</span>
               )}
               <span className={TYPE_BADGE_CLASS[selectedItem.type]}>{selectedItem.type}</span>
             </div>
@@ -1430,14 +1431,14 @@ export default function Workspace({
 
             {/* Where it came from - context card */}
             {selectedItem.previousContext && (
-              <div style={{ padding: '14px 16px', background: '#fff', border: '1px solid #e2e8f0', borderLeft: '3px solid #0f8fa8', borderRadius: 10, marginBottom: 26 }}>
+              <div style={{ padding: '14px 16px', background: '#fff', border: '1px solid #e2e8f0', borderLeft: `3px solid ${COLOR.primary}`, borderRadius: 10, marginBottom: 26 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#94a3b8', marginBottom: 6 }}>Where it came from</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                   <User size={11} style={{ color: 'var(--text-muted)' }} />
                   <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
                     {empName(selectedItem.previousContext.actor_id)} ({ROLE_LABELS[selectedItem.previousContext.actor_role]})
                   </span>
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 'auto' }}>{selectedItem.previousContext.timestamp}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{selectedItem.previousContext.timestamp}</span>
                 </div>
                 <div style={{ fontSize: 13.5, color: '#334155', lineHeight: 1.55 }}>{selectedItem.previousContext.action}</div>
                 {selectedItem.previousContext.notes && (
@@ -1733,7 +1734,7 @@ export default function Workspace({
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '0 14px', height: 28, borderBottom: stepRibbonOpen ? '1px solid var(--border)' : 'none',
         }}>
-          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
             {stepRibbonOpen ? 'Steps' : (() => {
               const active = roleSteps.find(s => s.key === effectiveStep)
               return active ? `Step ${active.stepNumber} — ${active.label}` : 'Steps'

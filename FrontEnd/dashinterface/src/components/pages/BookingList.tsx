@@ -119,7 +119,7 @@ export default function BookingList({ bookings, activityLog }: BookingListProps)
       <div style={{ ...CARD, padding: '0 0 8px' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
-            <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.06em' }}>
+            <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.06em' }}>
               <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Booking ID</th>
               <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Customer</th>
               <th style={{ padding: '10px 8px', borderBottom: '1px solid var(--border)' }}>Route</th>
@@ -152,7 +152,7 @@ export default function BookingList({ bookings, activityLog }: BookingListProps)
                   <td style={{ padding: '12px 8px', fontFamily: 'monospace', fontSize: 11, color: 'var(--text-muted)' }}>{b.id}</td>
                   <td style={{ padding: '12px 8px', fontWeight: 600 }}>
                     {b.customer_name}
-                    {b.is_urgent && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: '#dc2626', background: 'rgba(220,38,38,0.1)', padding: '1px 5px', borderRadius: 4 }}>URGENT</span>}
+                    {b.is_urgent && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 700, color: '#dc2626', background: 'rgba(220,38,38,0.1)', padding: '1px 5px', borderRadius: 4 }}>URGENT</span>}
                   </td>
                   <td style={{ padding: '12px 8px' }}>
                     <span>{b.origin}</span>
@@ -169,7 +169,7 @@ export default function BookingList({ bookings, activityLog }: BookingListProps)
                     )}
                   </td>
                   <td style={{ padding: '12px 8px' }}>
-                    <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 700, background: badge.bg, color: badge.color }}>
+                    <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, background: badge.bg, color: badge.color }}>
                       {b.status}
                     </span>
                   </td>
@@ -178,7 +178,7 @@ export default function BookingList({ bookings, activityLog }: BookingListProps)
                       <span style={{ color: cutoffDays !== null && cutoffDays < 0 ? '#dc2626' : cutoffDays !== null && cutoffDays <= 2 ? '#d97706' : 'var(--text)' }}>
                         {siblCutoff}
                         {cutoffDays !== null && (
-                          <span style={{ color: 'var(--text-muted)', fontSize: 10, marginLeft: 4 }}>
+                          <span style={{ color: 'var(--text-muted)', fontSize: 11, marginLeft: 4 }}>
                             ({cutoffDays < 0 ? `${Math.abs(cutoffDays)}d over` : `${cutoffDays}d`})
                           </span>
                         )}
@@ -239,17 +239,17 @@ export default function BookingList({ bookings, activityLog }: BookingListProps)
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   {(viewing.si_cutoff_date || viewing.bl_cutoff_date) && (
                     <div style={{ padding: '6px 12px', background: 'rgba(8,145,178,0.08)', border: '1px solid rgba(8,145,178,0.15)', borderRadius: 6, fontSize: 12 }}>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 600 }}>SI/BL</span> <strong>{viewing.si_cutoff_date || viewing.bl_cutoff_date}</strong>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>SI/BL</span> <strong>{viewing.si_cutoff_date || viewing.bl_cutoff_date}</strong>
                     </div>
                   )}
                   {viewing.vgm_cutoff_date && (
                     <div style={{ padding: '6px 12px', background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.15)', borderRadius: 6, fontSize: 12 }}>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 600 }}>VGM</span> <strong>{viewing.vgm_cutoff_date}</strong>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>VGM</span> <strong>{viewing.vgm_cutoff_date}</strong>
                     </div>
                   )}
                   {viewing.filing_cutoff_date && (
                     <div style={{ padding: '6px 12px', background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.15)', borderRadius: 6, fontSize: 12 }}>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 600 }}>Filing</span> <strong>{viewing.filing_cutoff_date}</strong>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Filing</span> <strong>{viewing.filing_cutoff_date}</strong>
                     </div>
                   )}
                 </div>
@@ -271,7 +271,7 @@ export default function BookingList({ bookings, activityLog }: BookingListProps)
                   { label: 'House BL', done: viewing.house_bl_created },
                 ].map(f => (
                   <span key={f.label} style={{
-                    padding: '3px 10px', borderRadius: 10, fontSize: 10, fontWeight: 600,
+                    padding: '3px 10px', borderRadius: 10, fontSize: 11, fontWeight: 600,
                     background: f.done ? 'rgba(22,163,74,0.1)' : 'rgba(0,0,0,0.04)',
                     color: f.done ? '#16a34a' : 'var(--text-muted)',
                   }}>
@@ -301,7 +301,7 @@ export default function BookingList({ bookings, activityLog }: BookingListProps)
                       <div key={a.id} style={{ padding: '8px 12px', background: 'var(--bg)', borderRadius: 6, fontSize: 12 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
                           <span style={{ fontWeight: 600, fontSize: 11, color: 'var(--text-secondary)' }}>{empName(a.actor_id)}</span>
-                          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{a.timestamp}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{a.timestamp}</span>
                         </div>
                         <div style={{ color: 'var(--text-secondary)', lineHeight: 1.4 }}>{a.action}</div>
                       </div>

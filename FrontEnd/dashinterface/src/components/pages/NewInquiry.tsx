@@ -12,6 +12,7 @@ import { apiGetLiners } from '../../api'
 import TagInput from '../shared/TagInput'
 import PortCombobox from '../shared/PortCombobox'
 import SearchCombobox from '../shared/SearchCombobox'
+import { COLOR } from '../ui/tokens'
 
 interface NewInquiryProps {
   clientList: ClientRecord[]
@@ -170,7 +171,7 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
         </button>
         <div>
           <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Plus size={18} style={{ color: '#0f8fa8' }} /> New Inquiry
+            <Plus size={18} style={{ color: COLOR.primary }} /> New Inquiry
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
             Log a new shipping inquiry — it enters the workflow at Rate Check immediately. Save to submit and add another.
@@ -193,7 +194,7 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
             <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', ...rowBorder }}>
               <div style={labelCell}>
                 Customer <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span>
-                {matchedCli && <span style={{ marginLeft: 6, fontSize: 10, color: '#16a34a', fontWeight: 500 }}>✓ existing</span>}
+                {matchedCli && <span style={{ marginLeft: 6, fontSize: 11, color: '#16a34a', fontWeight: 500 }}>✓ existing</span>}
               </div>
               <div style={valCell}>
                 <SearchCombobox
@@ -232,7 +233,7 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
               <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', ...rowBorder }}>
                 <div style={labelCell}>
                   Contact Person
-                  <span style={{ marginLeft: 6, fontSize: 10, color: '#16a34a', fontWeight: 500 }}>✓ existing</span>
+                  <span style={{ marginLeft: 6, fontSize: 11, color: '#16a34a', fontWeight: 500 }}>✓ existing</span>
                 </div>
                 <div style={valCell}>
                   <SearchCombobox
@@ -269,7 +270,7 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
             )}
 
             {/* ─── ROUTING divider ─── */}
-            <div style={{ padding: '7px 12px', background: 'rgba(15,143,168,0.12)', ...rowBorder }}>
+            <div style={{ padding: '7px 12px', background: 'rgba(44,44,130,0.12)', ...rowBorder }}>
               <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: 0.4 }}>ROUTING</span>
             </div>
 
@@ -432,7 +433,7 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
               </div>
 
               {/* ─── ADDITIONAL DETAILS divider ─── */}
-              <div style={{ padding: '7px 12px', background: 'rgba(15,143,168,0.12)', ...rowBorder }}>
+              <div style={{ padding: '7px 12px', background: 'rgba(44,44,130,0.12)', ...rowBorder }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: 0.4 }}>ADDITIONAL DETAILS</span>
               </div>
 

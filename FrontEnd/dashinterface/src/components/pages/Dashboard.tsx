@@ -5,6 +5,7 @@ import KPICard from '../shared/KPICard'
 import NLQBox from '../shared/NLQBox'
 import { EMPLOYEES, SBUS, isOverdue, type Inquiry, type Task, type Followup, type MissingItem, type KPIItem, type PageId, type SBU, type Quote } from '../../types'
 import { PAGE_WRAPPER, PAGE_TITLE_ROW, PAGE_TITLE_ICON, PAGE_TITLE_H2, CARD, SECTION_LABEL, TABLE_TH } from './pageStyles'
+import { CHART_SERIES, COLOR } from '../ui/tokens'
 
 interface DashboardProps {
   inquiries: Inquiry[]
@@ -33,7 +34,7 @@ const Tip = ({ active, payload, label }: TipProps) => {
 
 // SBU label colours (used by both the SBU card and the per-SBU list).
 const SBU_COLORS: Record<SBU, string> = {
-  'Ocean Exports': '#0f8fa8',
+  'Ocean Exports': COLOR.primary,
   'Ocean Imports': '#16a34a',
   'Air Freight': '#d97706',
   'Domestic': '#7c3aed',
@@ -117,7 +118,7 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
     for (const inq of inquiries) {
       map.set(inq.channel ?? 'Unknown', (map.get(inq.channel ?? 'Unknown') ?? 0) + 1)
     }
-    const colors: Record<string, string> = { WhatsApp: '#16a34a', Email: '#0f8fa8', Phone: '#d97706' }
+    const colors: Record<string, string> = { WhatsApp: '#16a34a', Email: CHART_SERIES[0], Phone: '#d97706' }
     return Array.from(map.entries()).map(([name, value]) => ({ name, value, color: colors[name] ?? '#7c3aed' }))
   }, [inquiries])
 
@@ -157,7 +158,7 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
       {/* Lifetime summary tiles */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 22 }}>
         {[
-          { label: 'Total Inquiries', value: total, color: '#0f8fa8' },
+          { label: 'Total Inquiries', value: total, color: COLOR.primary },
           { label: 'Completed', value: completedTotal, color: '#16a34a' },
           { label: 'Completion Rate', value: `${completionRate}%`, color: '#d97706' },
         ].map(t => (
@@ -179,7 +180,7 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
         <div style={CARD}>
           <div style={{ marginBottom: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Target size={14} style={{ color: '#0f8fa8' }} />
+              <Target size={14} style={{ color: COLOR.primary }} />
               <div>
                 <div style={SECTION_LABEL}>Salesperson Hit Rate</div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>Inquiry → completion conversion</div>
@@ -192,7 +193,7 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
                   <div>
                     <span style={{ color: 'var(--text)', fontWeight: 600, fontSize: 13 }}>{r.name}</span>
-                    <span style={{ color: 'var(--text-muted)', fontSize: 10, marginLeft: 8 }}>{r.role}</span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: 11, marginLeft: 8 }}>{r.role}</span>
                   </div>
                   <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
                     {r.completed}/{r.total} ·{' '}
@@ -216,7 +217,7 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
         <div style={CARD}>
           <div style={{ marginBottom: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Building2 size={14} style={{ color: '#0f8fa8' }} />
+              <Building2 size={14} style={{ color: COLOR.primary }} />
               <div>
                 <div style={SECTION_LABEL}>SBU Breakdown</div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -6 }}>Inquiries per Strategic Business Unit</div>
@@ -261,13 +262,13 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
               )
             })}
           </div>
-          <div style={{ display: 'flex', gap: 12, marginTop: 14, fontSize: 10, color: 'var(--text-muted)' }}>
+          <div style={{ display: 'flex', gap: 12, marginTop: 14, fontSize: 11, color: 'var(--text-muted)' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <span style={{ width: 8, height: 8, borderRadius: 2, background: 'rgba(0,0,0,0.18)', border: '1px solid var(--border)' }} />
               Pending portion
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 2, background: '#0f8fa8' }} />
+              <span style={{ width: 8, height: 8, borderRadius: 2, background: COLOR.primary }} />
               Completed portion
             </span>
           </div>
@@ -284,8 +285,8 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={byDay} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.06)" vertical={false} />
-              <XAxis dataKey="day" tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <XAxis dataKey="day" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
               <Tooltip content={<Tip />} />
               <Bar dataKey="pending" name="Pending" fill="#d97706" radius={[3, 3, 0, 0]} opacity={0.85} />
               <Bar dataKey="completed" name="Completed" fill="#16a34a" radius={[3, 3, 0, 0]} opacity={0.85} />
@@ -295,7 +296,7 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
             {[['#d97706', 'Pending'], ['#16a34a', 'Completed']].map(([c, l]) => (
               <div key={l} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: c }} />
-                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{l}</span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{l}</span>
               </div>
             ))}
           </div>
@@ -358,7 +359,7 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
                   <tr key={i.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                     <td style={{ padding: '12px 8px', color: 'var(--text)', fontWeight: 600 }}>
                       {i.customer_name}
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400, marginTop: 2 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, marginTop: 2 }}>
                         {i.id} · {i.channel}
                       </div>
                     </td>

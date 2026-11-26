@@ -41,7 +41,7 @@ export default function WorkflowStepper({ currentStage, onAdvance }: WorkflowSte
                   }}
                 >
                   {done ? <Check size={9} strokeWidth={3} color="#fff" /> : (
-                    <span style={{ fontSize: 8, color: active ? '#fff' : 'var(--text-muted)', fontWeight: 700 }}>
+                    <span style={{ fontSize: 11, color: active ? '#fff' : 'var(--text-muted)', fontWeight: 700 }}>
                       {stage.step}
                     </span>
                   )}

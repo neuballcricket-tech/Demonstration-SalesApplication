@@ -16,6 +16,7 @@ import type { CompletedRateRequest } from "../../../types"
 import type { WorkspaceItem, BlContainerRow, MblContainerRow, QuotationOptionOverride } from "./types"
 import { empName, openMailto, buildRateSection, generateQuotationPdf } from "./utils"
 import { lookupQuotationId } from "./useWorkspaceActions"
+import { COLOR } from "../../ui/tokens"
 
 export interface InlineStepFormsProps {
   selectedItem: WorkspaceItem
@@ -277,29 +278,29 @@ export default function InlineStepForms({
         const address = [kycClient.addr_street_ln, kycClient.addr_city, kycClient.addr_country].filter(Boolean).join(', ')
         return (
           <div style={{ padding: '12px 14px', background: 'rgba(8,145,178,0.04)', border: '1px solid rgba(8,145,178,0.14)', borderLeft: '3px solid #0891b2', borderRadius: 8 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.07em', color: '#0891b2', marginBottom: 10 }}>From Client Registry</div>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.07em', color: '#0891b2', marginBottom: 10 }}>From Client Registry</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px 16px' }}>
               {kycClient.vat_no && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>VAT No.</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>VAT No.</div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{kycClient.vat_no}</div>
                 </div>
               )}
               {kycClient.tin && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>TIN</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>TIN</div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{kycClient.tin}</div>
                 </div>
               )}
               {kycClient.credit_limit != null && (
                 <div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Credit Limit</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Credit Limit</div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{kycClient.credit_limit.toLocaleString()}</div>
                 </div>
               )}
               {address && (
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 2 }}>Address</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Address</div>
                   <div style={{ fontSize: 13, color: 'var(--text)' }}>{address}</div>
                 </div>
               )}
@@ -310,7 +311,7 @@ export default function InlineStepForms({
 
       {/* Client Information */}
       <div>
-        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>Client Information</div>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>Client Information</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 16px' }}>
           <div>
             <label className="lt-label">Customer</label>
@@ -364,7 +365,7 @@ export default function InlineStepForms({
 
       {/* Services Required */}
       <div>
-        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>Services Required</div>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>Services Required</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px' }}>
           {([
             ['Sea Imports', kycSeaImports, setKycSeaImports],
@@ -388,7 +389,7 @@ export default function InlineStepForms({
 
       {/* Document Checklist */}
       <div>
-        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>Document Checklist</div>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>Document Checklist</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', background: 'rgba(8,145,178,0.04)', borderRadius: 8, border: '1px solid rgba(8,145,178,0.12)' }}>
           {([
             ['BR Form', kycDocBrForm, setKycDocBrForm],
@@ -482,21 +483,21 @@ export default function InlineStepForms({
         </div>
 
         {/* RATE OPTIONS section divider */}
-        <div style={{ padding: '7px 12px', background: 'rgba(15,143,168,0.12)', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ padding: '7px 12px', background: 'rgba(44,44,130,0.12)', borderBottom: '1px solid var(--border)' }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: 0.4 }}>RATE OPTIONS</span>
-          <span style={{ fontSize: 9, color: 'var(--text-muted)', marginLeft: 8 }}>{pqOptions.length} option{pqOptions.length !== 1 ? 's' : ''}</span>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>{pqOptions.length} option{pqOptions.length !== 1 ? 's' : ''}</span>
         </div>
 
         {/* Rate options table header */}
         {pqOptions.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 110px 80px 100px 80px 1fr', borderBottom: '1px solid var(--border)', background: 'var(--bg-card)' }}>
-            <div style={{ padding: '6px 4px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center' }}></div>
-            <div style={{ padding: '6px 8px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', borderRight: '1px solid var(--border)' }}>LINER / VESSEL</div>
-            <div style={{ padding: '6px 8px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center', borderRight: '1px solid var(--border)' }}>SCHEDULE</div>
-            <div style={{ padding: '6px 8px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'right', borderRight: '1px solid var(--border)' }}>RATE</div>
-            <div style={{ padding: '6px 8px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center', borderRight: '1px solid var(--border)' }}>MARGIN</div>
-            <div style={{ padding: '6px 8px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'right', borderRight: '1px solid var(--border)' }}>FINAL</div>
-            <div style={{ padding: '6px 8px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)' }}>REMARK</div>
+            <div style={{ padding: '6px 4px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center' }}></div>
+            <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', borderRight: '1px solid var(--border)' }}>LINER / VESSEL</div>
+            <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center', borderRight: '1px solid var(--border)' }}>SCHEDULE</div>
+            <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'right', borderRight: '1px solid var(--border)' }}>RATE</div>
+            <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center', borderRight: '1px solid var(--border)' }}>MARGIN</div>
+            <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'right', borderRight: '1px solid var(--border)' }}>FINAL</div>
+            <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>REMARK</div>
           </div>
         )}
 
@@ -546,18 +547,18 @@ export default function InlineStepForms({
               {/* Liner / Vessel info */}
               <div style={{ padding: '6px 8px', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1 }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{linerName}</span>
-                {vesselLabel && <span style={{ fontSize: 10, color: 'var(--text-secondary)' }}>{vesselLabel}{voyageLabel ? ` / ${voyageLabel}` : ''}</span>}
-                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{typeLabel}{opt.service_name ? ` · ${opt.service_name}` : ''}</span>
+                {vesselLabel && <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{vesselLabel}{voyageLabel ? ` / ${voyageLabel}` : ''}</span>}
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{typeLabel}{opt.service_name ? ` · ${opt.service_name}` : ''}</span>
               </div>
 
               {/* Schedule — ETD / ETA / Cutoff */}
               <div style={{ padding: '5px 8px', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1 }}>
                 {(opt.etd_pol || opt.eta_pod) ? (<>
-                  {opt.etd_pol && <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>ETD {fmtShort(opt.etd_pol)}</div>}
-                  {opt.eta_pod && <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>ETA {fmtShort(opt.eta_pod)}</div>}
-                  {opt.bk_cutoff && <div style={{ fontSize: 9, color: '#b45309' }}>Cut {fmtShort(opt.bk_cutoff)}</div>}
+                  {opt.etd_pol && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>ETD {fmtShort(opt.etd_pol)}</div>}
+                  {opt.eta_pod && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>ETA {fmtShort(opt.eta_pod)}</div>}
+                  {opt.bk_cutoff && <div style={{ fontSize: 11, color: '#b45309' }}>Cut {fmtShort(opt.bk_cutoff)}</div>}
                 </>) : (
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{r.transit ? `${r.transit}d transit` : '—'}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.transit ? `${r.transit}d transit` : '—'}</span>
                 )}
               </div>
 
@@ -578,7 +579,7 @@ export default function InlineStepForms({
                   disabled={!isSelected}
                 />
                 <button type="button"
-                  style={{ border: '1px solid var(--border)', borderRadius: 4, background: 'transparent', cursor: 'pointer', padding: '2px 4px', fontSize: 10, fontWeight: 600, color: ovr.isPercentage ? 'var(--accent)' : 'var(--text-muted)', minWidth: 24, textAlign: 'center' }}
+                  style={{ border: '1px solid var(--border)', borderRadius: 4, background: 'transparent', cursor: 'pointer', padding: '2px 4px', fontSize: 11, fontWeight: 600, color: ovr.isPercentage ? 'var(--accent)' : 'var(--text-muted)', minWidth: 24, textAlign: 'center' }}
                   onClick={() => setOptionOverrides(prev => ({ ...prev, [opt.option_id]: { ...ovr, isPercentage: !ovr.isPercentage } }))}
                   disabled={!isSelected}
                   title={ovr.isPercentage ? 'Percentage markup' : 'Flat amount markup'}>
@@ -612,7 +613,7 @@ export default function InlineStepForms({
         )}
 
         {/* QUOTATION DOCUMENT section divider */}
-        <div style={{ padding: '7px 12px', background: 'rgba(15,143,168,0.12)', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ padding: '7px 12px', background: 'rgba(44,44,130,0.12)', borderBottom: '1px solid var(--border)' }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: 0.4 }}>QUOTATION DOCUMENT</span>
         </div>
 
@@ -806,7 +807,7 @@ export default function InlineStepForms({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Booking summary */}
-      <div style={{ padding: '10px 14px', background: 'rgba(15,143,168,0.06)', border: '1px solid rgba(15,143,168,0.15)', borderRadius: 8, fontSize: 12 }}>
+      <div style={{ padding: '10px 14px', background: 'rgba(44,44,130,0.06)', border: '1px solid rgba(44,44,130,0.15)', borderRadius: 8, fontSize: 12 }}>
         <strong>{coBkg.customer_name}</strong> — {coBkg.origin} → {coBkg.destination}
         <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
           {coBkg.quantity}x {coBkg.container_type} · {coBkg.shipping_line || 'No liner'}
@@ -823,7 +824,7 @@ export default function InlineStepForms({
               <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase' as const, letterSpacing: 0.4 }}>Release Order Reference</span>
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{coRo.reference_nbr}</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{coRo.reference_nbr}</span>
               <ChevronDown size={14} style={{ color: '#7c3aed', transform: roRefCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
             </span>
           </button>
@@ -845,7 +846,7 @@ export default function InlineStepForms({
                 ['Weight', coRo.cargo_weight ? `${coRo.cargo_weight} kg` : undefined],
               ].filter(([, v]) => v).map(([label, value]) => (
                 <div key={label} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>
-                  <div style={{ padding: '4px 10px', background: 'rgba(124,58,237,0.04)', fontSize: 10, fontWeight: 600, color: '#7c3aed', display: 'flex', alignItems: 'center', borderRight: '1px solid rgba(124,58,237,0.08)' }}>{label}</div>
+                  <div style={{ padding: '4px 10px', background: 'rgba(124,58,237,0.04)', fontSize: 11, fontWeight: 600, color: '#7c3aed', display: 'flex', alignItems: 'center', borderRight: '1px solid rgba(124,58,237,0.08)' }}>{label}</div>
                   <div style={{ padding: '4px 10px', fontSize: 11, color: 'var(--text)' }}>{value}</div>
                 </div>
               ))}
@@ -989,7 +990,7 @@ export default function InlineStepForms({
                 <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase' as const, letterSpacing: 0.4 }}>Release Order Reference</span>
               </span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{siRo.reference_nbr}</span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{siRo.reference_nbr}</span>
                 <ChevronDown size={14} style={{ color: '#7c3aed', transform: roRefCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
               </span>
             </button>
@@ -1011,7 +1012,7 @@ export default function InlineStepForms({
                   ['Weight', siRo.cargo_weight ? `${siRo.cargo_weight} kg` : undefined],
                 ].filter(([, v]) => v).map(([label, value]) => (
                   <div key={label} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>
-                    <div style={{ padding: '4px 10px', background: 'rgba(124,58,237,0.04)', fontSize: 10, fontWeight: 600, color: '#7c3aed', display: 'flex', alignItems: 'center', borderRight: '1px solid rgba(124,58,237,0.08)' }}>{label}</div>
+                    <div style={{ padding: '4px 10px', background: 'rgba(124,58,237,0.04)', fontSize: 11, fontWeight: 600, color: '#7c3aed', display: 'flex', alignItems: 'center', borderRight: '1px solid rgba(124,58,237,0.08)' }}>{label}</div>
                     <div style={{ padding: '4px 10px', fontSize: 11, color: 'var(--text)' }}>{value}</div>
                   </div>
                 ))}
@@ -1186,14 +1187,14 @@ export default function InlineStepForms({
   )
   const paInput = (label: string, key: string, opts?: { readOnly?: boolean; span?: boolean }) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, gridColumn: opts?.span ? '1 / -1' : undefined }}>
-      <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)' }}>{label}</label>
+      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{label}</label>
       <input value={paField(key)} onChange={e => setPaField(key, e.target.value)} readOnly={opts?.readOnly}
         style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, background: opts?.readOnly ? 'rgba(0,0,0,0.03)' : 'var(--bg-card)' }} />
     </div>
   )
   const paTextarea = (label: string, key: string) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, gridColumn: '1 / -1' }}>
-      <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)' }}>{label}</label>
+      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{label}</label>
       <textarea value={paField(key)} onChange={e => setPaField(key, e.target.value)} rows={3}
         style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, resize: 'vertical', fontFamily: 'inherit' }} />
     </div>
@@ -1437,7 +1438,7 @@ export default function InlineStepForms({
 
             {/* Notes */}
             <div style={{ marginTop: 12 }}>
-              <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)' }}>Internal Notes</label>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>Internal Notes</label>
               <textarea value={formNote} onChange={e => setFormNote(e.target.value)} rows={2} placeholder="Optional notes..."
                 style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, resize: 'vertical', fontFamily: 'inherit', marginTop: 4, boxSizing: 'border-box' }} />
             </div>
@@ -1472,14 +1473,14 @@ export default function InlineStepForms({
   )
   const praInput = (label: string, key: string, opts?: { readOnly?: boolean; span?: boolean }) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3, gridColumn: opts?.span ? '1 / -1' : undefined }}>
-      <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)' }}>{label}</label>
+      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{label}</label>
       <input value={paField(key)} onChange={e => setPaField(key, e.target.value)} readOnly={opts?.readOnly}
         style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, background: opts?.readOnly ? 'rgba(0,0,0,0.03)' : 'var(--bg-card)' }} />
     </div>
   )
   const praSelect = (label: string, key: string, options: string[]) => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)' }}>{label}</label>
+      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{label}</label>
       <select value={paField(key)} onChange={e => setPaField(key, e.target.value)}
         style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, background: 'var(--bg-card)' }}>
         {options.map(o => <option key={o} value={o}>{o || '—'}</option>)}
@@ -1603,7 +1604,7 @@ export default function InlineStepForms({
 
       {/* Notes */}
       <div style={{ marginTop: 14 }}>
-        <label style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)' }}>Internal Notes</label>
+        <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>Internal Notes</label>
         <textarea value={formNote} onChange={e => setFormNote(e.target.value)} rows={2} placeholder="Optional notes..."
           style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, resize: 'vertical', fontFamily: 'inherit', marginTop: 4, boxSizing: 'border-box' }} />
       </div>
@@ -1632,7 +1633,7 @@ export default function InlineStepForms({
   const roRow = (label: string, value: string | undefined) =>
     value ? (
       <div key={label} style={{ display: 'grid', gridTemplateColumns: '150px 1fr', borderBottom: '1px solid rgba(124,58,237,0.12)' }}>
-        <div style={{ padding: '6px 12px', background: 'rgba(124,58,237,0.06)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.4, color: '#7c3aed', display: 'flex', alignItems: 'center', borderRight: '1px solid rgba(124,58,237,0.12)' }}>{label}</div>
+        <div style={{ padding: '6px 12px', background: 'rgba(124,58,237,0.06)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.4, color: '#7c3aed', display: 'flex', alignItems: 'center', borderRight: '1px solid rgba(124,58,237,0.12)' }}>{label}</div>
         <div style={{ padding: '6px 12px', fontSize: 12, color: 'var(--text)' }}>{value}</div>
       </div>
     ) : null
@@ -1658,7 +1659,7 @@ export default function InlineStepForms({
               <FileText size={14} style={{ color: '#fff' }} />
               <span style={{ fontSize: 13, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>RELEASE ORDER — REVIEW</span>
             </div>
-            <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>Step 1 of 2</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>Step 1 of 2</span>
           </div>
 
           {/* Booking summary */}
@@ -1679,18 +1680,18 @@ export default function InlineStepForms({
               </div>
 
               {/* Liner Reference section */}
-              <div style={{ padding: '6px 12px', background: 'rgba(124,58,237,0.03)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: '#94a3b8', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>Liner Reference</div>
+              <div style={{ padding: '6px 12px', background: 'rgba(124,58,237,0.03)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: '#94a3b8', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>Liner Reference</div>
               {roRow('Reference No.',  ro.reference_nbr)}
               {roRow('Pick Up Date',   ro.pickup_empty_date)}
               {roRow('Valid Until',    ro.validity_expiration_date)}
 
               {/* Depot section */}
-              <div style={{ padding: '6px 12px', background: 'rgba(124,58,237,0.03)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: '#94a3b8', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>Pick Up Depot</div>
+              <div style={{ padding: '6px 12px', background: 'rgba(124,58,237,0.03)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: '#94a3b8', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>Pick Up Depot</div>
               {roRow('Depot Name',     ro.pickup_depot)}
               {roRow('Depot Address',  ro.pickup_depot_address)}
 
               {/* Routing section */}
-              <div style={{ padding: '6px 12px', background: 'rgba(124,58,237,0.03)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: '#94a3b8', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>Routing & Schedule</div>
+              <div style={{ padding: '6px 12px', background: 'rgba(124,58,237,0.03)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: '#94a3b8', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>Routing & Schedule</div>
               {roRow('Booking Client', rbkg.customer_name)}
               {roRow('Port of Loading', rbkg.origin)}
               {ro.next_port_of_discharge ? roRow('Next Port', ro.next_port_of_discharge) : null}
@@ -1702,7 +1703,7 @@ export default function InlineStepForms({
               {roRow('ETA',            ro.eta)}
 
               {/* Cargo section */}
-              <div style={{ padding: '6px 12px', background: 'rgba(124,58,237,0.03)', fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: '#94a3b8', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>Cargo & Container</div>
+              <div style={{ padding: '6px 12px', background: 'rgba(124,58,237,0.03)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: '#94a3b8', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>Cargo & Container</div>
               {roRow('Container',      `${rbkg.quantity}x ${rbkg.container_type}`)}
               {roRow('Cargo',          ro.cargo_description)}
               {roRow('Weight',         ro.cargo_weight ? `${ro.cargo_weight} kg` : undefined)}
@@ -1744,7 +1745,7 @@ export default function InlineStepForms({
               <Send size={14} style={{ color: '#fff' }} />
               <span style={{ fontSize: 13, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>RELEASE TO CUSTOMER</span>
             </div>
-            <span style={{ fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>Step 2 of 2</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>Step 2 of 2</span>
           </div>
 
           {/* Back to review link */}
@@ -1926,7 +1927,7 @@ export default function InlineStepForms({
         <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.4, color: '#7c3aed', marginBottom: 10 }}>Release Order Details</div>
 
         {/* Liner Reference */}
-        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 6 }}>Liner Reference</div>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 6 }}>Liner Reference</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
           <div>
             <label className="lt-label">Reference Nbr</label>
@@ -1947,7 +1948,7 @@ export default function InlineStepForms({
         </div>
 
         {/* Pick Up Depot */}
-        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 6 }}>Pick Up Depot</div>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 6 }}>Pick Up Depot</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8, marginBottom: 12 }}>
           <div>
             <label className="lt-label">Depot Name</label>
@@ -1964,7 +1965,7 @@ export default function InlineStepForms({
         </div>
 
         {/* Cargo */}
-        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 6 }}>Cargo</div>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 6 }}>Cargo</div>
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 8, marginBottom: 12 }}>
           <div>
             <label className="lt-label">Cargo Description</label>
@@ -1981,7 +1982,7 @@ export default function InlineStepForms({
         </div>
 
         {/* Schedule */}
-        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 6 }}>Vessel Schedule</div>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 6 }}>Vessel Schedule</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
           <div>
             <label className="lt-label">Cut-Off Date</label>
@@ -2138,7 +2139,7 @@ export default function InlineStepForms({
                   <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase' as const, letterSpacing: 0.4 }}>Release Order Reference</span>
                 </span>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{siRo.reference_nbr}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{siRo.reference_nbr}</span>
                   <ChevronDown size={14} style={{ color: '#7c3aed', transform: roRefCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
                 </span>
               </button>
@@ -2160,7 +2161,7 @@ export default function InlineStepForms({
                     ['Weight', siRo.cargo_weight ? `${siRo.cargo_weight} kg` : undefined],
                   ].filter(([, v]) => v).map(([label, value]) => (
                     <div key={label} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>
-                      <div style={{ padding: '4px 10px', background: 'rgba(124,58,237,0.04)', fontSize: 10, fontWeight: 600, color: '#7c3aed', display: 'flex', alignItems: 'center', borderRight: '1px solid rgba(124,58,237,0.08)' }}>{label}</div>
+                      <div style={{ padding: '4px 10px', background: 'rgba(124,58,237,0.04)', fontSize: 11, fontWeight: 600, color: '#7c3aed', display: 'flex', alignItems: 'center', borderRight: '1px solid rgba(124,58,237,0.08)' }}>{label}</div>
                       <div style={{ padding: '4px 10px', fontSize: 11, color: 'var(--text)' }}>{value}</div>
                     </div>
                   ))}
@@ -2364,7 +2365,7 @@ export default function InlineStepForms({
       </div>
 
       {/* Booking summary */}
-      <div style={{ padding: '10px 14px', background: 'rgba(15,143,168,0.06)', border: '1px solid rgba(15,143,168,0.15)', borderRadius: 8, fontSize: 12 }}>
+      <div style={{ padding: '10px 14px', background: 'rgba(44,44,130,0.06)', border: '1px solid rgba(44,44,130,0.15)', borderRadius: 8, fontSize: 12 }}>
         <strong>{gsBkg.customer_name}</strong> — {gsBkg.origin} → {gsBkg.destination}
         <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
           {gsBkg.quantity}x {gsBkg.container_type} · {gsBkg.shipping_line || 'No liner'}
@@ -2666,7 +2667,7 @@ export default function InlineStepForms({
             placeholder="e.g. MSC America" autoComplete="off" />
           {showVesselSuggestions && vesselMatches.length > 0 && (
             <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto', marginTop: 2 }}>
-              <div style={{ padding: '6px 10px', fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)' }}>Recent vessels (last 2 weeks)</div>
+              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)' }}>Recent vessels (last 2 weeks)</div>
               {vesselMatches.map(vs => (
                 <button key={vs.id} onMouseDown={e => { e.preventDefault(); applyVesselSchedule(vs) }}
                   style={{ display: 'block', width: '100%', padding: '8px 10px', border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 12, borderBottom: '1px solid var(--border)' }}
@@ -2929,7 +2930,7 @@ export default function InlineStepForms({
                     onMouseEnter={e => (e.currentTarget.style.background = 'rgba(8,145,178,0.08)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
                     <div style={{ fontSize: 12 }}><strong>{v.voyageNumber}</strong> <span style={{ color: 'var(--text-muted)', marginLeft: 6, fontSize: 11 }}>{v.vesselName} · {v.shippingLine}</span></div>
-                    <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{v.pol} → {v.fpod} &nbsp;·&nbsp; ETD {v.etdPol} &nbsp;·&nbsp; ETA {v.etaFpod}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{v.pol} → {v.fpod} &nbsp;·&nbsp; ETD {v.etdPol} &nbsp;·&nbsp; ETA {v.etaFpod}</div>
                   </div>
                 ))}
               </div>
@@ -3101,7 +3102,7 @@ export default function InlineStepForms({
       letterSpacing: '0.05em', color: '#d97706', marginTop: 4,
       cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     }}>
-      <span>{title}{hint ? <span style={{ fontWeight: 400, textTransform: 'none' as const, marginLeft: 8, fontSize: 10, color: '#64748b' }}>{hint}</span> : null}</span>
+      <span>{title}{hint ? <span style={{ fontWeight: 400, textTransform: 'none' as const, marginLeft: 8, fontSize: 11, color: '#64748b' }}>{hint}</span> : null}</span>
       <span style={{ fontSize: 14, lineHeight: 1 }}>{hblCollapsed[sectionId] ? '+' : '−'}</span>
     </div>
   )
@@ -3384,7 +3385,7 @@ export default function InlineStepForms({
       letterSpacing: '0.05em', color: '#0891b2', marginTop: 4,
       cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     }}>
-      <span>{title}{hint ? <span style={{ fontWeight: 400, textTransform: 'none' as const, marginLeft: 8, fontSize: 10, color: '#64748b' }}>{hint}</span> : null}</span>
+      <span>{title}{hint ? <span style={{ fontWeight: 400, textTransform: 'none' as const, marginLeft: 8, fontSize: 11, color: '#64748b' }}>{hint}</span> : null}</span>
       <span style={{ fontSize: 14, lineHeight: 1 }}>{hblCollapsed[sectionId] ? '+' : '−'}</span>
     </div>
   )
@@ -3475,7 +3476,7 @@ export default function InlineStepForms({
                   <div style={{ fontSize: 12, fontWeight: 600, color: isSelected ? '#0d9488' : 'var(--text)' }}>
                     {hb.house_bl_number || hb.id} — {hb.customer_name}
                   </div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
                     {hb.origin} → {hb.destination} · {hb.quantity}x {hb.container_type} · {hb.shipping_line || 'No liner'}
                   </div>
                 </div>
@@ -3484,7 +3485,7 @@ export default function InlineStepForms({
           })}
         </div>
         {selectedHblBookings.length > 0 && (
-          <div style={{ padding: '6px 12px', background: 'rgba(13,148,136,0.04)', borderTop: '1px solid rgba(13,148,136,0.15)', fontSize: 10, color: '#0d9488', fontWeight: 600 }}>
+          <div style={{ padding: '6px 12px', background: 'rgba(13,148,136,0.04)', borderTop: '1px solid rgba(13,148,136,0.15)', fontSize: 11, color: '#0d9488', fontWeight: 600 }}>
             Selected: {selectedHblBookings.map(b => b.house_bl_number || b.id).join(', ')}
           </div>
         )}
@@ -3527,7 +3528,7 @@ export default function InlineStepForms({
                 </div>
               ) : (
                 <div style={{ overflowX: 'auto' as const }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '100px 120px 90px 80px 70px 70px 70px 60px 1fr', gap: 4, fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, paddingLeft: 2, minWidth: 700 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '100px 120px 90px 80px 70px 70px 70px 60px 1fr', gap: 4, fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, paddingLeft: 2, minWidth: 700 }}>
                     <span>BL No.</span><span>Shipper</span><span>Final Dest</span><span>Cargo Type</span><span>No. of Pkgs</span><span>Pkg Type</span><span>GW (kg)</span><span>CBM</span><span>Container / Seal</span>
                   </div>
                   {selectedHblBookings.map((hb) => (
@@ -3634,7 +3635,7 @@ export default function InlineStepForms({
         <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', borderBottom: '1px solid var(--border)' }}>
           <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'flex-start', paddingTop: 10 }}>
             Containers<span style={{ color: '#ef4444', marginLeft: 2 }}>*</span>
-            <span style={{ fontSize: 9, color: 'var(--text-muted)', marginLeft: 4 }}>({bkContainers.reduce((s, c) => s + c.qty, 0)})</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>({bkContainers.reduce((s, c) => s + c.qty, 0)})</span>
           </div>
           <div style={{ padding: '4px 8px', display: 'flex', flexDirection: 'column', gap: 4 }}>
             {bkContainers.map((ctn, ci) => (
@@ -3745,7 +3746,7 @@ export default function InlineStepForms({
           </div>
         </div>
         {/* Special Instructions header */}
-        <div style={{ padding: '7px 12px', background: 'rgba(15,143,168,0.12)', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ padding: '7px 12px', background: 'rgba(44,44,130,0.12)', borderBottom: '1px solid var(--border)' }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: 0.4 }}>SPECIAL INSTRUCTIONS</span>
         </div>
         {/* Contract No + RA No (mutually exclusive) */}
@@ -3909,7 +3910,7 @@ export default function InlineStepForms({
         <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
           <button type="button" onClick={() => setDraftCollapsed(c => !c)}
             style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-card)', border: 'none', cursor: 'pointer' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: '#0f8fa8', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: COLOR.primary, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
               <FileText size={12} /> Quotation Preview
             </span>
             <ChevronDown size={13} style={{ color: 'var(--text-muted)', transform: draftCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }} />

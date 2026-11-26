@@ -151,7 +151,7 @@ export default function NLQBox({ inquiries, tasks, missingItems, followups }: NL
   }
 
   return (
-    <div className="db-chart-card" style={{ marginBottom: 18, borderColor: 'rgba(15,143,168,0.2)' }}>
+    <div className="db-chart-card" style={{ marginBottom: 18, borderColor: 'rgba(44,44,130,0.2)' }}>
       <div className="db-chart-head">
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Sparkles size={16} style={{ color: 'var(--accent-light)' }} />
@@ -196,7 +196,7 @@ export default function NLQBox({ inquiries, tasks, missingItems, followups }: NL
 
       {result && (
         <div style={{
-          background: 'rgba(15,143,168,0.03)', border: '1px solid rgba(15,143,168,0.12)',
+          background: 'rgba(44,44,130,0.03)', border: '1px solid rgba(44,44,130,0.12)',
           borderRadius: 10, padding: '12px 14px',
         }}>
           <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, marginBottom: result.rows ? 10 : 0 }}>
@@ -206,7 +206,7 @@ export default function NLQBox({ inquiries, tasks, missingItems, followups }: NL
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                 <thead>
-                  <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 10, letterSpacing: '0.06em' }}>
+                  <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.06em' }}>
                     {result.columns.map(c => (
                       <th key={c} style={{ padding: '6px 8px', borderBottom: '1px solid #e2e8f0' }}>{c}</th>
                     ))}

@@ -133,12 +133,12 @@ export default function Shipments({ shipments, bookings, onAdvanceLeg, onRecordP
                     <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 13 }}>{b.customer_name}</span>
                     <span className={BOOKING_STATUS_BADGE[b.status]}>{b.status}</span>
                     {b.is_urgent && (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10, color: '#dc2626', fontWeight: 700 }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 11, color: '#dc2626', fontWeight: 700 }}>
                         <AlertTriangle size={11} /> URGENT
                       </span>
                     )}
                     {b.is_urgent && !b.procurement_notified && (
-                      <span style={{ fontSize: 10, color: '#dc2626', background: 'rgba(220,38,38,0.08)', padding: '2px 6px', borderRadius: 4 }}>
+                      <span style={{ fontSize: 11, color: '#dc2626', background: 'rgba(220,38,38,0.08)', padding: '2px 6px', borderRadius: 4 }}>
                         Procurement not notified
                       </span>
                     )}
@@ -169,11 +169,11 @@ export default function Shipments({ shipments, bookings, onAdvanceLeg, onRecordP
                             flex: 1,
                             padding: '6px 10px',
                             borderRadius: 6,
-                            fontSize: 10,
+                            fontSize: 11,
                             fontWeight: active ? 700 : 500,
                             color: done ? '#fff' : 'var(--text-muted)',
                             background: done
-                              ? (active ? 'var(--accent)' : 'rgba(15,143,168,0.5)')
+                              ? (active ? 'var(--accent)' : 'rgba(44,44,130,0.5)')
                               : 'rgba(0,0,0,0.04)',
                             textAlign: 'center',
                             whiteSpace: 'nowrap',
@@ -277,14 +277,14 @@ export default function Shipments({ shipments, bookings, onAdvanceLeg, onRecordP
                           <LEG_ICON type={leg.type} />
                         </span>
                         <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 12 }}>{leg.port}</span>
-                        <span style={{ fontSize: 9, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{leg.type}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{leg.type}</span>
                       </div>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                         ETA {leg.expected_at}
                         {leg.actual_at && <> · actual {leg.actual_at}</>}
                       </div>
                       <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
-                        <span style={{ fontSize: 10, color, fontWeight: 700, textTransform: 'uppercase' }}>
+                        <span style={{ fontSize: 11, color, fontWeight: 700, textTransform: 'uppercase' }}>
                           {leg.status === 'Arrived' && <CheckCircle2 size={10} style={{ display: 'inline', marginRight: 3, marginBottom: -1 }} />}
                           {leg.status}
                         </span>
@@ -294,7 +294,7 @@ export default function Shipments({ shipments, bookings, onAdvanceLeg, onRecordP
                             title={canAdvanceLeg ? (leg.status === 'Pending' ? 'Mark Arrived' : 'Mark Departed') : 'Restricted — requires Admin role'}
                             onClick={() => canAdvanceLeg && onAdvanceLeg(s.id, leg.id)}
                             disabled={!canAdvanceLeg}
-                            style={{ padding: '2px 6px', height: 20, width: 'auto', fontSize: 9, gap: 2, opacity: canAdvanceLeg ? 1 : 0.4, cursor: canAdvanceLeg ? 'pointer' : 'not-allowed' }}
+                            style={{ padding: '2px 6px', height: 20, width: 'auto', fontSize: 11, gap: 2, opacity: canAdvanceLeg ? 1 : 0.4, cursor: canAdvanceLeg ? 'pointer' : 'not-allowed' }}
                           >
                             <ChevronRight size={10} />
                           </button>

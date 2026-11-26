@@ -12,6 +12,7 @@ import {
 import type { KycRequestRecord } from '../../../api'
 import type { WorkspaceItem } from './types'
 import { empName, openMailto, generateQuotationPdf, openOutlookWithQuotation } from './utils'
+import { COLOR } from '../../ui/tokens'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -162,7 +163,7 @@ export default function ModalStepForms(props: ModalStepFormsProps) {
       const docLabel = (label: string, val?: string) => (
         <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
           <span style={{
-            width: 16, height: 16, borderRadius: 3, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700,
+            width: 16, height: 16, borderRadius: 3, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700,
             background: val === 'true' ? '#16a34a' : '#dc2626', color: '#fff',
           }}>{val === 'true' ? '✓' : '✗'}</span>
           <span style={{ color: val === 'true' ? 'var(--text-primary)' : 'var(--text-muted)' }}>{label}</span>
@@ -197,7 +198,7 @@ export default function ModalStepForms(props: ModalStepFormsProps) {
                   ['Dangerous Goods', kycReq.dangerous_goods],
                   ['Perishables', kycReq.perishable_goods],
                 ].map(([label, val]) => val ? (
-                  <span key={String(label)} style={{ fontSize: 11, padding: '2px 7px', borderRadius: 10, background: 'rgba(15,143,168,0.12)', color: '#0f8fa8', fontWeight: 600 }}>{String(label)}</span>
+                  <span key={String(label)} style={{ fontSize: 11, padding: '2px 7px', borderRadius: 10, background: 'rgba(44,44,130,0.12)', color: COLOR.primary, fontWeight: 600 }}>{String(label)}</span>
                 ) : null)}
               </div>
             </div>
@@ -293,7 +294,7 @@ export default function ModalStepForms(props: ModalStepFormsProps) {
             <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
               <button type="button" onClick={() => setDraftCollapsed(c => !c)}
                 style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-card)', border: 'none', cursor: 'pointer' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: '#0f8fa8', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: COLOR.primary, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
                   <FileText size={12} /> Quotation Document
                 </span>
                 <ChevronDown size={13} style={{ color: 'var(--text-muted)', transform: draftCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }} />
@@ -433,7 +434,7 @@ export default function ModalStepForms(props: ModalStepFormsProps) {
           )}
 
           {/* Booking summary */}
-          <div style={{ padding: '10px 14px', background: 'rgba(15,143,168,0.06)', border: '1px solid rgba(15,143,168,0.15)', borderRadius: 8, fontSize: 12 }}>
+          <div style={{ padding: '10px 14px', background: 'rgba(44,44,130,0.06)', border: '1px solid rgba(44,44,130,0.15)', borderRadius: 8, fontSize: 12 }}>
             <strong>{cbkg.customer_name}</strong> — {cbkg.origin} → {cbkg.destination}
             <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
               {cbkg.quantity}x {cbkg.container_type} · {cbkg.shipping_line || 'Any liner'}
@@ -468,7 +469,7 @@ export default function ModalStepForms(props: ModalStepFormsProps) {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {/* Booking summary */}
-          <div style={{ padding: '10px 14px', background: 'rgba(15,143,168,0.06)', border: '1px solid rgba(15,143,168,0.15)', borderRadius: 8, fontSize: 12 }}>
+          <div style={{ padding: '10px 14px', background: 'rgba(44,44,130,0.06)', border: '1px solid rgba(44,44,130,0.15)', borderRadius: 8, fontSize: 12 }}>
             <strong>{baBkg.customer_name}</strong> — {baBkg.origin} → {baBkg.destination}
             <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
               {baBkg.quantity}x {baBkg.container_type} · {baBkg.shipping_line || 'No liner'}{isDtd ? ' · Door-to-Door' : ''}
@@ -554,7 +555,7 @@ export default function ModalStepForms(props: ModalStepFormsProps) {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {/* Booking summary */}
-          <div style={{ padding: '10px 14px', background: 'rgba(15,143,168,0.06)', border: '1px solid rgba(15,143,168,0.15)', borderRadius: 8, fontSize: 12 }}>
+          <div style={{ padding: '10px 14px', background: 'rgba(44,44,130,0.06)', border: '1px solid rgba(44,44,130,0.15)', borderRadius: 8, fontSize: 12 }}>
             <strong>{mbBkg.customer_name}</strong> — {mbBkg.origin} → {mbBkg.destination}
             <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
               {mbBkg.quantity}x {mbBkg.container_type} · {mbBkg.shipping_line || 'No liner'} · Door-to-Door
@@ -618,7 +619,7 @@ export default function ModalStepForms(props: ModalStepFormsProps) {
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {/* Booking summary */}
-          <div style={{ padding: '10px 14px', background: 'rgba(15,143,168,0.06)', border: '1px solid rgba(15,143,168,0.15)', borderRadius: 8, fontSize: 12 }}>
+          <div style={{ padding: '10px 14px', background: 'rgba(44,44,130,0.06)', border: '1px solid rgba(44,44,130,0.15)', borderRadius: 8, fontSize: 12 }}>
             <strong>{hbBkg.customer_name}</strong> — {hbBkg.origin} → {hbBkg.destination}
             <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
               {hbBkg.quantity}x {hbBkg.container_type} · {hbBkg.shipping_line || 'No liner'} · Door-to-Door

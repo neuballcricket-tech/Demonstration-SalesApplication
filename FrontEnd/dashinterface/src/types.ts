@@ -1,3 +1,4 @@
+import { COLOR } from './components/ui/tokens'
 // ==================== FREIGHTOS ====================
 export type PageId =
   | 'dashboard'
@@ -53,11 +54,11 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 }
 
 export const ROLE_COLORS: Record<UserRole, string> = {
-  CS:          '#0f8fa8',
-  Sales:       '#0f8fa8',
-  Finance:     '#0f8fa8',
-  Procurement: '#0f8fa8',
-  Admin:       '#0f8fa8',
+  CS:          COLOR.primary,
+  Sales:       COLOR.primary,
+  Finance:     COLOR.primary,
+  Procurement: COLOR.primary,
+  Admin:       COLOR.primary,
 }
 
 export const ROLE_PAGE_ACCESS: Record<UserRole, PageId[]> = {

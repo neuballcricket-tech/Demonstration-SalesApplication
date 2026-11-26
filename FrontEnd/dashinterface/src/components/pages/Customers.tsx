@@ -83,8 +83,8 @@ export default function Customers({ inquiries, customers, onUpdateCustomer, onFl
       <div style={{
         marginBottom: 18,
         padding: '12px 16px',
-        background: 'rgba(15,143,168,0.03)',
-        border: '1px dashed rgba(15,143,168,0.2)',
+        background: 'rgba(44,44,130,0.03)',
+        border: '1px dashed rgba(44,44,130,0.2)',
         borderRadius: 10,
         display: 'flex',
         alignItems: 'center',
@@ -137,11 +137,11 @@ export default function Customers({ inquiries, customers, onUpdateCustomer, onFl
                   >
                     <td style={{ padding: '12px 8px', color: 'var(--text)', fontWeight: 600 }}>
                       {c.name}
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400, marginTop: 2 }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, marginTop: 2 }}>
                         {c.id}{c.contact_person ? ` · ${c.contact_person}` : ''}
                       </div>
                       {c.notes && (
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 400, marginTop: 2, fontStyle: 'italic' }}>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, marginTop: 2, fontStyle: 'italic' }}>
                           {c.notes}
                         </div>
                       )}

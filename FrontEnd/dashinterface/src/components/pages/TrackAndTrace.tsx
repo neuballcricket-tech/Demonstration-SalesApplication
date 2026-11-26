@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { Radar, Search, Loader2, Ship, MapPin, Package, ChevronDown, ChevronRight } from 'lucide-react'
 import { apiTrackingEvents } from '../../api'
 import type { TrackingContainer, TrackingEvent, TrackingEventDateTime } from '../../types'
+import { COLOR } from '../ui/tokens'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -87,7 +88,7 @@ function EventTimeline({ events }: { events: TrackingEvent[] }) {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{
-                    fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 4,
+                    fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 4,
                     background: style.bg, color: style.color, whiteSpace: 'nowrap',
                   }}>
                     {ev.eventTypeCode}
@@ -96,25 +97,25 @@ function EventTimeline({ events }: { events: TrackingEvent[] }) {
                     {ev.eventTypeDescription}
                   </span>
                   {ev.eventClassifierCode === 'ACT' && (
-                    <span style={{ fontSize: 8, fontWeight: 600, color: '#16a34a', textTransform: 'uppercase' }}>Actual</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#16a34a', textTransform: 'uppercase' }}>Actual</span>
                   )}
                   {ev.eventClassifierCode === 'EST' && (
-                    <span style={{ fontSize: 8, fontWeight: 600, color: '#d97706', textTransform: 'uppercase' }}>Estimated</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#d97706', textTransform: 'uppercase' }}>Estimated</span>
                   )}
                 </div>
-                <span style={{ fontSize: 10, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                   {fmtDateShort(ev.eventDateTime)}
                 </span>
               </div>
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 10, color: 'var(--text-secondary)' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, fontSize: 11, color: 'var(--text-secondary)' }}>
                 {/* Location */}
                 {ev.eventLocation?.locationName && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                     <MapPin size={9} style={{ opacity: 0.6 }} />
                     <span>{ev.eventLocation.locationName}{ev.eventLocation.unLocode ? ` (${ev.eventLocation.unLocode})` : ''}</span>
                     {ev.eventLocation.countryName && (
-                      <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>, {ev.eventLocation.countryName}</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>, {ev.eventLocation.countryName}</span>
                     )}
                   </div>
                 )}
@@ -130,7 +131,7 @@ function EventTimeline({ events }: { events: TrackingEvent[] }) {
                 {/* Load status */}
                 {ev.emptyIndicatorCodeDescription && (
                   <span style={{
-                    fontSize: 9, fontWeight: 600, padding: '1px 5px', borderRadius: 3,
+                    fontSize: 11, fontWeight: 600, padding: '1px 5px', borderRadius: 3,
                     background: ev.emptyIndicatorCode === 'L' ? 'rgba(22,163,74,0.08)' : 'rgba(100,116,139,0.08)',
                     color: ev.emptyIndicatorCode === 'L' ? '#16a34a' : '#64748b',
                   }}>
@@ -140,13 +141,13 @@ function EventTimeline({ events }: { events: TrackingEvent[] }) {
 
                 {/* Seal */}
                 {ev.sealNumber && (
-                  <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>Seal: {ev.sealNumber}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Seal: {ev.sealNumber}</span>
                 )}
               </div>
 
               {/* Transportation route: POL → POD */}
               {(pol || pod) && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5, fontSize: 9, color: 'var(--text-muted)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5, fontSize: 11, color: 'var(--text-muted)' }}>
                   {pol && (
                     <span>
                       POL: {pol.transportationLocationCode}
@@ -200,7 +201,7 @@ function ContainerCard({ container, defaultExpanded }: { container: TrackingCont
         style={{
           padding: '12px 16px', cursor: 'pointer',
           display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-          background: expanded ? 'rgba(15,143,168,0.03)' : 'transparent',
+          background: expanded ? 'rgba(44,44,130,0.03)' : 'transparent',
           borderBottom: expanded ? '1px solid var(--border)' : 'none',
         }}
       >
@@ -214,7 +215,7 @@ function ContainerCard({ container, defaultExpanded }: { container: TrackingCont
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             {container.equipmentReference && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <Package size={12} style={{ color: '#0f8fa8' }} />
+                <Package size={12} style={{ color: COLOR.primary }} />
                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', letterSpacing: 0.3 }}>
                   {container.equipmentReference}
                 </span>
@@ -222,14 +223,14 @@ function ContainerCard({ container, defaultExpanded }: { container: TrackingCont
             )}
             {container.equipmentSizeTypeDescription && (
               <span style={{
-                fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
-                background: 'rgba(15,143,168,0.08)', color: '#0f8fa8',
+                fontSize: 11, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+                background: 'rgba(44,44,130,0.08)', color: COLOR.primary,
               }}>
                 {container.equipmentSizeTypeDescription}
               </span>
             )}
           </div>
-          <div style={{ display: 'flex', gap: 12, marginTop: 3, fontSize: 10, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 12, marginTop: 3, fontSize: 11, color: 'var(--text-muted)', flexWrap: 'wrap' }}>
             {container.billOfLadingNumber && <span>B/L: <b style={{ color: 'var(--text-secondary)' }}>{container.billOfLadingNumber}</b></span>}
             {container.carrierBookingReference && <span>Booking: <b style={{ color: 'var(--text-secondary)' }}>{container.carrierBookingReference}</b></span>}
             {container.inttraBookingReference && <span>INTTRA: <b style={{ color: 'var(--text-secondary)' }}>{container.inttraBookingReference}</b></span>}
@@ -242,12 +243,12 @@ function ContainerCard({ container, defaultExpanded }: { container: TrackingCont
         {latestEvent && (
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
             <div style={{
-              fontSize: 10, fontWeight: 700, padding: '3px 10px', borderRadius: 6,
+              fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 6,
               background: latestStyle.bg, color: latestStyle.color, display: 'inline-block',
             }}>
               {latestEvent.eventTypeDescription}
             </div>
-            <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
               {fmtDateShort(latestEvent.eventDateTime)}
               {latestEvent.eventLocation?.locationName && (
                 <> &middot; {latestEvent.eventLocation.locationName}</>
@@ -258,7 +259,7 @@ function ContainerCard({ container, defaultExpanded }: { container: TrackingCont
 
         {/* Event count */}
         <div style={{
-          fontSize: 10, color: 'var(--text-muted)', background: 'rgba(100,116,139,0.06)',
+          fontSize: 11, color: 'var(--text-muted)', background: 'rgba(100,116,139,0.06)',
           padding: '2px 8px', borderRadius: 10, fontWeight: 600, flexShrink: 0,
         }}>
           {container.events.length} event{container.events.length !== 1 ? 's' : ''}
@@ -333,7 +334,7 @@ export default function TrackAndTrace({ onFlash }: TrackAndTraceProps) {
     <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
       {/* Page title */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-        <Radar size={18} style={{ color: '#0f8fa8' }} />
+        <Radar size={18} style={{ color: COLOR.primary }} />
         <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Track &amp; Trace</h2>
       </div>
 
@@ -344,7 +345,7 @@ export default function TrackAndTrace({ onFlash }: TrackAndTraceProps) {
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
           <div>
-            <label style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3, display: 'block' }}>INTTRA Booking Ref</label>
+            <label style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3, display: 'block' }}>INTTRA Booking Ref</label>
             <input
               style={inputStyle}
               value={inttraRef}
@@ -354,7 +355,7 @@ export default function TrackAndTrace({ onFlash }: TrackAndTraceProps) {
             />
           </div>
           <div>
-            <label style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3, display: 'block' }}>Carrier Booking Ref</label>
+            <label style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3, display: 'block' }}>Carrier Booking Ref</label>
             <input
               style={inputStyle}
               value={carrierRef}
@@ -364,7 +365,7 @@ export default function TrackAndTrace({ onFlash }: TrackAndTraceProps) {
             />
           </div>
           <div>
-            <label style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3, display: 'block' }}>Bill of Lading Number</label>
+            <label style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3, display: 'block' }}>Bill of Lading Number</label>
             <input
               style={inputStyle}
               value={blNumber}
@@ -374,7 +375,7 @@ export default function TrackAndTrace({ onFlash }: TrackAndTraceProps) {
             />
           </div>
           <div>
-            <label style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3, display: 'block' }}>Equipment / Container Ref</label>
+            <label style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 3, display: 'block' }}>Equipment / Container Ref</label>
             <input
               style={inputStyle}
               value={equipmentRef}

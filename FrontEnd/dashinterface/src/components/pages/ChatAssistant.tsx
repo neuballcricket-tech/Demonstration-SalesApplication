@@ -20,6 +20,7 @@ import {
 import { apiGetLiners } from '../../api'
 import { useRole } from '../../RoleContext'
 import { useWebSocket } from '../../useWebSocket'
+import { COLOR } from '../ui/tokens'
 
 /* ------------------------------------------------------------------ */
 /*  Quick-command definitions                                          */
@@ -33,7 +34,7 @@ interface QuickCommand {
 }
 
 const QUICK_COMMANDS: QuickCommand[] = [
-  { id: 'new-customer',   label: '/new customer',     icon: <UserPlus size={14} />,         color: '#0f8fa8', description: 'Register a new customer' },
+  { id: 'new-customer',   label: '/new customer',     icon: <UserPlus size={14} />,         color: COLOR.primary, description: 'Register a new customer' },
   { id: 'new-inquiry',    label: '/new inquiry',      icon: <PackagePlus size={14} />,      color: '#0891b2', description: 'Log a shipping inquiry' },
   { id: 'follow-up',      label: '/follow up',        icon: <MessageSquarePlus size={14} />,color: '#16a34a', description: 'Log a follow-up note' },
   { id: 'new-task',       label: '/new task',         icon: <ListPlus size={14} />,         color: '#d97706', description: 'Create a task or reminder' },
@@ -667,7 +668,7 @@ export default function ChatAssistant({
     <div className="ca-wrap">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px 12px', borderBottom: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Sparkles size={18} style={{ color: '#0f8fa8' }} />
+          <Sparkles size={18} style={{ color: COLOR.primary }} />
           <div>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Command Center</h2>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>

@@ -11,6 +11,7 @@ import {
   ROLE_PAGE_ACCESS, ROLE_QUICK_COMMANDS, ROLE_ACTIONS, ROLE_COLORS,
   type PageId, type UserRole,
 } from '../../types'
+import { COLOR } from '../ui/tokens'
 
 interface SidebarProps {
   current: PageId
@@ -114,7 +115,7 @@ export default function Sidebar({ current, onNav, activeRole, collapsed, onToggl
                 <p className="help-intro">Each page in the sidebar serves a specific purpose in your sales workflow.</p>
 
                 <div className="help-item-list">
-                  <HelpNavItem icon={<LayoutDashboard size={14} />} title="Dashboard" color="#0f8fa8">
+                  <HelpNavItem icon={<LayoutDashboard size={14} />} title="Dashboard" color={COLOR.primary}>
                     High-level overview of your sales performance — KPIs, pipeline stages, conversion funnel, and top-performing accounts. Use it for a quick morning check or when reporting to management.
                   </HelpNavItem>
                   <HelpNavItem icon={<MessageSquare size={14} />} title="Command Center" color="#7c3aed">
@@ -149,7 +150,7 @@ export default function Sidebar({ current, onNav, activeRole, collapsed, onToggl
                 </p>
 
                 <div className="help-cmd-grid">
-                  <HelpCmdItem icon={<UserPlus size={13} />} cmd="/new customer" color="#0f8fa8">
+                  <HelpCmdItem icon={<UserPlus size={13} />} cmd="/new customer" color={COLOR.primary}>
                     <strong>Fields:</strong> Name*, Location, Tier, Payment Terms<br />
                     Registers a new customer in the system with default settings.
                   </HelpCmdItem>
