@@ -1,5 +1,6 @@
 export { Badge, type BadgeProps } from './Badge'
 export { Button, type ButtonProps } from './Button'
+export { ComboBox, type ComboBoxItem, type ComboBoxProps } from './ComboBox'
 export { Field, type FieldControlProps, type FieldProps } from './Field'
 export { Input, NumberInput, Textarea, type InputProps, type TextareaProps } from './Input'
 export { Select, type Option, type OptionGroup, type SelectProps } from './Select'
