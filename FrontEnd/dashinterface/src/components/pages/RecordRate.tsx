@@ -424,7 +424,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
                   key={key}
                   size="sm"
                   aria-pressed={entryMode === key}
-                  className={cn(entryMode === key && 'border-accent bg-accent text-white hover:bg-accent')}
+                  className={cn(entryMode === key && 'border-primary bg-primary text-white hover:bg-primary-hover')}
                   icon={key === 'bulk' ? <FileSpreadsheet size={14} aria-hidden="true" /> : undefined}
                   onClick={() => setEntryMode(key)}
                 >
@@ -783,7 +783,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
           const row = (label: string, value: string) => (
             <div className="flex justify-between border-b border-line-soft py-1 text-control">
               <span className="text-fg-muted">{label}</span>
-              <strong className="font-semibold text-fg">{value || '—'}</strong>
+              <strong className="font-bold text-fg">{value || '—'}</strong>
             </div>
           )
           const containerRows = (arr: (TariffContainerRate | ContractedContainerRate)[]) =>
