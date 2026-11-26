@@ -2557,8 +2557,8 @@ export default function InlineStepForms({
           {(() => {
             // Validate dynamic lists
             const pc = parseInt(inttraField('partyCount')) || 0
-            const hasCarrier = Array.from({ length: pc }, (_, i) => i).some(i => inttraField(`party_${i}_role`) === 'Carrier' && (inttraField(`party_${i}_name`) || inttraField(`party_${i}_alias`) || inttraField(`party_${i}_inttraId`)))
-            const hasBooker = Array.from({ length: pc }, (_, i) => i).some(i => inttraField(`party_${i}_role`) === 'Booker' && (inttraField(`party_${i}_name`) || inttraField(`party_${i}_inttraId`)))
+            const hasCarrier = Array.from({ length: pc }, (_, i) => i).some(i => inttraField(`party_${i}_role`) === 'Carrier' && inttraField(`party_${i}_name`))
+            const hasBooker = Array.from({ length: pc }, (_, i) => i).some(i => inttraField(`party_${i}_role`) === 'Booker' && inttraField(`party_${i}_name`))
             const hasInttraId = Array.from({ length: pc }, (_, i) => i).some(i => (inttraField(`party_${i}_role`) === 'Shipper' || inttraField(`party_${i}_role`) === 'Forwarder') && inttraField(`party_${i}_inttraId`))
             const rc = parseInt(inttraField('refCount')) || 0
             const hasRef = Array.from({ length: rc }, (_, i) => i).some(i => inttraField(`ref_${i}_type`) && inttraField(`ref_${i}_value`))

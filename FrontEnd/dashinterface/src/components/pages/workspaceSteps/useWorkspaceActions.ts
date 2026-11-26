@@ -810,69 +810,74 @@ CLSynergy (Pvt) Ltd`
           '20 FLAT RACK': '22P1', '40 FLAT RACK': '42P1',
         }
         const isReefer = /RF|REEFER/i.test(cbBkg.container_type || '')
-        // >>> TEST OVERRIDE: hardcoded from booking_req_successful.json <<<
         setInttraForm({
           // Transaction contact
-          contactName: 'Thaarushi Herath',
+          contactName: activeEmployee.name,
           contactType: 'InformationContact',
-          contactEmail: 'unleashideas@clsynergy.com',
-          contactPhone: '0759759251',
+          contactEmail: '',
+          contactPhone: '',
           // Shipment
-          moveType: 'PortToPort',
-          incoterm: '',
-          serviceType: 'FCL',
+          moveType: moveTypeMap[cbBkg.delivery_type || ''] || 'PortToPort',
+          incoterm: cbInq?.incoterm || '',
+          serviceType: cbInq?.is_fcl !== false ? 'FCL' : 'LCL',
           shipmentId: '',
           // Cargo indicators
           cargoHazardous: 'false',
-          cargoControlledEnvironment: 'false',
+          cargoControlledEnvironment: isReefer ? 'true' : 'false',
           cargoEnvironmentalPollutant: 'false',
           cargoOutOfGauge: 'false',
           // Locations
-          placeOfReceipt: 'LKCMB',
+          placeOfReceipt: cbBkg.origin || '',
           receiptIdentifierType: 'UNLOC',
-          placeOfDelivery: 'SGSIN',
+          placeOfDelivery: cbBkg.destination || '',
           deliveryIdentifierType: 'UNLOC',
           locationDateType: 'EarliestDepartureDate',
-          earliestDepartureDate: '2026-11-30',
-          locationDateFormat: 'CCYYMMDD',
+          earliestDepartureDate: cbBkg.vessel_etd || cbInq?.cargo_ready_date || '',
+          locationDateFormat: 'CCYYMMDDHHMM',
           // --- Dynamic Parties (indexed) ---
-          partyCount: '3',
-          // 0: Booker
-          party_0_role: 'Booker', party_0_name: '', party_0_inttraId: '809794', party_0_alias: '', party_0_address: '', party_0_city: '', party_0_country: '', party_0_chargeCount: '0',
-          // 1: Carrier
-          party_1_role: 'Carrier', party_1_name: '', party_1_inttraId: '', party_1_alias: 'ONEY', party_1_address: '', party_1_city: '', party_1_country: '', party_1_chargeCount: '0',
-          // 2: Forwarder
-          party_2_role: 'Forwarder', party_2_name: 'CLSynergy (Pvt) Ltd', party_2_inttraId: '809794', party_2_alias: '', party_2_address: 'Colombo 03, Sri Lanka', party_2_city: 'Colombo', party_2_country: 'LK', party_2_chargeCount: '0',
+          partyCount: '5',
+          // 0: Carrier
+          party_0_role: 'Carrier', party_0_name: cbBkg.shipping_line || '', party_0_inttraId: '', party_0_alias: '', party_0_address: '', party_0_city: '', party_0_country: '', party_0_chargeCount: '0',
+          // 1: Booker
+          party_1_role: 'Booker', party_1_name: 'CL SYNERGY LIMITED', party_1_inttraId: '', party_1_alias: '', party_1_address: '', party_1_city: '', party_1_country: '', party_1_chargeCount: '0',
+          // 2: Shipper (with freight charge)
+          party_2_role: 'Shipper', party_2_name: cbBkg.customer_name || '', party_2_inttraId: '', party_2_alias: '', party_2_address: '', party_2_city: '', party_2_country: '',
+          party_2_chargeCount: '1', party_2_charge_0_type: 'OceanFreight', party_2_charge_0_term: 'Prepaid',
+          // 3: Consignee
+          party_3_role: 'Consignee', party_3_name: '', party_3_inttraId: '', party_3_alias: '', party_3_address: '', party_3_city: '', party_3_country: '', party_3_chargeCount: '0',
+          // 4: Forwarder
+          party_4_role: 'Forwarder', party_4_name: 'CL SYNERGY LIMITED', party_4_inttraId: '', party_4_alias: '', party_4_address: '', party_4_city: '', party_4_country: '', party_4_chargeCount: '0',
           // --- Dynamic References (indexed) ---
-          refCount: '0',
+          refCount: '1',
+          ref_0_type: 'ContractNumber', ref_0_value: cbBkg.contract_no || cbBkg.ra_number || '',
           // --- Dynamic Package Details (indexed) ---
           pkgCount: '1',
-          pkg_0_goodsDesc: 'Electronic Components',
-          pkg_0_hsCode: '854231',
+          pkg_0_goodsDesc: String(cbBkg.commodity ?? cbInq?.containers?.[0]?.commodityName ?? cbInq?.commodity_type ?? ''),
+          pkg_0_hsCode: String(cbBkg.hs_code ?? cbInq?.containers?.[0]?.hs_code ?? ''),
           pkg_0_classType: 'WCO',
-          pkg_0_weight: '15000',
+          pkg_0_weight: cbInq?.cargo_weight ? String(cbInq.cargo_weight) : '',
           pkg_0_weightUnit: 'KGM',
           pkg_0_volume: '',
           pkg_0_volumeUnit: 'MTQ',
-          pkg_0_pkgCount: '120',
-          pkg_0_pkgCode: 'CT',
-          pkg_0_pkgDesc: 'Carton',
+          pkg_0_pkgCount: '',
+          pkg_0_pkgCode: '',
+          pkg_0_pkgDesc: '',
           // --- Dynamic Equipment (indexed) ---
           eqCount: '1',
-          eq_0_count: '2',
-          eq_0_sizeCode: '22G1',
-          eq_0_haulage: 'MerchantMerchant',
-          eq_0_supplier: '',
-          eq_0_svcType: 'FCLFCL',
-          eq_0_reeferTemp: '',
+          eq_0_count: String(cbBkg.quantity || 1),
+          eq_0_sizeCode: isoMap[cbBkg.container_type] || '22G1',
+          eq_0_haulage: EXPECTED_HAULAGE[moveTypeMap[cbBkg.delivery_type || ''] || 'PortToPort'] || 'MerchantMerchant',
+          eq_0_supplier: 'CarrierSupplied',
+          eq_0_svcType: '',
+          eq_0_reeferTemp: cbBkg.reefer_temp || '',
           eq_0_reeferUnit: 'CEL',
           eq_0_comments: '',
           // --- Dynamic Transport Legs (indexed) ---
           legCount: '1',
           leg_0_stage: 'MainCarriage',
-          leg_0_scac: '',
-          leg_0_vessel: '',
-          leg_0_voyage: '',
+          leg_0_scac: cbLiner?.scac || '',
+          leg_0_vessel: cbBkg.vessel_name || '',
+          leg_0_voyage: cbBkg.voyage_number || '',
           leg_0_mode: 'MaritimeTransport',
           leg_0_means: 'OceanVessel',
           // Flags
@@ -881,7 +886,6 @@ CLSynergy (Pvt) Ltd`
           generalComments: '',
           notifyMe: 'true',
         })
-        // >>> END TEST OVERRIDE <<<
         setInttraError(null)
         setActionModal(item)
         break
@@ -2088,19 +2092,33 @@ CLSynergy (Pvt) Ltd`
             onFlash(`INTTRA booking submitted — ${cbBkg.customer_name}`, nextStepAction)
           } catch (err: unknown) {
             const raw = err instanceof Error ? err.message : 'INTTRA booking submission failed'
-            // Try to extract FastAPI detail array from the error message
-            const jsonMatch = raw.match(/\u2014\s*(.+)$/)
+            // Try to extract JSON from the error message (after " — ")
+            const jsonMatch = raw.match(/\s\u2014\s(.+)$/)
             if (jsonMatch) {
               try {
                 const parsed = JSON.parse(jsonMatch[1])
+                // Handle FastAPI detail array: {detail: [{loc, msg, type}, ...]}
                 const details = Array.isArray(parsed?.detail) ? parsed.detail : Array.isArray(parsed) ? parsed : null
-                if (details) {
-                  const lines = details.map((d: { loc?: string[]; msg?: string }) => {
-                    const path = (d.loc || []).filter((s: string) => s !== 'body').join(' > ')
-                    const msg = (d.msg || '').replace(/^Value error,?\s*/i, '').trim()
-                    return path ? `${path}: ${msg}` : msg
+                if (details && details.length > 0) {
+                  const lines = details.map((d: Record<string, unknown>) => {
+                    // FastAPI validation: {loc: [...], msg: "...", type: "..."}
+                    if (d.loc && d.msg) {
+                      const path = (d.loc as string[]).filter(s => s !== 'body').join(' > ')
+                      const msg = String(d.msg).replace(/^Value error,?\s*/i, '').replace(/^Field /i, 'Field ').trim()
+                      return path ? `${path}: ${msg}` : msg
+                    }
+                    // INTTRA error: {code: "224099", message: "..."}
+                    if (d.message) {
+                      return d.code ? `[${d.code}] ${d.message}` : String(d.message)
+                    }
+                    return JSON.stringify(d)
                   })
                   setInttraError(lines.join('\n'))
+                  return
+                }
+                // Handle plain string detail
+                if (typeof parsed?.detail === 'string') {
+                  setInttraError(parsed.detail)
                   return
                 }
               } catch { /* fall through to raw message */ }
