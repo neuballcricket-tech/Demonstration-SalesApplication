@@ -967,7 +967,9 @@ export default function App() {
   }
 
 
-  const addInquiry = (data: Omit<Inquiry, 'id' | 'created_at' | 'status' | 'completed_at' | 'followup_note' | 'inquiry_text'>): Inquiry => {
+  // Resolves once the backend has saved the inquiry; rejects (after removing the optimistic row
+  // and showing the error) if it fails, so callers can keep the user's input on failure.
+  const addInquiry = (data: Omit<Inquiry, 'id' | 'created_at' | 'status' | 'completed_at' | 'followup_note' | 'inquiry_text'>): Promise<Inquiry> => {
     const tempId = `INQ-${uuid()}`
     const stamp = nowStamp()
     const tempInq: Inquiry = {
@@ -1023,7 +1025,7 @@ export default function App() {
             contact_channel_id:  data.contact_channel_id,
             ...sharedFields,
           })
-    apiCall.then(created => {
+    return apiCall.then(created => {
       // Replace temp UUID with backend IDs; keep all optimistic fields intact
       setInquiries(prev => prev.map(i =>
         i.id === tempId
@@ -1062,14 +1064,15 @@ export default function App() {
           return [...prev, { cli_id: created.cli_id, name: data.customer_name }]
         })
       }
+      flash(`Inquiry created for ${data.customer_name}`)
+      return { ...tempInq, id: String(created.inq_id), inq_id: created.inq_id, cli_id: created.cli_id, cpid: created.cpid }
     }).catch(err => {
       console.error('Create inquiry failed:', err)
       // Remove the optimistic temp item so it doesn't linger as a duplicate
       setInquiries(prev => prev.filter(i => i.id !== tempId))
       flash(`ERROR saving inquiry: ${(err as Error).message}`)
+      throw err
     })
-    flash(`Inquiry created for ${data.customer_name}`)  // optimistic flash
-    return tempInq
   }
 
   const updateCustomer = (customerName: string, patch: Partial<Omit<Customer, 'id'>>) => {

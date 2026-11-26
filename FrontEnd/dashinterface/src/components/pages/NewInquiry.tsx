@@ -17,14 +17,15 @@ interface NewInquiryProps {
   clientList: ClientRecord[]
   contactPersonList: ContactPersonRecord[]
   activeEmployee: { id: number; name: string }
-  onCreateInquiry: (data: Omit<Inquiry, 'id' | 'created_at' | 'status' | 'completed_at' | 'followup_note' | 'inquiry_text'>) => Inquiry
+  onCreateInquiry: (data: Omit<Inquiry, 'id' | 'created_at' | 'status' | 'completed_at' | 'followup_note' | 'inquiry_text'>) => Promise<Inquiry>
   onFlash: (msg: string, action?: { label: string; onClick: () => void }) => void
   onGoBack: () => void
 }
 
-export default function NewInquiry({ clientList, contactPersonList, activeEmployee, onCreateInquiry, onFlash, onGoBack }: NewInquiryProps) {
+export default function NewInquiry({ clientList, contactPersonList, activeEmployee, onCreateInquiry, onGoBack }: NewInquiryProps) {
   // Inquiry-level state
   const [niCustomer, setNiCustomer] = useState('')
+  const [saving, setSaving] = useState(false)
   const [niOrigin, setNiOrigin] = useState('')
   const [niChannel, setNiChannel] = useState<'WhatsApp' | 'Email' | 'Phone' | 'WeChat'>('Email')
   const [niSbu, setNiSbu] = useState<SBU>('Ocean Imports')
@@ -97,9 +98,9 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
       ) ?? null)
     : null
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const customerName = niCustomer.trim()
-    if (!customerName) return
+    if (!customerName || saving) return
     const firstContainer = containers[0]
     const autoRequest = [
       firstContainer ? `${firstContainer.quantity}x ${firstContainer.containerType}` : '',
@@ -108,38 +109,44 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
       firstContainer?.commodityName.trim() ? `— ${firstContainer.commodityName.trim()}` : '',
     ].filter(Boolean).join(' ') || `Inquiry from ${customerName}`
 
-    const created = onCreateInquiry({
-      customer_name: customerName,
-      // Passing cli_id / cpid tells App.tsx which endpoint to route to (cases 2 and 3)
-      ...(matchedCli ? { cli_id: matchedCli.cli_id } : {}),
-      ...(matchedCp  ? { cpid:   matchedCp.cp_id   } : {}),
-      request: autoRequest,
-      origin: niOrigin.trim(),
-      destination: firstContainer?.destination.trim() ?? '',
-      delivery_type: niDelivery,
-      sbu: niSbu,
-      employee_id: activeEmployee.id,
-      workflow_stage: 'rate-check',
-      priority: niPriority,
-      incoterm: niIncoterm.trim() || undefined,
-      cargo_ready_date: niCargoReadyDate || undefined,
-      preferred_rate: niPreferredRate !== '' ? niPreferredRate : undefined,
-      commodity_type: firstContainer?.commodityType,
-      container_type: firstContainer?.containerType,
-      container_qty: firstContainer?.quantity,
-      cargo_weight: firstContainer?.weight === '' ? undefined : firstContainer?.weight,
-      is_fcl: firstContainer?.isFcl ?? true,
-      remark: niRemark.trim() || undefined,
-      // Contact fields omitted for case 3 (existing contact — backend already has them)
-      channel:             matchedCp ? undefined : niChannel,
-      contact_person:      matchedCp ? undefined : (niContactPerson.trim() || undefined),
-      contact_designation: matchedCp ? undefined : (niContactDesignation.trim() || undefined),
-      contact_channel_id:  matchedCp ? undefined : (niContactChannelId.trim() || undefined),
-      containers,
-      preferred_liners: niPreferredLiners.length > 0 ? niPreferredLiners : undefined,
-    })
-    onFlash(`Inquiry created for ${created.customer_name}`)
-    resetForm()
+    setSaving(true)
+    try {
+      await onCreateInquiry({
+        customer_name: customerName,
+        // Passing cli_id / cpid tells App.tsx which endpoint to route to (cases 2 and 3)
+        ...(matchedCli ? { cli_id: matchedCli.cli_id } : {}),
+        ...(matchedCp  ? { cpid:   matchedCp.cp_id   } : {}),
+        request: autoRequest,
+        origin: niOrigin.trim(),
+        destination: firstContainer?.destination.trim() ?? '',
+        delivery_type: niDelivery,
+        sbu: niSbu,
+        employee_id: activeEmployee.id,
+        workflow_stage: 'rate-check',
+        priority: niPriority,
+        incoterm: niIncoterm.trim() || undefined,
+        cargo_ready_date: niCargoReadyDate || undefined,
+        preferred_rate: niPreferredRate !== '' ? niPreferredRate : undefined,
+        commodity_type: firstContainer?.commodityType,
+        container_type: firstContainer?.containerType,
+        container_qty: firstContainer?.quantity,
+        cargo_weight: firstContainer?.weight === '' ? undefined : firstContainer?.weight,
+        is_fcl: firstContainer?.isFcl ?? true,
+        remark: niRemark.trim() || undefined,
+        // Contact fields omitted for case 3 (existing contact — backend already has them)
+        channel:             matchedCp ? undefined : niChannel,
+        contact_person:      matchedCp ? undefined : (niContactPerson.trim() || undefined),
+        contact_designation: matchedCp ? undefined : (niContactDesignation.trim() || undefined),
+        contact_channel_id:  matchedCp ? undefined : (niContactChannelId.trim() || undefined),
+        containers,
+        preferred_liners: niPreferredLiners.length > 0 ? niPreferredLiners : undefined,
+      })
+      resetForm()  // only after the backend has saved it
+    } catch {
+      // App already showed the error; keep the form so the user can fix and retry
+    } finally {
+      setSaving(false)
+    }
   }
 
   const canSave = !!niCustomer.trim()
@@ -468,10 +475,10 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
           <button
             className="db-btn primary"
             style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, opacity: canSave ? 1 : 0.5, cursor: canSave ? 'pointer' : 'not-allowed' }}
-            disabled={!canSave}
+            disabled={!canSave || saving}
             onClick={handleSave}
           >
-            <Save size={12} /> Save Inquiry
+            <Save size={12} /> {saving ? 'Saving…' : 'Save Inquiry'}
           </button>
         </div>
 
