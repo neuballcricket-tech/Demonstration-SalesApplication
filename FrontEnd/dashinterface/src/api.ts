@@ -1686,6 +1686,42 @@ export function apiSubmitInttraBooking(
   return post<Record<string, unknown>>(`/booking-requests/${inqId}/inttra-booking`, payload)
 }
 
+/** Validate an INTTRA booking payload without submitting to INTTRA. */
+export async function apiValidateInttraBooking(
+  inqId: number,
+  payload: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<import('./components/pages/workspaceSteps/inttraValidation').BackendValidationResult | null> {
+  try {
+    const res = await fetch(`${BASE}/booking-requests/${inqId}/inttra-booking/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal,
+    })
+    if (res.ok) return res.json()
+    if (res.status === 422) {
+      const detail = await res.json().catch(() => null)
+      const pydanticErrors = Array.isArray(detail?.detail) ? detail.detail : []
+      return {
+        can_submit: false,
+        errors: pydanticErrors.map((e: Record<string, unknown>) => ({
+          severity: 'error' as const,
+          code: 'PYDANTIC_VALIDATION',
+          field: Array.isArray(e.loc) ? (e.loc as string[]).filter(s => s !== 'body').join('.') : '',
+          message: String(e.msg),
+          source: 'PYDANTIC',
+        })),
+        warnings: [],
+      }
+    }
+    return null
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err
+    return null
+  }
+}
+
 /** Shape of an INTTRA booking record returned by GET /booking-requests/inttra-bookings */
 export interface InttraBookingRecord {
   bkg_id: number

@@ -10,13 +10,14 @@ import {
   type ReleaseOrderFields,
 } from '../../types'
 import { useRole } from '../../RoleContext'
-import { apiGetLiners, apiFetchCompletedRateRequests, apiGetUnsentQuotations, apiGetSentQuotations, apiGetAcceptedQuotations, type KycPendingClient, type KycRequestRecord, type QuotationOptionRow, type UnsentQuotation, type SentQuotationRow, type AcceptedQuotationRow } from '../../api'
+import { apiGetLiners, apiFetchCompletedRateRequests, apiGetUnsentQuotations, apiGetSentQuotations, apiGetAcceptedQuotations, apiValidateInttraBooking, type KycPendingClient, type KycRequestRecord, type QuotationOptionRow, type UnsentQuotation, type SentQuotationRow, type AcceptedQuotationRow } from '../../api'
 import type { CompletedRateRequest } from '../../types'
 import InlineStepForms from './workspaceSteps/InlineStepForms'
 import ModalStepForms from './workspaceSteps/ModalStepForms'
 import VesselCreatedPrompt from './workspaceSteps/VesselCreatedPrompt'
-import { useWorkspaceActions } from './workspaceSteps/useWorkspaceActions'
+import { useWorkspaceActions, buildInttraPayload } from './workspaceSteps/useWorkspaceActions'
 import { generateReleaseOrderDraft } from './workspaceSteps/utils'
+import type { BackendValidationResult } from './workspaceSteps/inttraValidation'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -289,6 +290,8 @@ export default function Workspace({
   const setInttraField = (key: string, value: string) => setInttraForm(prev => ({ ...prev, [key]: value }))
   const [inttraLoading, setInttraLoading] = useState(false)
   const [inttraError, setInttraError] = useState<string | null>(null)
+  const [backendValidation, setBackendValidation] = useState<BackendValidationResult | null>(null)
+  const [validationLoading, setValidationLoading] = useState(false)
   // Backend quotation ID — set in prepare-quotation, used in customer-response
   const [lastQuotationId, setLastQuotationId] = useState<number | null>(null)
   // Quotation options loaded from backend for the customer-response modal
@@ -1218,6 +1221,38 @@ export default function Workspace({
   }, [selectedItemId, filteredItems, IMMEDIATE_FIRE_KINDS])
 
   const getItemKey = (item: WorkspaceItem) => `${item.type}-${item.refId}-${item.actionKind}-${(item.sourceData as any)?.containerIdx ?? 0}`
+
+  // Debounced backend validation for INTTRA form
+  const validationSeqRef = useRef(0)
+  useEffect(() => {
+    if (procBookingTab !== 'inttra') return
+    const booking = (selectedItem?.sourceData as any)?.booking as Booking | undefined
+    const inqId = booking?.inq_id
+    if (!inqId) return
+
+    validationSeqRef.current += 1
+    const seq = validationSeqRef.current
+    const ctrl = new AbortController()
+
+    const timer = setTimeout(() => {
+      setValidationLoading(true)
+      const payload = buildInttraPayload(inttraField)
+      apiValidateInttraBooking(inqId, payload, ctrl.signal)
+        .then(result => {
+          if (seq === validationSeqRef.current) {
+            setBackendValidation(result)
+            setValidationLoading(false)
+          }
+        })
+        .catch(() => {
+          if (seq === validationSeqRef.current) setValidationLoading(false)
+        })
+    }, 1500)
+
+    return () => { clearTimeout(timer); ctrl.abort() }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inttraForm, procBookingTab, selectedItem])
+
   // ---------------------------------------------------------------------------
 
   const { handleAction, handleModalSubmit } = useWorkspaceActions({
@@ -1539,6 +1574,8 @@ export default function Workspace({
               setInttraField={setInttraField}
               inttraLoading={inttraLoading}
               inttraError={inttraError}
+              backendValidation={backendValidation}
+              validationLoading={validationLoading}
               onSubmitInttraBooking={handleModalSubmit}
               siContent={siContent}
               setSiContent={setSiContent}
