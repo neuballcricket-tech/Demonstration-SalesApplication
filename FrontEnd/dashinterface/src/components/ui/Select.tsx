@@ -1,5 +1,5 @@
 import { Check, ChevronDown } from 'lucide-react'
-import type { CSSProperties } from 'react'
+import type { AriaAttributes, CSSProperties } from 'react'
 import {
   Button,
   Header,
@@ -21,10 +21,17 @@ export interface SelectProps {
   /** `''` means no selection. */
   value: string
   onChange: (value: string) => void
+  /**
+   * Include an option with `value: ''` (e.g. "All" or "— None —") to let users pick the empty value again.
+   * Without one, `''` shows the `placeholder` and cannot be re-selected.
+   */
   options: Array<Option | OptionGroup>
   placeholder?: string
   label?: string
   'aria-label'?: string
+  'aria-labelledby'?: string
+  'aria-describedby'?: string
+  'aria-invalid'?: AriaAttributes['aria-invalid']
   isDisabled?: boolean
   isInvalid?: boolean
   isRequired?: boolean
@@ -37,14 +44,18 @@ export interface SelectProps {
   style?: CSSProperties
 }
 
+// RAC cannot use '' as an item key, so an empty-value option is keyed by this sentinel internally.
+const EMPTY_KEY = '__ui-select-empty__'
+const toKey = (value: string) => (value === '' ? EMPTY_KEY : value)
+
 const isGroup = (o: Option | OptionGroup): o is OptionGroup => 'options' in o
 
 const itemClass =
-  'flex cursor-default items-center justify-between gap-2 rounded-option px-2 py-1.5 text-control text-fg focus:bg-primary-subtle selected:font-semibold disabled:text-fg-muted'
+  'flex items-center justify-between gap-2 rounded-option px-2 py-1.5 text-control text-fg focus:bg-primary-subtle selected:font-semibold disabled:text-fg-muted'
 
 function Item({ option }: { option: Option }) {
   return (
-    <ListBoxItem id={option.value} textValue={option.label} isDisabled={option.disabled} className={itemClass}>
+    <ListBoxItem id={toKey(option.value)} textValue={option.label} isDisabled={option.disabled} className={itemClass}>
       {({ isSelected }) => (
         <>
           <span className="truncate">{option.label}</span>
@@ -62,6 +73,9 @@ export function Select({
   placeholder,
   label,
   'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledby,
+  'aria-describedby': ariaDescribedby,
+  'aria-invalid': ariaInvalid,
   isDisabled,
   isInvalid,
   isRequired,
@@ -77,14 +91,16 @@ export function Select({
 
   return (
     <AriaSelect
-      value={known ? value : null}
+      value={known ? toKey(value) : null}
       onChange={(key) => {
-        if (key !== null) onChange(String(key))
+        if (key !== null) onChange(key === EMPTY_KEY ? '' : String(key))
       }}
       placeholder={placeholder}
       aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledby}
+      aria-describedby={ariaDescribedby}
       isDisabled={isDisabled}
-      isInvalid={isInvalid}
+      isInvalid={isInvalid || ariaInvalid === true || ariaInvalid === 'true'}
       isRequired={isRequired}
       name={name}
       className={cn('group flex flex-col gap-1', className)}
@@ -97,7 +113,7 @@ export function Select({
           'ui-control',
           controlModifier(controlSize),
           control({ controlSize }),
-          'flex cursor-pointer items-center justify-between gap-2 text-left group-data-invalid:border-danger group-data-invalid:focus-visible:border-danger',
+          'flex items-center justify-between gap-2 text-left group-data-invalid:border-danger group-data-invalid:focus-visible:border-danger',
         )}
       >
         <SelectValue className={({ isPlaceholder }) => cn('truncate', isPlaceholder && !unknown && 'text-fg-muted')}>

@@ -3,6 +3,7 @@ import { cn } from '../../lib/cn'
 
 export interface FieldControlProps {
   id: string
+  'aria-labelledby': string
   'aria-describedby'?: string
   'aria-invalid'?: true
 }
@@ -19,18 +20,20 @@ export interface FieldProps {
 
 export function Field({ label, required, hint, error, children, className, style }: FieldProps) {
   const id = useId()
+  const labelId = `${id}-label`
   const hintId = `${id}-hint`
   const errorId = `${id}-error`
   const describedBy = [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ')
 
   return (
     <div className={cn('ui-field flex flex-col gap-1', className)} style={style}>
-      <label htmlFor={id} className="text-label font-semibold text-fg-label">
+      <label id={labelId} htmlFor={id} className="text-label font-semibold text-fg-label">
         {label}
         {required && <span aria-hidden="true" className="ml-0.5 text-danger">*</span>}
       </label>
       {children({
         id,
+        'aria-labelledby': labelId,
         ...(describedBy ? { 'aria-describedby': describedBy } : {}),
         ...(error ? { 'aria-invalid': true as const } : {}),
       })}

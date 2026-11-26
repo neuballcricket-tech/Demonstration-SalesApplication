@@ -12,6 +12,15 @@ describe('Field', () => {
     expect(input).toHaveFocus()
   })
 
+  it('label has an id referenced by aria-labelledby, and keeps htmlFor', () => {
+    render(<Field label="Client">{ids => <input {...ids} />}</Field>)
+    const input = screen.getByLabelText('Client')
+    const label = screen.getByText('Client')
+    expect(label).toHaveAttribute('for', input.id)
+    expect(label.id).not.toBe('')
+    expect(input).toHaveAttribute('aria-labelledby', label.id)
+  })
+
   it('error sets aria-invalid and aria-describedby', () => {
     render(<Field label="Client" error="Required">{ids => <input {...ids} />}</Field>)
     const input = screen.getByLabelText('Client')

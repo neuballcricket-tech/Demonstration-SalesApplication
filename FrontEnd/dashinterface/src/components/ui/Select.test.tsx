@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import { Field } from './Field'
 import { Select, type Option, type OptionGroup } from './Select'
 
 const options: Option[] = [
@@ -123,5 +124,70 @@ describe('Select', () => {
     const btn = screen.getByRole('button')
     expect(btn.parentElement).toHaveAttribute('data-invalid')
     expect(btn).toHaveClass('group-data-invalid:border-danger', 'group-data-invalid:focus-visible:border-danger')
+  })
+
+  it("lets users go back to '' through an empty-value option", async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    const withAll: Option[] = [{ value: '', label: 'All' }, ...options]
+    function Harness() {
+      const [v, setV] = useState('air')
+      return (
+        <Select
+          aria-label="Service"
+          value={v}
+          onChange={(x) => {
+            onChange(x)
+            setV(x)
+          }}
+          options={withAll}
+          placeholder="Pick…"
+        />
+      )
+    }
+    render(<Harness />)
+    expect(screen.getByRole('button')).toHaveTextContent('Air Freight')
+    await user.click(screen.getByRole('button'))
+    await user.click(screen.getByRole('option', { name: 'All' }))
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledWith('')
+    expect(screen.getByRole('button')).toHaveTextContent('All')
+  })
+
+  it("shows the empty option's label when value is '' and one exists", () => {
+    render(<Select aria-label="S" value="" onChange={() => {}} options={[{ value: '', label: 'All' }, ...options]} placeholder="Pick…" />)
+    expect(screen.getByRole('button')).toHaveTextContent('All')
+  })
+
+  it("shows the placeholder for '' when there is no empty option", () => {
+    render(<Select aria-label="S" value="" onChange={() => {}} options={options} placeholder="— Select —" />)
+    expect(screen.getByRole('button')).toHaveTextContent('— Select —')
+  })
+
+  it('is named by Field label and described by its hint', () => {
+    render(
+      <Field label="Liner" hint="Pick one">
+        {(ids) => <Select {...ids} options={options} value="" onChange={() => {}} placeholder="— Select —" />}
+      </Field>,
+    )
+    const btn = screen.getByRole('button', { name: /liner/i })
+    expect(btn).toHaveAccessibleDescription('Pick one')
+  })
+
+  it('shows the invalid state from Field error', () => {
+    render(
+      <Field label="Liner" error="Required">
+        {(ids) => <Select {...ids} options={options} value="" onChange={() => {}} />}
+      </Field>,
+    )
+    const btn = screen.getByRole('button', { name: /liner/i })
+    expect(btn.parentElement).toHaveAttribute('data-invalid')
+    expect(btn).toHaveClass('group-data-invalid:border-danger')
+    expect(btn).toHaveAccessibleDescription('Required')
+  })
+
+  it('does not force a pointer cursor on the trigger', () => {
+    render(<Select aria-label="S" value="" onChange={() => {}} options={options} />)
+    expect(screen.getByRole('button').className).not.toMatch(/cursor-/)
   })
 })
