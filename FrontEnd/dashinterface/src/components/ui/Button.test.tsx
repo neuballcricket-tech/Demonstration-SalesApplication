@@ -75,4 +75,14 @@ describe('Button', () => {
     expect(spy).not.toHaveBeenCalled()
     spy.mockRestore()
   })
+
+  it.each(['primary', 'secondary', 'ghost', 'danger'] as const)(
+    '%s variant has a 1px border box (no UA outset border without preflight)',
+    (variant) => {
+      render(<Button variant={variant}>Go</Button>)
+      const classes = screen.getByRole('button', { name: 'Go' }).classList
+      expect(classes).toContain('border')
+      if (variant === 'primary' || variant === 'ghost') expect(classes).toContain('border-transparent')
+    },
+  )
 })

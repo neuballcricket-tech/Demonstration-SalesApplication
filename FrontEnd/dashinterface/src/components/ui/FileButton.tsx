@@ -56,8 +56,6 @@ export function FileButton({
             `ui-button--${variant}`,
             `ui-button--${size}`,
             buttonStyles({ variant, size }),
-            (variant === 'primary' || variant === 'ghost') && 'border-none',
-            'data-disabled:cursor-not-allowed data-disabled:opacity-60',
           )}
         >
           <Upload size={14} aria-hidden="true" />
