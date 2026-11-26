@@ -128,6 +128,45 @@ describe('ComboBox', () => {
     expect(screen.getByRole('combobox')).toHaveValue('LKCMB')
   })
 
+  it('retyping a picked value after the parent clears it keeps the list open', async () => {
+    const user = userEvent.setup()
+    function Clearable() {
+      const [v, setV] = useState('')
+      return (
+        <>
+          <ComboBox aria-label="Port" items={items} value={v} onChange={setV} />
+          <button onClick={() => setV('')}>clear</button>
+        </>
+      )
+    }
+    render(<Clearable />)
+    await user.type(screen.getByRole('combobox'), 'col')
+    await user.click(screen.getByRole('option', { name: /Colombo/ }))
+    await user.click(screen.getByRole('button', { name: 'clear' }))
+    await user.type(screen.getByRole('combobox'), 'LKCMB')
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Colombo/ })).toBeInTheDocument()
+  })
+
+  it('onPick is called with the value on a pick, not on typing', async () => {
+    const onPick = vi.fn()
+    const user = userEvent.setup()
+    render(<Harness onPick={onPick} />)
+    await user.type(screen.getByRole('combobox'), 'LKCMB')
+    expect(onPick).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('option', { name: /Colombo/ }))
+    expect(onPick).toHaveBeenCalledTimes(1)
+    expect(onPick).toHaveBeenCalledWith('LKCMB')
+  })
+
+  it('filter replaces the default matching', async () => {
+    const user = userEvent.setup()
+    render(<Harness filter={(item, text) => item.value.startsWith(text.toUpperCase())} />)
+    // The default filter would also match "China" and "Cochin"
+    await user.type(screen.getByRole('combobox'), 'in')
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['CochinIndia'])
+  })
+
   it('allowsCustomValue=false: free text reverts to empty on blur', async () => {
     const onChange = vi.fn()
     const user = userEvent.setup()

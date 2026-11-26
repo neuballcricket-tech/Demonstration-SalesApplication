@@ -40,6 +40,10 @@ export interface ComboBoxProps {
   className?: string
   style?: CSSProperties
   onInputChange?: (text: string) => void
+  /** Called with `item.value` when an item is picked (after `onChange`), never on typing. */
+  onPick?: (value: string) => void
+  /** Replaces the default filter (text contained in value, label or description, ignoring case). */
+  filter?: (item: ComboBoxItem, text: string) => boolean
   menuTrigger?: 'focus' | 'input'
 }
 
@@ -66,17 +70,24 @@ export function ComboBox({
   className,
   style,
   onInputChange,
+  onPick,
+  filter,
   menuTrigger = 'input',
 }: ComboBoxProps) {
   const needle = value.toLowerCase()
   // Like a datalist, the typed text matches the value as well as the label and description.
   const visible = items.filter((item) =>
-    `${item.value} ${item.label ?? ''} ${item.description ?? ''}`.toLowerCase().includes(needle),
+    filter
+      ? filter(item, value)
+      : `${item.value} ${item.label ?? ''} ${item.description ?? ''}`.toLowerCase().includes(needle),
   )
   // Only used when allowsCustomValue is false: where to revert to on blur.
   const lastPicked = useRef<string | null>(items.some((i) => i.value === value) ? value : null)
   // The key of an actual pick only (never derived from the text), cleared as soon as the text is edited.
   const [pickedKey, setPickedKey] = useState<string | null>(null)
+  // Forget a pick once the text no longer shows it (edited or reset by the parent), so retyping
+  // that exact value later does not count as a pick and close the list.
+  if (pickedKey !== null && pickedKey !== value) setPickedKey(null)
 
   return (
     <AriaComboBox
@@ -90,12 +101,13 @@ export function ComboBox({
       }}
       // Selection comes only from an actual pick, so typing an exact item value does not close the list.
       // RAC reports a pick here, not through onInputChange, and reports null when the text is edited.
-      selectedKey={pickedKey === value ? pickedKey : null}
+      selectedKey={pickedKey}
       onSelectionChange={(key) => {
         setPickedKey(key === null ? null : String(key))
         if (key === null) return
         lastPicked.current = String(key)
         onChange(String(key))
+        onPick?.(String(key))
       }}
       allowsCustomValue={allowsCustomValue}
       menuTrigger={menuTrigger}
@@ -124,7 +136,7 @@ export function ComboBox({
             'pr-8 group-data-invalid:border-danger group-data-invalid:focus-visible:border-danger',
           )}
         />
-        <Button className="absolute inset-y-0 right-0 flex w-8 items-center justify-center text-fg-muted">
+        <Button className="absolute inset-y-0 right-0 flex w-8 items-center justify-center border-0 bg-transparent p-0 text-fg-muted">
           <ChevronDown size={16} aria-hidden="true" />
         </Button>
       </div>

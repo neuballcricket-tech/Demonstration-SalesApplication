@@ -13,11 +13,13 @@
  *     • Any mix of slashes, commas and spaces is normalised for comparison.
  *   Fetched lazily on first need; UNLOCODE→label and label→UNLOCODE caches held in module scope.
  *
- * Only the 5-character UNLOCODE is sent to the parent via onChange.
+ * Only the 5-character UNLOCODE is sent to the parent via onChange, and the input shows it once
+ * committed, with the port's label in the message below.
  * When input is invalid, similar curated suggestions are shown inline.
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useId } from 'react'
+import { ComboBox } from '../ui'
 
 // ---------------------------------------------------------------------------
 // Curated port list
@@ -156,20 +158,20 @@ interface PortComboboxProps {
   style?: React.CSSProperties
 }
 
+// The list is already narrowed by filterCurated (which also accepts "Port/Country"), so the
+// ComboBox must not filter it again.
+const showAll = () => true
+
 export default function PortCombobox({ value, onChange, placeholder, id, style }: PortComboboxProps) {
-  // inputText is what shows in the <input>:
+  // inputText is what shows in the input:
   //   - While searching: raw query (e.g. "hamb")
-  //   - When committed: "CODE — Label" (e.g. "DEHAM — Hamburg, Germany")
-  const [inputText, setInputText] = useState<string>(() => {
-    if (!value) return ''
-    const lbl = curatedLabel(value)
-    return lbl ? `${value} — ${lbl}` : value
-  })
-  const [isOpen, setIsOpen] = useState(false)
+  //   - When committed: the UNLOCODE (e.g. "DEHAM"), with its label in the message below
+  const [inputText, setInputText] = useState<string>(value)
   const [validation, setValidation] = useState<Validation>({ status: 'idle' })
 
   const isFocusedRef = useRef(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
+  const messageId = useId()
 
   // Sync external value changes (e.g., form reset) into display, but don't
   // override the user's live input while they're focused.
@@ -180,49 +182,38 @@ export default function PortCombobox({ value, onChange, placeholder, id, style }
       setValidation({ status: 'idle' })
     } else {
       const lbl = curatedLabel(value)
-      setInputText(lbl ? `${value} — ${lbl}` : value)
+      setInputText(value)
       if (lbl) setValidation({ status: 'valid', label: lbl })
     }
   }, [value])
 
-  // Derive the search token from the input text.
-  // "DEHAM — Hamburg, Germany" → search by "DEHAM" (the code portion before " — ")
-  const searchQuery = inputText.includes(' — ') ? inputText.split(' — ')[0] : inputText
-  const suggestions = filterCurated(searchQuery)
+  const suggestions = filterCurated(inputText).map(p => ({ value: p.code, description: p.label }))
 
   function commitPort(port: CuratedPort) {
-    setInputText(`${port.code} — ${port.label}`)
+    setInputText(port.code)
     setValidation({ status: 'valid', label: port.label })
-    setIsOpen(false)
     onChange(port.code)
   }
 
-  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const text = e.target.value
+  // Called on every keystroke, and with the code when a port is picked from the list.
+  function handleInputChange(text: string) {
     setInputText(text)
     setValidation({ status: 'idle' })
-    setIsOpen(true)
 
     if (!text.trim()) {
       onChange('')
       return
     }
 
-    // Auto-commit if the user typed an exact curated UNLOCODE
+    // Auto-commit if the user typed (or picked) an exact curated UNLOCODE
     const exact = CURATED_PORTS.find(p => p.code === text.trim().toUpperCase())
     if (exact) commitPort(exact)
   }
 
-  function handleFocus() {
-    isFocusedRef.current = true
-    setIsOpen(true)
-  }
-
-  async function handleBlur() {
+  async function handleBlur(e: React.FocusEvent<HTMLDivElement>) {
+    // Focus moving between the input and the "Did you mean" buttons is not a blur of the field
+    if (e.currentTarget.contains(e.relatedTarget)) return
     isFocusedRef.current = false
-    // Allow mousedown on dropdown items to register before closing
-    await new Promise<void>(r => setTimeout(r, 160))
-    setIsOpen(false)
 
     const raw = inputText.trim()
     if (!raw || validation.status === 'valid') return
@@ -251,7 +242,7 @@ export default function PortCombobox({ value, onChange, placeholder, id, style }
       if (potentialCode.length >= 3) {
         const lbl = allPorts[potentialCode]
         if (lbl) {
-          setInputText(`${potentialCode} — ${lbl}`)
+          setInputText(potentialCode)
           setValidation({ status: 'valid', label: lbl })
           onChange(potentialCode)
           return
@@ -264,7 +255,7 @@ export default function PortCombobox({ value, onChange, placeholder, id, style }
       const codeFromLabel = reverseMap.get(rawNorm)
       if (codeFromLabel) {
         const portLabel = allPorts[codeFromLabel]
-        setInputText(`${codeFromLabel} — ${portLabel}`)
+        setInputText(codeFromLabel)
         setValidation({ status: 'valid', label: portLabel })
         onChange(codeFromLabel)
         return
@@ -284,105 +275,63 @@ export default function PortCombobox({ value, onChange, placeholder, id, style }
     }
   }
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (!wrapperRef.current?.contains(e.target as Node)) setIsOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
+  function pickSimilar(port: CuratedPort) {
+    commitPort(port)
+    // The clicked button disappears once the port is valid, so return focus to the input
+    wrapperRef.current?.querySelector('input')?.focus()
+  }
 
   return (
-    <div ref={wrapperRef} style={{ position: 'relative', ...style }}>
-      <input
-        id={id}
-        className="lt-input"
-        style={{ width: '100%' }}
+    <div
+      ref={wrapperRef}
+      className="flex flex-col gap-0.5"
+      style={style}
+      onFocus={() => { isFocusedRef.current = true }}
+      onBlur={handleBlur}
+    >
+      <ComboBox
+        items={suggestions}
+        filter={showAll}
         value={inputText}
         onChange={handleInputChange}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
         placeholder={placeholder ?? 'Type port name or UNLOCODE'}
-        autoComplete="off"
-        spellCheck={false}
+        aria-label={placeholder ?? 'Type port name or UNLOCODE'}
+        aria-describedby={validation.status === 'idle' ? undefined : messageId}
+        isInvalid={validation.status === 'invalid'}
+        id={id}
+        menuTrigger="focus"
       />
 
-      {validation.status === 'validating' && (
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
-          Checking port...
-        </div>
-      )}
-      {validation.status === 'valid' && (
-        <div style={{ fontSize: 11, color: '#16a34a', marginTop: 3 }}>
-          ✓ {validation.label}
-        </div>
-      )}
-      {validation.status === 'invalid' && (
-        <div style={{ fontSize: 11, color: '#dc2626', marginTop: 3 }}>
-          Port not recognised.
-          {validation.similar.length > 0 && (
-            <> Did you mean:{' '}
-              {validation.similar.map((p, i) => (
-                <span key={p.code}>
-                  <button
-                    type="button"
-                    style={{
-                      background: 'none', border: 'none', color: '#2563eb',
-                      cursor: 'pointer', fontSize: 11, padding: 0, textDecoration: 'underline',
-                    }}
-                    onMouseDown={e => { e.preventDefault(); commitPort(p) }}
-                  >
-                    {p.code}
-                  </button>
-                  {i < validation.similar.length - 1 ? ', ' : ''}
-                </span>
-              ))}
-            </>
-          )}
-        </div>
-      )}
-
-      {isOpen && suggestions.length > 0 && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 2px)',
-            left: 0,
-            right: 0,
-            background: 'var(--bg-card, #fff)',
-            border: '1px solid var(--border)',
-            borderRadius: 8,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.18)',
-            zIndex: 1000,
-            maxHeight: 240,
-            overflowY: 'auto',
-          }}
-        >
-          {suggestions.map(port => (
-            <div
-              key={port.code}
-              onMouseDown={e => { e.preventDefault(); commitPort(port) }}
-              style={{
-                padding: '7px 12px',
-                cursor: 'pointer',
-                display: 'flex',
-                gap: 10,
-                alignItems: 'center',
-                borderBottom: '1px solid var(--border)',
-                background: 'var(--bg-card, #fff)',
-              }}
-              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--bg, #f8fafc)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = 'var(--bg-card, #fff)' }}
-            >
-              <span style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color: 'var(--primary, #2563eb)', minWidth: 50 }}>
-                {port.code}
-              </span>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{port.label}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      <div id={messageId} className="text-label">
+        {validation.status === 'validating' && (
+          <span className="text-fg-muted">Checking port...</span>
+        )}
+        {validation.status === 'valid' && (
+          <span className="text-success">✓ {validation.label}</span>
+        )}
+        {validation.status === 'invalid' && (
+          <span className="text-danger">
+            Port not recognised.
+            {validation.similar.length > 0 && (
+              <> Did you mean:{' '}
+                {validation.similar.map((p, i) => (
+                  <span key={p.code}>
+                    <button
+                      type="button"
+                      className="text-primary underline"
+                      onMouseDown={e => e.preventDefault()}
+                      onClick={() => pickSimilar(p)}
+                    >
+                      {p.code}
+                    </button>
+                    {i < validation.similar.length - 1 ? ', ' : ''}
+                  </span>
+                ))}
+              </>
+            )}
+          </span>
+        )}
+      </div>
     </div>
   )
 }
