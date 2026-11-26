@@ -5,7 +5,7 @@ import {
   type PortRecord, type LinerRecord, type TradeLaneRecord, type EmployeeRecord, type ClientRecord,
   type RateSourceType,
 } from '../../types'
-import { apiGetPorts, apiGetLiners, apiGetTradeLanes, apiGetEmployeesDb, apiGetClientsDb, apiCreateTariffRate, apiCreateContractedRate, apiCreateNacRate, apiPreviewBulkTariffRates, apiBulkCreateTariffRates, type BulkTariffPreviewRow } from '../../api'
+import { apiGetPorts, apiGetLiners, apiGetTradeLanes, apiGetEmployeesDb, apiGetClientsDb, apiCreateTariffRate, apiCreateContractedRate, apiCreateNacRate, apiPreviewBulkTariffRates, apiBulkCreateTariffRates, BACKEND_ACTOR_ID, type BulkTariffPreviewRow } from '../../api'
 import TagInput from '../shared/TagInput'
 import { FIELD_LABEL, INPUT_STYLE } from './pageStyles'
 
@@ -183,6 +183,15 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
 
   const handleSave = async () => {
     if (saving) return
+    // The backend requires a valid trade lane on every rate
+    if (rrTradeLaneId === '') {
+      onFlash(tradeLaneList.length === 0
+        ? 'No trade lanes are set up in the system yet, so rates cannot be saved. Ask an administrator to add trade lanes.'
+        : 'Select a trade lane before saving.')
+      return
+    }
+    const trLnId = rrTradeLaneId
+    const salespersonId = rrSalesPersonId !== '' ? rrSalesPersonId : BACKEND_ACTOR_ID
     const summarise = (arr: (TariffContainerRate | ContractedContainerRate)[]) =>
       arr.filter(c => c.rate !== '').map(c => `${c.containerType || '?'}: ${c.rate} ${c.currency}`).join(', ')
     const containers = rrType === 'Tariff Rate' ? rrTariffContainers : rrType === 'Contracted' ? rrContractedContainers : rrNacContainers
@@ -195,9 +204,9 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
         row: ct,
         request: () => apiCreateTariffRate({
           lin_id: rrLinerId !== '' ? rrLinerId : undefined,
-          tr_ln_id: 1,
-          updated_by: 6,
-          salesperson: 6,
+          tr_ln_id: trLnId,
+          updated_by: BACKEND_ACTOR_ID,
+          salesperson: salespersonId,
           origin: rrOrigin,
           destination: rrDestination,
           valid_from: rrValidFrom || undefined,
@@ -216,19 +225,19 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
         row: cc,
         request: () => apiCreateContractedRate({
           lin_id: rrLinerId !== '' ? rrLinerId : undefined,
-          tr_ln_id: 1,
+          tr_ln_id: trLnId,
           contract_ref_id: rrContractId || undefined,
           valid_from: rrValidFrom || undefined,
           valid_to: rrValidTo || undefined,
           contracted_volume: cc.contractedVolume.trim() ? (parseInt(cc.contractedVolume) || 0) : 0,
           container_type: cc.containerType || undefined,
-          updated_by: 6,
+          updated_by: BACKEND_ACTOR_ID,
           origin: rrOrigin,
           destination: rrDestination,
           rate: cc.rate,
           currency: cc.currency,
-          emp_id_sales: 6,
-          emp_id_cs: 6,
+          emp_id_sales: salespersonId,
+          emp_id_cs: BACKEND_ACTOR_ID,
           free_time: rrFreeTime.trim() || undefined,
           max_weight: cc.weight.trim() ? parseInt(cc.weight) : undefined,
           note: rrNote || undefined,
@@ -248,7 +257,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
         request: () => apiCreateNacRate({
           cli_id: cliId,
           lin_id: rrLinerId !== '' ? rrLinerId : undefined,
-          tr_ln_id: 1,
+          tr_ln_id: trLnId,
           nac_ref_id: rrNacRefNo || undefined,
           origin: rrOrigin,
           destination: rrDestination,
@@ -258,8 +267,8 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
           rate: nc.rate,
           currency: nc.currency,
           contracted_volume: nc.contractedVolume.trim() ? (parseInt(nc.contractedVolume) || 0) : 0,
-          emp_id_sales: 6,
-          emp_id_cs: 6,
+          emp_id_sales: salespersonId,
+          emp_id_cs: BACKEND_ACTOR_ID,
           free_time: rrFreeTime.trim() || undefined,
           max_weight: nc.weight.trim() ? parseInt(nc.weight) : undefined,
           note: rrNote || undefined,

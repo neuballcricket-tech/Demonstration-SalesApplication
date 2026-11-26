@@ -52,6 +52,7 @@ import {
   apiConfirmBookingRequest, apiCreateReleaseOrder, apiPatchReleaseOrder,
   apiGetBookingRequests, apiFetchPendingReleaseOrders, apiGetLiners,
   type BackendBookingRecord, type BackendReleaseOrderRecord,
+  BACKEND_ACTOR_ID,
 } from './api'
 
 // crypto.randomUUID() requires HTTPS (secure context). Fall back for plain HTTP deployments.
@@ -502,7 +503,7 @@ export default function App() {
       customer_name: customerName,
       note: newFup.note,
       completion_flag: completionFlag,
-      employee_id: 6,
+      employee_id: BACKEND_ACTOR_ID,
     }).then(created => {
       setFollowups(prev => prev.map(f => f.id === newFup.id ? created : f))
     }).catch(err => console.error('Create followup failed:', err))
@@ -624,7 +625,7 @@ export default function App() {
       customer_name: customerName,
       task: taskText,
       due_date: dueDate,
-      employee_id: 6,
+      employee_id: BACKEND_ACTOR_ID,
     }).then(created => {
       setTasks(prev => prev.map(t => t.id === newTask.id ? created : t))
     }).catch(err => console.error('Create task failed:', err))
@@ -645,7 +646,7 @@ export default function App() {
     setActivityLog(prev => [newEntry, ...prev])
     apiCreateActivity({
       actor_role: entry.actor_role,
-      actor_id: 1,
+      actor_id: entry.actor_id,
       action: entry.action,
       ref_type: entry.ref_type,
       ref_id: entry.ref_id,
@@ -664,7 +665,7 @@ export default function App() {
       }
       return prev.map(b =>
         b.id === bookingId
-          ? { ...b, status: 'Liner Confirmed' as const, vessel_name: vesselName, voyage_number: voyageNumber, confirmed_by: 1, confirmed_at: nowStamp() }
+          ? { ...b, status: 'Liner Confirmed' as const, vessel_name: vesselName, voyage_number: voyageNumber, confirmed_by: activeEmployeeId, confirmed_at: nowStamp() }
           : b
       )
     })
@@ -749,7 +750,7 @@ export default function App() {
       }
       return prev.map(b =>
         b.id === bookingId
-          ? { ...b, status: 'Released' as const, released_by: 1, released_at: nowStamp(), notes: note || b.notes }
+          ? { ...b, status: 'Released' as const, released_by: activeEmployeeId, released_at: nowStamp(), notes: note || b.notes }
           : b
       )
     })

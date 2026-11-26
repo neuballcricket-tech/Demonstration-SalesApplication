@@ -17,7 +17,7 @@ import type { CompletedRateRequest } from '../../../types'
 import {
   apiCreateKycRequest, apiCreateQuotation, apiPatchQuotation,
   apiMarkQuotationSent, apiRecordQuotationResponse,
-  apiUpdateKycStage, apiUploadQuotationDocument,
+  apiUpdateKycStage, apiUploadQuotationDocument, BACKEND_ACTOR_ID,
   type KycPendingClient, type KycRequestRecord,
   type QuotationOptionPayload, type QuotationOptionRow,
 } from '../../../api'
@@ -1426,8 +1426,8 @@ CLSynergy (Pvt) Ltd`
             await apiCreateKycRequest(cli_id, {
               br_number: kycBrNumber,
               parent_organization: kycParentOrg || undefined,
-              emp_id_sales: activeRole === 'Sales' ? 6 : undefined,
-              emp_id_cs:    activeRole === 'CS'    ? 6 : undefined,
+              emp_id_sales: activeRole === 'Sales' ? BACKEND_ACTOR_ID : undefined,
+              emp_id_cs:    activeRole === 'CS'    ? BACKEND_ACTOR_ID : undefined,
               document_submission_deadline: kycDeadline,
               cli_type: kycCliType,
               currency: kycCurrency,
@@ -1744,7 +1744,7 @@ CLSynergy (Pvt) Ltd`
           origin: inquiry.origin,
           destination: bkPod || inquiry.destination,
           is_urgent: false,
-          booked_by: 6,
+          booked_by: BACKEND_ACTOR_ID,
           notes: [
             `Containers: ${ctnSummary}`,
             bkCommodity && `Commodity: ${bkCommodity}`,

@@ -866,7 +866,7 @@ function buildUnified(
 export async function apiFetchAllRates(): Promise<UnifiedRate[]> {
   const [liners, lanes, tariffs, nacs, contracted, vessels, faks, specials] = await Promise.all([
     get<LinerRecord[]>('/liners').catch((): LinerRecord[] => []),
-    get<TradeLaneRecord[]>('/trade-lanes').catch((): TradeLaneRecord[] => []),
+    get<TradeLaneRecord[]>('/liners/trade-lanes').catch((): TradeLaneRecord[] => []),
     get<TariffRaw[]>('/rates/tariff-rates').catch((): TariffRaw[]    => []),
     get<NacRaw[]>('/rates/nac-rates').catch(():       NacRaw[]       => []),
     get<ContractedRaw[]>('/rates/contracted-rates').catch((): ContractedRaw[] => []),
@@ -999,8 +999,19 @@ export function apiGetLiners(): Promise<LinerRecord[]> {
   return get<LinerRecord[]>('/liners')
 }
 
+/**
+ * Employee id sent to the backend for "who did this" fields (updated_by, booked_by,
+ * emp_id_*, employee_id).
+ *
+ * TEMPORARY: the test login accounts (ids 5-9) do not exist in the backend's employee
+ * table (ids 1-7), so the logged-in user's id cannot be sent yet - it would fail the
+ * foreign key. Replace this with the signed-in user's backend emp_id (from /auth/me)
+ * when real sign-in is added.
+ */
+export const BACKEND_ACTOR_ID = 6
+
 export function apiGetTradeLanes(): Promise<TradeLaneRecord[]> {
-  return get<TradeLaneRecord[]>('/trade-lanes')
+  return get<TradeLaneRecord[]>('/liners/trade-lanes')
 }
 
 /**
@@ -1012,7 +1023,7 @@ export function apiGetContactPersons(): Promise<ContactPersonRecord[]> {
 }
 
 export function apiGetEmployeesDb(): Promise<EmployeeRecord[]> {
-  return get<EmployeeRecord[]>('/employees')
+  return get<EmployeeRecord[]>('/auth/employees')
 }
 
 /** Fetch employees from auth module, optionally filtered by department. */

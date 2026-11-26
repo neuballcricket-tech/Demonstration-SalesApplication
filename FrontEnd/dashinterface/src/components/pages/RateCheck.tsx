@@ -10,7 +10,7 @@ import {
 } from '../../types'
 import { useRole } from '../../RoleContext'
 import { FIELD_LABEL, INPUT_STYLE } from './pageStyles'
-import { apiFetchAllRates, apiGetPorts, apiGetLiners, apiGetTradeLanes, apiGetEmployeesDb, apiGetAuthEmployees, apiCreateVesselRate, apiCreateFakRate, apiCreateSpecialRate, apiCreateRateRequest, apiPatchRateRequestProc, apiAddRateRequestOption, apiGetIncomingRateRequests, apiGetAggregateScheduleRates, apiGetEnrichedScheduleRates } from '../../api'
+import { apiFetchAllRates, apiGetPorts, apiGetLiners, apiGetTradeLanes, apiGetEmployeesDb, apiGetAuthEmployees, apiCreateVesselRate, apiCreateFakRate, apiCreateSpecialRate, apiCreateRateRequest, apiPatchRateRequestProc, apiAddRateRequestOption, apiGetIncomingRateRequests, apiGetAggregateScheduleRates, apiGetEnrichedScheduleRates, BACKEND_ACTOR_ID } from '../../api'
 
 type ManualRateTab = 'vessel-spot' | 'fak' | 'special'
 const MR_TAB_LABELS: Record<ManualRateTab, string> = { 'vessel-spot': 'Spot Rate', fak: 'FAK', special: 'Special Rate' }
@@ -902,6 +902,14 @@ export default function RateCheck({
   // Add current manual form as an entry to the brief
   const addEntryToBrief = () => {
     if (!canAddEntry) return
+    // The backend requires a valid trade lane on every rate
+    const trLnId = tradeLaneList.find(t => t.trln_name === mrTradeLane)?.trln_id
+    if (trLnId == null) {
+      onFlash(tradeLaneList.length === 0
+        ? 'No trade lanes are set up in the system yet, so rates cannot be saved. Ask an administrator to add trade lanes.'
+        : 'Select a trade lane before adding this rate.')
+      return
+    }
     const currentLinkedSchedule = linkedSchedule
     setManualEntries(prev => [...prev, {
       id: `mr-${Date.now()}`,
@@ -928,7 +936,6 @@ export default function RateCheck({
 
     // Persist to backend — one POST per filled container row
     const linId  = linerList.find(l => l.name === mrLiner)?.lin_id
-    const trLnId = 1
     const inqId  = inquiry.inq_id
     const filledContainers = mrContainers.filter(c => c.rate.trim())
 
@@ -1109,7 +1116,7 @@ export default function RateCheck({
     console.log('[RateCheck] createCsRateRequest:', { inq_id: inquiry.inq_id, is_given: isGiven, remark, selected_schedules: schedules })
     return apiCreateRateRequest({
       inq_id: inquiry.inq_id!,
-      emp_id_requested: 6, // beta: backend hardcodes emp_id 6
+      emp_id_requested: BACKEND_ACTOR_ID,
       is_given: isGiven,
       remark,
       selected_schedules: schedules ?? [],
