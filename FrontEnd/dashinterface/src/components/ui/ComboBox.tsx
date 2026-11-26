@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react'
-import { useEffect, useRef, useState, type AriaAttributes, type CSSProperties } from 'react'
+import { useRef, useState, type AriaAttributes, type CSSProperties } from 'react'
 import {
   Button,
   ComboBox as AriaComboBox,
@@ -87,14 +87,22 @@ export function ComboBox({
   )
   // Only used when allowsCustomValue is false: where to revert to on blur.
   const lastPicked = useRef<string | null>(items.some((i) => i.value === value) ? value : null)
-  // The key of an actual pick only (never derived from the text), cleared as soon as the text is edited.
-  const [pickedKey, setPickedKey] = useState<string | null>(null)
-  // Forget a pick once the text no longer shows it (edited or reset by the parent), so retyping
-  // that exact value later does not count as a pick and close the list. Done after render, so RAC
-  // still sees the pick (and closes the list) when the parent replaces the text, e.g. TagInput clearing it.
-  useEffect(() => {
-    if (pickedKey !== null && pickedKey !== value) setPickedKey(null)
-  }, [pickedKey, value])
+  // The key of an actual pick only (never derived from the text). `shownWith` is the text it was first
+  // rendered with: RAC closes the list only once it sees the key in a committed render, so the pick is kept
+  // even when the parent replaces the text in the same update (TagInput clears it).
+  const [pick, setPick] = useState<{ key: string; shownWith?: string } | null>(null)
+  if (pick && pick.shownWith === undefined) {
+    setPick({ key: pick.key, shownWith: value })
+  } else if (
+    pick &&
+    value !== pick.key &&
+    (value !== pick.shownWith || items.some((i) => i.value === pick.key))
+  ) {
+    // Forget the pick once the text is edited or reset by the parent, so retyping that exact value later
+    // does not count as a pick and close the list; also once a replaced pick is listed again (a removed tag).
+    setPick(null)
+  }
+  const pickedKey = pick?.key ?? null
 
   return (
     <AriaComboBox
@@ -110,7 +118,7 @@ export function ComboBox({
       // RAC reports a pick here, not through onInputChange, and reports null when the text is edited.
       selectedKey={pickedKey}
       onSelectionChange={(key) => {
-        setPickedKey(key === null ? null : String(key))
+        setPick(key === null ? null : { key: String(key) })
         if (key === null) return
         lastPicked.current = String(key)
         onChange(String(key))

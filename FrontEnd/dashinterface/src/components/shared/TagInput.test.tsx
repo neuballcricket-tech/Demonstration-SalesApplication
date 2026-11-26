@@ -81,6 +81,17 @@ describe('TagInput', () => {
     expect(screen.getByRole('combobox')).toHaveFocus()
   })
 
+  it('a picked then removed tag is listed again as unselected', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.type(screen.getByRole('combobox'), 'ms')
+    await user.click(screen.getByRole('option', { name: 'MSC' }))
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
+    // Removing the last tag returns focus to the input, which opens the list
+    await user.click(screen.getByRole('button', { name: 'Remove MSC' }))
+    expect(await screen.findByRole('option', { name: 'MSC' })).toHaveAttribute('aria-selected', 'false')
+  })
+
   it('clicking the field box focuses the input; chips sit inside the box', async () => {
     const user = userEvent.setup()
     render(<Harness initial={['MSC']} />)
