@@ -155,6 +155,8 @@ interface PortComboboxProps {
   onChange: (code: string) => void
   placeholder?: string
   id?: string
+  /** Names the input from a visible label (e.g. Field's), taking precedence over the placeholder-based aria-label. */
+  'aria-labelledby'?: string
   style?: React.CSSProperties
 }
 
@@ -162,7 +164,7 @@ interface PortComboboxProps {
 // ComboBox must not filter it again.
 const showAll = () => true
 
-export default function PortCombobox({ value, onChange, placeholder, id, style }: PortComboboxProps) {
+export default function PortCombobox({ value, onChange, placeholder, id, 'aria-labelledby': ariaLabelledby, style }: PortComboboxProps) {
   // inputText is what shows in the input:
   //   - While searching: raw query (e.g. "hamb")
   //   - When committed: the UNLOCODE (e.g. "DEHAM"), with its label in the message below
@@ -298,6 +300,7 @@ export default function PortCombobox({ value, onChange, placeholder, id, style }
         onChange={handleInputChange}
         placeholder={placeholder ?? 'Type port name or UNLOCODE'}
         aria-label={placeholder ?? 'Type port name or UNLOCODE'}
+        aria-labelledby={ariaLabelledby}
         aria-describedby={validation.status === 'idle' ? undefined : messageId}
         isInvalid={validation.status === 'invalid'}
         id={id}

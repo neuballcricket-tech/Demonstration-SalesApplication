@@ -11,9 +11,13 @@ interface TagInputProps {
   /** Optional display formatter — shown in dropdown and tag chips while the
    *  raw suggestion string is stored as the actual value. */
   formatLabel?: (value: string) => string
+  /** Lands on the text input, so a `<label htmlFor>` (e.g. from `Field`) points at it. */
+  id?: string
+  /** Names the input from a visible label, taking precedence over the placeholder-based aria-label. */
+  'aria-labelledby'?: string
 }
 
-export default function TagInput({ values, onChange, suggestions, placeholder, formatLabel }: TagInputProps) {
+export default function TagInput({ values, onChange, suggestions, placeholder, formatLabel, id, 'aria-labelledby': ariaLabelledby }: TagInputProps) {
   const [input, setInput] = useState('')
   const wrapperRef = useRef<HTMLDivElement>(null)
 
@@ -115,6 +119,8 @@ export default function TagInput({ values, onChange, suggestions, placeholder, f
         onPick={addValue}
         placeholder={values.length === 0 ? inputName : ''}
         aria-label={inputName}
+        aria-labelledby={ariaLabelledby}
+        id={id}
         menuTrigger="focus"
         className="min-w-40 flex-1"
         inputClassName="h-7 border-0 bg-transparent px-1 shadow-none"

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { ArrowLeft, Plus, Save } from 'lucide-react'
+import { useState, useEffect, type ReactNode } from 'react'
+import { ArrowLeft, Plus, Save, X } from 'lucide-react'
 import {
   SBUS, INQUIRY_PRIORITIES, COMMODITY_TYPES, CONTAINER_TYPES, CONTAINER_TYPE_LABELS,
   emptyContainerLine, linerDisplay,
@@ -12,7 +12,46 @@ import { apiGetLiners } from '../../api'
 import TagInput from '../shared/TagInput'
 import PortCombobox from '../shared/PortCombobox'
 import SearchCombobox from '../shared/SearchCombobox'
-import { COLOR } from '../ui/tokens'
+import { Button, DatePicker, Field, Input, NumberInput, Select, Tooltip, type Option } from '../ui'
+import { cn } from '../../lib/cn'
+
+const CHANNELS = ['Email', 'WhatsApp', 'Phone', 'WeChat'] as const
+type Channel = typeof CHANNELS[number]
+
+const CHANNEL_OPTIONS: Option[] = CHANNELS.map(c => ({ value: c, label: c }))
+const PRIORITY_OPTIONS: Option[] = INQUIRY_PRIORITIES.map(p => ({ value: p, label: p }))
+const SBU_OPTIONS: Option[] = SBUS.map(s => ({ value: s, label: s }))
+const DELIVERY_OPTIONS: Option[] = [
+  { value: 'port-to-port', label: 'Port to Port' },
+  { value: 'door-to-door', label: 'Door to Door' },
+  { value: 'port-to-door', label: 'Port to Door' },
+  { value: 'door-to-port', label: 'Door to Port' },
+]
+const COMMODITY_OPTIONS: Option[] = COMMODITY_TYPES.map(c => ({ value: c, label: c }))
+const CONTAINER_OPTIONS: Option[] = CONTAINER_TYPES.map(c => ({ value: c, label: CONTAINER_TYPE_LABELS[c] }))
+const FCL_OPTIONS: Option[] = [{ value: 'FCL', label: 'FCL' }, { value: 'LCL', label: 'LCL' }]
+
+/** A titled form card: navy header bar, then a two-column field grid. */
+function Section({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="overflow-hidden rounded-card border border-line-soft bg-surface">
+      <div className="flex min-h-9 items-center justify-between bg-primary px-4 py-1">
+        <h2 className="m-0 text-label font-bold uppercase tracking-label text-white">{title}</h2>
+        {action}
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3 p-4">{children}</div>
+    </section>
+  )
+}
+
+/** Sub-heading that splits a section's grid. */
+function SubHead({ children }: { children: ReactNode }) {
+  return (
+    <h3 className="col-span-full m-0 mt-2 border-b border-line-soft pb-2 text-label font-bold uppercase tracking-label text-fg-muted">
+      {children}
+    </h3>
+  )
+}
 
 interface NewInquiryProps {
   clientList: ClientRecord[]
@@ -28,7 +67,7 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
   const [niCustomer, setNiCustomer] = useState('')
   const [saving, setSaving] = useState(false)
   const [niOrigin, setNiOrigin] = useState('')
-  const [niChannel, setNiChannel] = useState<'WhatsApp' | 'Email' | 'Phone' | 'WeChat'>('Email')
+  const [niChannel, setNiChannel] = useState<Channel>('Email')
   const [niSbu, setNiSbu] = useState<SBU>('Ocean Imports')
   const [niDelivery, setNiDelivery] = useState<DeliveryType>('port-to-port')
   const [niPriority, setNiPriority] = useState<InquiryPriority>('Medium')
@@ -152,335 +191,195 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
 
   const canSave = !!niCustomer.trim()
 
-  // Style-guide tokens
-  const labelCell: React.CSSProperties = { padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }
-  const labelCellNarrow: React.CSSProperties = { ...labelCell, padding: '8px 8px' }
-  const valCell: React.CSSProperties = { padding: '4px 8px' }
-  const valCellBR: React.CSSProperties = { ...valCell, borderRight: '1px solid var(--border)' }
-  const inputStyle: React.CSSProperties = { width: '100%', border: 'none', background: 'transparent', padding: '4px 0' }
-  const rowBorder: React.CSSProperties = { borderBottom: '1px solid var(--border)' }
-
   const channelLabel = niChannel === 'Email' ? 'Email Address' : niChannel === 'WhatsApp' ? 'WhatsApp Number' : niChannel === 'Phone' ? 'Phone Number' : 'WeChat ID'
 
+  const contactItems = (matchedCli
+    ? contactPersonList.filter(cp => cp.cli_id === matchedCli.cli_id)
+    : contactPersonList
+  ).map(cp => ({ label: cp.name ?? '', sublabel: cp.email ?? undefined }))
+
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+    <div className="mx-auto max-w-[1200px] p-6">
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <button className="lt-icon-btn" onClick={onGoBack} title="Back to Workspace" style={{ padding: 6 }}>
-          <ArrowLeft size={18} />
-        </button>
+      <div className="mb-5 flex items-center gap-3">
+        <Tooltip content="Back to Workspace">
+          <Button size="sm" className="w-7 px-0" icon={<ArrowLeft size={16} aria-hidden="true" />} aria-label="Back to Workspace" onClick={onGoBack} />
+        </Tooltip>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Plus size={18} style={{ color: COLOR.primary }} /> New Inquiry
+          <div className="flex items-center gap-2 text-title font-bold text-fg">
+            <Plus size={18} className="text-primary" aria-hidden="true" /> New Inquiry
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+          <div className="mt-0.5 text-control text-fg-muted">
             Log a new shipping inquiry — it enters the workflow at Rate Check immediately. Save to submit and add another.
           </div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="flex flex-col gap-4">
 
         {/* ═══════════════ INQUIRY DETAILS ═══════════════ */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-          {/* Header bar */}
-          <div style={{ padding: '8px 14px', background: 'var(--accent)', borderRadius: '8px 8px 0 0', marginBottom: 1 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>INQUIRY DETAILS</span>
-          </div>
-
-          {/* Fields table */}
-          <div style={{ border: '1px solid var(--border)', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
-            {/* Customer — full width */}
-            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', ...rowBorder }}>
-              <div style={labelCell}>
-                Customer <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span>
-                {matchedCli && <span style={{ marginLeft: 6, fontSize: 11, color: '#16a34a', fontWeight: 500 }}>✓ existing</span>}
-              </div>
-              <div style={valCell}>
-                <SearchCombobox
-                  value={niCustomer}
-                  onChange={val => { setNiCustomer(val); setNiContactPerson('') }}
-                  items={clientList.map(cl => ({ label: cl.name, sublabel: cl.city ?? undefined }))}
-                  placeholder="Type or select customer name"
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            {/* Contact Person + Designation (hidden when matchedCp) */}
-            {!matchedCp ? (
-              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
-                <div style={labelCell}>
-                  Contact Person
-                </div>
-                <div style={valCellBR}>
-                  <SearchCombobox
-                    value={niContactPerson}
-                    onChange={setNiContactPerson}
-                    items={(matchedCli
-                      ? contactPersonList.filter(cp => cp.cli_id === matchedCli.cli_id)
-                      : contactPersonList
-                    ).map(cp => ({ label: cp.name ?? '', sublabel: cp.email ?? undefined }))}
-                    placeholder="Name of the person making the inquiry"
-                  />
-                </div>
-                <div style={labelCellNarrow}>Designation</div>
-                <div style={valCell}>
-                  <input className="lt-input" style={inputStyle} value={niContactDesignation} onChange={e => setNiContactDesignation(e.target.value)} placeholder="e.g. Logistics Manager" />
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', ...rowBorder }}>
-                <div style={labelCell}>
-                  Contact Person
-                  <span style={{ marginLeft: 6, fontSize: 11, color: '#16a34a', fontWeight: 500 }}>✓ existing</span>
-                </div>
-                <div style={valCell}>
-                  <SearchCombobox
-                    value={niContactPerson}
-                    onChange={setNiContactPerson}
-                    items={(matchedCli
-                      ? contactPersonList.filter(cp => cp.cli_id === matchedCli.cli_id)
-                      : contactPersonList
-                    ).map(cp => ({ label: cp.name ?? '', sublabel: cp.email ?? undefined }))}
-                    placeholder="Name of the person making the inquiry"
-                  />
-                </div>
-              </div>
+        <Section title="Inquiry Details">
+          <Field label="Customer" required hint={matchedCli ? '✓ existing' : undefined} className="col-span-full">
+            {ids => (
+              <SearchCombobox
+                id={ids.id}
+                aria-labelledby={ids['aria-labelledby']}
+                value={niCustomer}
+                onChange={val => { setNiCustomer(val); setNiContactPerson('') }}
+                items={clientList.map(cl => ({ label: cl.name, sublabel: cl.city ?? undefined }))}
+                placeholder="Type or select customer name"
+                autoFocus
+              />
             )}
+          </Field>
 
-            {/* Channel + Channel ID — hidden when matchedCp */}
-            {!matchedCp && (
-              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
-                <div style={labelCell}>Channel <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
-                <div style={valCellBR}>
-                  <select className="lt-input" style={inputStyle} value={niChannel} onChange={e => { setNiChannel(e.target.value as 'WhatsApp' | 'Email' | 'Phone' | 'WeChat'); setNiContactChannelId('') }}>
-                    <option>Email</option><option>WhatsApp</option><option>Phone</option><option>WeChat</option>
-                  </select>
-                </div>
-                <div style={labelCellNarrow}>{channelLabel}</div>
-                <div style={valCell}>
-                  <input className="lt-input" style={inputStyle}
+          {/* Contact Person + Designation (designation hidden when matchedCp) */}
+          <Field label="Contact Person" hint={matchedCp ? '✓ existing' : undefined} className={cn(matchedCp && 'col-span-full')}>
+            {ids => (
+              <SearchCombobox
+                id={ids.id}
+                aria-labelledby={ids['aria-labelledby']}
+                value={niContactPerson}
+                onChange={setNiContactPerson}
+                items={contactItems}
+                placeholder="Name of the person making the inquiry"
+              />
+            )}
+          </Field>
+          {!matchedCp && (
+            <Field label="Designation">
+              {ids => <Input {...ids} value={niContactDesignation} onChange={e => setNiContactDesignation(e.target.value)} placeholder="e.g. Logistics Manager" />}
+            </Field>
+          )}
+
+          {/* Channel + Channel ID — hidden when matchedCp */}
+          {!matchedCp && (
+            <>
+              <Field label="Channel" required>
+                {ids => <Select {...ids} value={niChannel} onChange={v => { setNiChannel(v as Channel); setNiContactChannelId('') }} options={CHANNEL_OPTIONS} />}
+              </Field>
+              <Field label={channelLabel}>
+                {ids => (
+                  <Input {...ids}
                     type={niChannel === 'Email' ? 'email' : niChannel === 'WeChat' ? 'text' : 'tel'}
                     value={niContactChannelId} onChange={e => setNiContactChannelId(e.target.value)}
                     placeholder={niChannel === 'Email' ? 'e.g. john@acme.com' : niChannel === 'WhatsApp' ? 'e.g. +94 77 123 4567' : niChannel === 'Phone' ? 'e.g. +94 11 234 5678' : 'e.g. john_doe'}
                   />
-                </div>
-              </div>
-            )}
+                )}
+              </Field>
+            </>
+          )}
 
-            {/* ─── ROUTING divider ─── */}
-            <div style={{ padding: '7px 12px', background: 'rgba(44,44,130,0.12)', ...rowBorder }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: 0.4 }}>ROUTING</span>
-            </div>
+          <SubHead>Routing</SubHead>
 
-            {/* Origin + Priority */}
-            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
-              <div style={labelCell}>Origin <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
-              <div style={valCellBR}>
-                <PortCombobox value={niOrigin} onChange={setNiOrigin} placeholder="e.g. Colombo/Sri Lanka" />
-              </div>
-              <div style={labelCellNarrow}>Priority <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
-              <div style={valCell}>
-                <select className="lt-input" style={inputStyle} value={niPriority} onChange={e => setNiPriority(e.target.value as InquiryPriority)}>
-                  {INQUIRY_PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </div>
-            </div>
+          <Field label="Origin" required>
+            {ids => <PortCombobox id={ids.id} aria-labelledby={ids['aria-labelledby']} value={niOrigin} onChange={setNiOrigin} placeholder="e.g. Colombo/Sri Lanka" />}
+          </Field>
+          <Field label="Priority" required>
+            {ids => <Select {...ids} value={niPriority} onChange={v => setNiPriority(v as InquiryPriority)} options={PRIORITY_OPTIONS} />}
+          </Field>
 
-            {/* SBU + Delivery Type */}
-            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
-              <div style={labelCell}>SBU <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
-              <div style={valCellBR}>
-                <select className="lt-input" style={inputStyle} value={niSbu} onChange={e => setNiSbu(e.target.value as SBU)}>
-                  {SBUS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div style={labelCellNarrow}>Delivery Type <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
-              <div style={valCell}>
-                <select className="lt-input" style={inputStyle} value={niDelivery} onChange={e => setNiDelivery(e.target.value as DeliveryType)}>
-                  <option value="port-to-port">Port to Port</option>
-                  <option value="door-to-door">Door to Door</option>
-                  <option value="port-to-door">Port to Door</option>
-                  <option value="door-to-port">Door to Port</option>
-                </select>
-              </div>
-            </div>
+          <Field label="SBU" required>
+            {ids => <Select {...ids} value={niSbu} onChange={v => setNiSbu(v as SBU)} options={SBU_OPTIONS} />}
+          </Field>
+          <Field label="Delivery Type" required>
+            {ids => <Select {...ids} value={niDelivery} onChange={v => setNiDelivery(v as DeliveryType)} options={DELIVERY_OPTIONS} />}
+          </Field>
 
-            {/* Incoterm + Cargo Ready Date */}
-            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
-              <div style={labelCell}>Incoterm</div>
-              <div style={valCellBR}>
-                <input className="lt-input" style={inputStyle} value={niIncoterm} onChange={e => setNiIncoterm(e.target.value)} placeholder="e.g. FOB, CIF, EXW, DDP" />
-              </div>
-              <div style={labelCellNarrow}>Cargo Ready</div>
-              <div style={valCell}>
-                <input className="lt-input" type="date" style={inputStyle} value={niCargoReadyDate} onChange={e => setNiCargoReadyDate(e.target.value)} />
-              </div>
-            </div>
+          <Field label="Incoterm">
+            {ids => <Input {...ids} value={niIncoterm} onChange={e => setNiIncoterm(e.target.value)} placeholder="e.g. FOB, CIF, EXW, DDP" />}
+          </Field>
+          <Field label="Cargo Ready">
+            {ids => <DatePicker {...ids} value={niCargoReadyDate} onChange={setNiCargoReadyDate} />}
+          </Field>
 
-            {/* Preferred Rate + Preferred Liners */}
-            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
-              <div style={labelCell}>Preferred Rate</div>
-              <div style={valCellBR}>
-                <input className="lt-input" type="number" style={inputStyle} value={niPreferredRate} onChange={e => setNiPreferredRate(e.target.value === '' ? '' : Number(e.target.value))} min={0} placeholder="e.g. 1200 USD" />
-              </div>
-              <div style={labelCellNarrow}>Pref. Liners</div>
-              <div style={valCell}>
-                <TagInput values={niPreferredLiners} onChange={setNiPreferredLiners} suggestions={linerList.map(l => l.name)} placeholder="Type to add liners..." formatLabel={formatLinerLabel} />
-              </div>
-            </div>
+          <Field label="Preferred Rate">
+            {ids => <NumberInput {...ids} value={niPreferredRate} onChange={e => setNiPreferredRate(e.target.value === '' ? '' : Number(e.target.value))} min={0} placeholder="e.g. 1200 USD" />}
+          </Field>
+          <Field label="Pref. Liners">
+            {ids => <TagInput id={ids.id} aria-labelledby={ids['aria-labelledby']} values={niPreferredLiners} onChange={setNiPreferredLiners} suggestions={linerList.map(l => l.name)} placeholder="Type to add liners..." formatLabel={formatLinerLabel} />}
+          </Field>
 
-            {/* Remarks — full width, last row */}
-            <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr' }}>
-              <div style={labelCell}>Remarks</div>
-              <div style={valCell}>
-                <input className="lt-input" style={inputStyle} value={niRemark} onChange={e => setNiRemark(e.target.value)} placeholder="Any special instructions or notes" />
-              </div>
-            </div>
-          </div>
-        </div>
+          <Field label="Remarks" className="col-span-full">
+            {ids => <Input {...ids} value={niRemark} onChange={e => setNiRemark(e.target.value)} placeholder="Any special instructions or notes" />}
+          </Field>
+        </Section>
 
         {/* ═══════════════ CONTAINER SECTIONS ═══════════════ */}
         {containers.map((c, idx) => (
-          <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {/* Container header bar */}
-            <div style={{ padding: '8px 14px', background: 'var(--accent)', borderRadius: '8px 8px 0 0', marginBottom: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#fff', letterSpacing: 0.5 }}>CONTAINER {idx + 1}</span>
-              {containers.length > 1 && (
-                <button type="button" onClick={() => removeContainer(idx)} title="Remove container"
-                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.7)', fontSize: 14, padding: '0 2px', lineHeight: 1 }}>
-                  ×
-                </button>
-              )}
-            </div>
+          <Section
+            key={idx}
+            title={`Container ${idx + 1}`}
+            action={containers.length > 1 && (
+              <Tooltip content="Remove container">
+                <Button variant="ghost" size="sm" className="w-7 px-0 text-white hover:bg-primary-hover" icon={<X size={14} aria-hidden="true" />} aria-label={`Remove container ${idx + 1}`} onClick={() => removeContainer(idx)} />
+              </Tooltip>
+            )}
+          >
+            <Field label="Commodity Type" required>
+              {ids => <Select {...ids} value={c.commodityType} onChange={v => updateContainer(idx, { commodityType: v as CommodityType })} options={COMMODITY_OPTIONS} />}
+            </Field>
+            <Field label="Commodity">
+              {ids => <Input {...ids} value={c.commodityName} onChange={e => updateContainer(idx, { commodityName: e.target.value })} placeholder="e.g. Cotton T-shirts" />}
+            </Field>
 
-            {/* Container fields table */}
-            <div style={{ border: '1px solid var(--border)', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
-              {/* Commodity Type + Commodity Name */}
-              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
-                <div style={labelCell}>Commodity Type <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
-                <div style={valCellBR}>
-                  <select className="lt-input" style={inputStyle} value={c.commodityType} onChange={e => updateContainer(idx, { commodityType: e.target.value as CommodityType })}>
-                    {COMMODITY_TYPES.map(ct => <option key={ct} value={ct}>{ct}</option>)}
-                  </select>
-                </div>
-                <div style={labelCellNarrow}>Commodity</div>
-                <div style={valCell}>
-                  <input className="lt-input" style={inputStyle} value={c.commodityName} onChange={e => updateContainer(idx, { commodityName: e.target.value })} placeholder="e.g. Cotton T-shirts" />
-                </div>
-              </div>
+            <Field label="Destination" required>
+              {ids => <PortCombobox id={ids.id} aria-labelledby={ids['aria-labelledby']} value={c.destination} onChange={dest => updateContainer(idx, { destination: dest })} placeholder="e.g. Hamburg/Germany" />}
+            </Field>
+            <Field label="Container" required>
+              {ids => <Select {...ids} value={c.containerType} onChange={v => updateContainer(idx, { containerType: v as ContainerType })} options={CONTAINER_OPTIONS} />}
+            </Field>
 
-              {/* Destination + Container Type */}
-              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
-                <div style={labelCell}>Destination <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
-                <div style={valCellBR}>
-                  <PortCombobox value={c.destination} onChange={dest => updateContainer(idx, { destination: dest })} placeholder="e.g. Hamburg/Germany" />
-                </div>
-                <div style={labelCellNarrow}>Container <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
-                <div style={valCell}>
-                  <select className="lt-input" style={inputStyle} value={c.containerType} onChange={e => updateContainer(idx, { containerType: e.target.value as ContainerType })}>
-                    {CONTAINER_TYPES.map(ct => <option key={ct} value={ct}>{CONTAINER_TYPE_LABELS[ct]}</option>)}
-                  </select>
-                </div>
-              </div>
+            <Field label="Qty" required>
+              {ids => <NumberInput {...ids} value={c.quantity} onChange={e => updateContainer(idx, { quantity: Math.max(1, Number(e.target.value)) })} min={1} />}
+            </Field>
+            <Field label="Weight (kg)">
+              {ids => <NumberInput {...ids} value={c.weight} onChange={e => updateContainer(idx, { weight: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 18000" />}
+            </Field>
 
-              {/* Qty + Weight */}
-              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
-                <div style={labelCell}>Qty <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
-                <div style={valCellBR}>
-                  <input className="lt-input" type="number" style={inputStyle} value={c.quantity} onChange={e => updateContainer(idx, { quantity: Math.max(1, Number(e.target.value)) })} min={1} />
-                </div>
-                <div style={labelCellNarrow}>Weight (kg)</div>
-                <div style={valCell}>
-                  <input className="lt-input" type="number" style={inputStyle} value={c.weight} onChange={e => updateContainer(idx, { weight: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 18000" />
-                </div>
-              </div>
+            <Field label="FCL / LCL" required>
+              {ids => <Select {...ids} value={c.isFcl ? 'FCL' : 'LCL'} onChange={v => updateContainer(idx, { isFcl: v === 'FCL' })} options={FCL_OPTIONS} />}
+            </Field>
+            <Field label="Zip Code">
+              {ids => <Input {...ids} value={c.zipCode} onChange={e => updateContainer(idx, { zipCode: e.target.value })} placeholder="e.g. 20095" />}
+            </Field>
 
-              {/* FCL/LCL + Zip Code */}
-              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
-                <div style={labelCell}>FCL / LCL <span style={{ color: '#dc2626', marginLeft: 2 }}>*</span></div>
-                <div style={valCellBR}>
-                  <select className="lt-input" style={inputStyle} value={c.isFcl ? 'FCL' : 'LCL'} onChange={e => updateContainer(idx, { isFcl: e.target.value === 'FCL' })}>
-                    <option value="FCL">FCL</option>
-                    <option value="LCL">LCL</option>
-                  </select>
-                </div>
-                <div style={labelCellNarrow}>Zip Code</div>
-                <div style={valCell}>
-                  <input className="lt-input" style={inputStyle} value={c.zipCode} onChange={e => updateContainer(idx, { zipCode: e.target.value })} placeholder="e.g. 20095" />
-                </div>
-              </div>
+            <Field label="Free Time (days)">
+              {ids => <NumberInput {...ids} value={c.freeTime} onChange={e => updateContainer(idx, { freeTime: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 14" />}
+            </Field>
+            <Field label="Temp. (°C)">
+              {ids => <NumberInput {...ids} value={c.temperature ?? ''} onChange={e => updateContainer(idx, { temperature: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="e.g. -18" />}
+            </Field>
 
-              {/* Free Time + Temperature */}
-              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 110px 1fr', ...rowBorder }}>
-                <div style={labelCell}>Free Time (days)</div>
-                <div style={valCellBR}>
-                  <input className="lt-input" type="number" style={inputStyle} value={c.freeTime} onChange={e => updateContainer(idx, { freeTime: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 14" />
-                </div>
-                <div style={labelCellNarrow}>Temp. (°C)</div>
-                <div style={valCell}>
-                  <input className="lt-input" type="number" style={inputStyle} value={c.temperature ?? ''} onChange={e => updateContainer(idx, { temperature: e.target.value === '' ? undefined : Number(e.target.value) })} placeholder="e.g. -18" />
-                </div>
-              </div>
+            <Field label="HS Code" className="col-span-full">
+              {ids => <Input {...ids} value={c.hs_code ?? ''} onChange={e => updateContainer(idx, { hs_code: e.target.value || undefined })} placeholder="e.g. 6109.10" />}
+            </Field>
 
-              {/* HS Code — single value */}
-              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', ...rowBorder }}>
-                <div style={labelCell}>HS Code</div>
-                <div style={valCell}>
-                  <input className="lt-input" style={inputStyle} value={c.hs_code ?? ''} onChange={e => updateContainer(idx, { hs_code: e.target.value || undefined })} placeholder="e.g. 6109.10" />
-                </div>
-              </div>
+            <SubHead>Additional Details</SubHead>
 
-              {/* ─── ADDITIONAL DETAILS divider ─── */}
-              <div style={{ padding: '7px 12px', background: 'rgba(44,44,130,0.12)', ...rowBorder }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: 0.4 }}>ADDITIONAL DETAILS</span>
-              </div>
-
-              {/* Description — full width */}
-              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', ...rowBorder }}>
-                <div style={labelCell}>Description</div>
-                <div style={valCell}>
-                  <input className="lt-input" style={inputStyle} value={c.description ?? ''} onChange={e => updateContainer(idx, { description: e.target.value || undefined })} placeholder="Brief description of the goods" />
-                </div>
-              </div>
-
-              {/* Delivery Address — full width */}
-              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', ...rowBorder }}>
-                <div style={labelCell}>Delivery Address</div>
-                <div style={valCell}>
-                  <input className="lt-input" style={inputStyle} value={c.address ?? ''} onChange={e => updateContainer(idx, { address: e.target.value || undefined })} placeholder="Door delivery address (door-to-door only)" />
-                </div>
-              </div>
-
-              {/* Door Agent — full width, last row (no borderBottom) */}
-              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr' }}>
-                <div style={labelCell}>Door Agent</div>
-                <div style={valCell}>
-                  <TagInput values={c.doorAgents} onChange={doorAgents => updateContainer(idx, { doorAgents })} suggestions={linerList.map(l => l.name)} placeholder="Type to add door agents..." formatLabel={formatLinerLabel} />
-                </div>
-              </div>
-            </div>
-          </div>
+            <Field label="Description" className="col-span-full">
+              {ids => <Input {...ids} value={c.description ?? ''} onChange={e => updateContainer(idx, { description: e.target.value || undefined })} placeholder="Brief description of the goods" />}
+            </Field>
+            <Field label="Delivery Address" className="col-span-full">
+              {ids => <Input {...ids} value={c.address ?? ''} onChange={e => updateContainer(idx, { address: e.target.value || undefined })} placeholder="Door delivery address (door-to-door only)" />}
+            </Field>
+            <Field label="Door Agent" className="col-span-full">
+              {ids => <TagInput id={ids.id} aria-labelledby={ids['aria-labelledby']} values={c.doorAgents} onChange={doorAgents => updateContainer(idx, { doorAgents })} suggestions={linerList.map(l => l.name)} placeholder="Type to add door agents..." formatLabel={formatLinerLabel} />}
+            </Field>
+          </Section>
         ))}
 
         {/* Add Container button */}
-        <button type="button" onClick={addContainer}
-          style={{ border: '1px dashed var(--border)', borderRadius: 4, background: 'transparent', cursor: 'pointer', padding: '6px 12px', fontSize: 11, color: 'var(--accent)', fontWeight: 600, alignSelf: 'flex-start' }}>
-          + Add Container
-        </button>
+        <Button size="sm" className="self-start" icon={<Plus size={14} aria-hidden="true" />} onClick={addContainer}>
+          Add Container
+        </Button>
 
         {/* Submit area */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
-          <button className="db-btn" style={{ fontSize: 12 }} onClick={onGoBack}>Back to Workspace</button>
-          <button
-            className="db-btn primary"
-            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, opacity: canSave ? 1 : 0.5, cursor: canSave ? 'pointer' : 'not-allowed' }}
-            disabled={!canSave || saving}
-            onClick={handleSave}
-          >
-            <Save size={12} /> {saving ? 'Saving…' : 'Save Inquiry'}
-          </button>
+        <div className="flex justify-end gap-2">
+          <Button onClick={onGoBack}>Back to Workspace</Button>
+          <Button variant="primary" icon={<Save size={14} aria-hidden="true" />} isPending={saving} disabled={!canSave} onClick={handleSave}>
+            {saving ? 'Saving…' : 'Save Inquiry'}
+          </Button>
         </div>
 
       </div>

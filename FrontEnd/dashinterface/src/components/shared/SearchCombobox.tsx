@@ -21,6 +21,8 @@ interface SearchComboboxProps {
   onChange: (value: string) => void
   placeholder?: string
   id?: string
+  /** Names the input from a visible label (e.g. Field's), taking precedence over the placeholder-based aria-label. */
+  'aria-labelledby'?: string
   style?: React.CSSProperties
   autoFocus?: boolean
 }
@@ -39,7 +41,7 @@ function toComboBoxItems(items: SearchItem[]): ComboBoxItem[] {
 }
 
 export default function SearchCombobox({
-  items, value, onChange, placeholder, id, style, autoFocus,
+  items, value, onChange, placeholder, id, 'aria-labelledby': ariaLabelledby, style, autoFocus,
 }: SearchComboboxProps) {
   return (
     <ComboBox
@@ -48,6 +50,7 @@ export default function SearchCombobox({
       onChange={onChange}
       placeholder={placeholder}
       aria-label={placeholder}
+      aria-labelledby={ariaLabelledby}
       id={id}
       style={style}
       autoFocus={autoFocus}
