@@ -3,9 +3,51 @@ name: Build and deploy
 on:
   push:
     branches: [master]
+  pull_request:
+    branches: [master]
+
+# Never run two deploys of the same branch at once
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  # Quality gate: every push and pull request into master must pass this
+  # before anything is built or deployed.
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: FrontEnd/dashinterface
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: FrontEnd/dashinterface/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc -b
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
   build-and-push:
+    needs: verify
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
