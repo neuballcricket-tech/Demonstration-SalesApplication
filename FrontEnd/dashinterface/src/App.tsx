@@ -97,23 +97,32 @@ function mapInquiryRows(rows: InquiryRow[]): Inquiry[] {
   const result: Inquiry[] = []
   for (const [inq_id, group] of grouped) {
     const h = group[0]
-    const containers: ContainerLine[] = group.map(r => ({
-      containerType: (BE_CONTAINER_TYPE[r.container_type ?? ''] ?? r.container_type ?? '20GP') as ContainerLine['containerType'],
-      quantity: r.qty ?? 1,
-      weight: r.commodity_weight ?? '',
-      commodityType: (BE_COM_TYPE[r.commodity_type ?? ''] ?? r.commodity_type ?? 'Miscellaneous manufactured articles — furniture, toys') as ContainerLine['commodityType'],
-      commodityName: r.commodity_name ?? '',
-      destination: r.destination,
-      isFcl: r.is_fully_loaded,
-      zipCode: r.zip_code ?? '',
-      doorAgents: [],
-      freeTime: r.free_time ? (parseInt(r.free_time, 10) || '') : '',
-      temperature: r.temperature ?? undefined,
-      address: r.address ?? undefined,
-      hs_code: r.hs_code ?? undefined,
-      com_id: r.com_id,
-      cont_id: r.cont_id,
-    }))
+    // Deduplicate by cont_id — the backend JOIN may produce multiple rows per
+    // container (e.g. commodity × container cross-product). Without this guard
+    // every duplicate row becomes a duplicate workspace work-item.
+    const seenContIds = new Set<number>()
+    const containers: ContainerLine[] = []
+    for (const r of group) {
+      if (seenContIds.has(r.cont_id)) continue
+      seenContIds.add(r.cont_id)
+      containers.push({
+        containerType: (BE_CONTAINER_TYPE[r.container_type ?? ''] ?? r.container_type ?? '20GP') as ContainerLine['containerType'],
+        quantity: r.qty ?? 1,
+        weight: r.commodity_weight ?? '',
+        commodityType: (BE_COM_TYPE[r.commodity_type ?? ''] ?? r.commodity_type ?? 'Miscellaneous manufactured articles — furniture, toys') as ContainerLine['commodityType'],
+        commodityName: r.commodity_name ?? '',
+        destination: r.destination,
+        isFcl: r.is_fully_loaded,
+        zipCode: r.zip_code ?? '',
+        doorAgents: [],
+        freeTime: r.free_time ? (parseInt(r.free_time, 10) || '') : '',
+        temperature: r.temperature ?? undefined,
+        address: r.address ?? undefined,
+        hs_code: r.hs_code ?? undefined,
+        com_id: r.com_id,
+        cont_id: r.cont_id,
+      })
+    }
 
     result.push({
       id: String(inq_id),

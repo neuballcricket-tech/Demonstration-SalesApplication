@@ -1229,11 +1229,17 @@ export function apiGetAllAggregateRates(): Promise<AggregateScheduleRatesRespons
 }
 
 /** Fetch enriched schedule+rates with optional client/inquiry/port-pair filters. */
-export function apiGetEnrichedScheduleRates(params?: { cli_id?: number; inq_id?: number; port_pair?: string }): Promise<AggregateScheduleRatesResponse> {
+export function apiGetEnrichedScheduleRates(params?: {
+  cli_id?: number; inq_id?: number; port_pair?: string;
+  cargo_ready_date?: string; weeks_out?: number; direct_only?: boolean;
+}): Promise<AggregateScheduleRatesResponse> {
   const qs = new URLSearchParams()
   if (params?.cli_id != null) qs.append('cli_id', String(params.cli_id))
   if (params?.inq_id != null) qs.append('inq_id', String(params.inq_id))
   if (params?.port_pair) qs.append('port_pair', params.port_pair)
+  if (params?.cargo_ready_date) qs.append('cargo_ready_date', params.cargo_ready_date)
+  if (params?.weeks_out != null) qs.append('weeks_out', String(params.weeks_out))
+  if (params?.direct_only) qs.append('direct_only', 'true')
   const query = qs.toString()
   return get<AggregateScheduleRatesResponse>(`/inquiries/schedules/enriched${query ? `?${query}` : ''}`)
 }
@@ -1263,6 +1269,53 @@ export function apiSearchSchedulesBulk(params: {
     }
     return all
   })
+}
+
+/** Save selected ocean schedules to the DB. Returns array of inserted schedule_id values. */
+export function apiSaveSchedules(schedules: OceanSchedule[]): Promise<number[]> {
+  const payload = schedules.map(s => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const obj: Record<string, any> = {
+      scac: s.scac,
+      lin_id: s.linId,
+      service_name: s.serviceName,
+      vessel_name: s.vesselName,
+      voyage_number: s.voyageNumber,
+      imo_number: s.imoNumber,
+      origin_unloc: s.originUnloc,
+      origin_country: s.originCountry,
+      origin_city_name: s.originCityName,
+      origin_subdivision: s.originSubdivision,
+      origin_terminal: s.originTerminal,
+      destination_unloc: s.destinationUnloc,
+      destination_country: s.destinationCountry,
+      destination_city_name: s.destinationCityName,
+      destination_subdivision: s.destinationSubdivision,
+      destination_terminal: s.destinationTerminal,
+      origin_departure_date: s.originDepartureDate,
+      destination_arrival_date: s.destinationArrivalDate,
+      estimated_terminal_cutoff: s.estimatedTerminalCutoff,
+      terminal_cutoff: s.terminalCutoff,
+      bk_cutoff: s.bkCutoff,
+      si_cutoff: s.siCutoff,
+      haz_bk_cutoff: s.hazBkCutoff,
+      vgm_cutoff: s.vgmCutoff,
+      reefer_cutoff: s.reeferCutoff,
+      total_duration: s.totalDuration,
+      schedule_type: s.scheduleType,
+      allows_roro: s.allowsRORO,
+      allows_breakbulk: s.allowsBreakbulk,
+      schedule_source: s.scheduleSource,
+      created_date: s.createdDate,
+      legs: s.legs,
+    }
+    // Strip null/undefined values so the backend doesn't reject required int fields
+    for (const key of Object.keys(obj)) {
+      if (obj[key] == null) delete obj[key]
+    }
+    return obj
+  })
+  return post<number[]>('/inquiries/schedules', payload)
 }
 
 // ---------------------------------------------------------------------------
