@@ -148,6 +148,25 @@ describe('ComboBox', () => {
     expect(screen.getByRole('option', { name: /Colombo/ })).toBeInTheDocument()
   })
 
+  it('trims the typed text before matching', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    // Untrimmed, "lanka " would not match the end of "… Sri Lanka"
+    await user.type(screen.getByRole('combobox'), 'lanka ')
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['ColomboSri Lanka'])
+    await user.clear(screen.getByRole('combobox'))
+    // Spaces alone act like an empty query: every item, not matches on the joining spaces
+    await user.type(screen.getByRole('combobox'), '  ')
+    expect(screen.getAllByRole('option')).toHaveLength(items.length)
+  })
+
+  it('inputClassName is merged onto the input', () => {
+    render(<ComboBox aria-label="Port" items={items} value="" onChange={() => {}} inputClassName="border-0 h-7" />)
+    const input = screen.getByRole('combobox')
+    expect(input).toHaveClass('border-0', 'h-7')
+    expect(input).not.toHaveClass('h-8')
+  })
+
   it('onPick is called with the value on a pick, not on typing', async () => {
     const onPick = vi.fn()
     const user = userEvent.setup()

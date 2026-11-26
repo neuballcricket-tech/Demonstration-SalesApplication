@@ -154,9 +154,27 @@ describe('PortCombobox', () => {
     expect(onChange).toHaveBeenLastCalledWith('')
     expect(screen.getByRole('combobox')).toHaveAttribute('aria-invalid', 'true')
     expect(screen.getByRole('combobox')).toHaveAccessibleDescription(/Port not recognised\./)
-    await user.click(screen.getByRole('button', { name: 'DEHAM' }))
+    const deham = screen.getByRole('button', { name: 'DEHAM' })
+    // Looks like a link: reset native button chrome, message-sized text
+    expect(deham).toHaveClass('border-none', 'bg-transparent', 'p-0', 'text-label', 'text-primary', 'underline')
+    await user.click(deham)
     expect(onChange).toHaveBeenLastCalledWith('DEHAM')
     expect(screen.getByText('✓ Hamburg, Germany')).toBeInTheDocument()
+    // A mouse click does not pull focus back into the input (which would reopen the list)
+    expect(screen.getByRole('combobox')).not.toHaveFocus()
+  })
+
+  it('a "Did you mean" button pressed from the keyboard returns focus to the input', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(<Harness onChange={onChange} />)
+    await user.type(screen.getByRole('combobox'), 'hamburg xyz')
+    await user.tab()
+    const deham = await screen.findByRole('button', { name: 'DEHAM' })
+    deham.focus()
+    await user.keyboard('{Enter}')
+    expect(onChange).toHaveBeenLastCalledWith('DEHAM')
+    expect(screen.getByRole('combobox')).toHaveFocus()
   })
 
   it('shows an external value as its code with the label message, and resets', async () => {

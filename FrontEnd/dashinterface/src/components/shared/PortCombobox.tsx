@@ -275,10 +275,12 @@ export default function PortCombobox({ value, onChange, placeholder, id, style }
     }
   }
 
-  function pickSimilar(port: CuratedPort) {
+  function pickSimilar(port: CuratedPort, e: React.MouseEvent<HTMLButtonElement>) {
+    // A keyboard press leaves focus on the button, which disappears once the port is valid, so
+    // return focus to the input. A mouse click (mousedown is prevented) leaves focus where it was.
+    const hadFocus = document.activeElement === e.currentTarget
     commitPort(port)
-    // The clicked button disappears once the port is valid, so return focus to the input
-    wrapperRef.current?.querySelector('input')?.focus()
+    if (hadFocus) wrapperRef.current?.querySelector('input')?.focus()
   }
 
   return (
@@ -318,9 +320,9 @@ export default function PortCombobox({ value, onChange, placeholder, id, style }
                   <span key={p.code}>
                     <button
                       type="button"
-                      className="text-primary underline"
+                      className="border-none bg-transparent p-0 text-label text-primary underline"
                       onMouseDown={e => e.preventDefault()}
-                      onClick={() => pickSimilar(p)}
+                      onClick={e => pickSimilar(p, e)}
                     >
                       {p.code}
                     </button>

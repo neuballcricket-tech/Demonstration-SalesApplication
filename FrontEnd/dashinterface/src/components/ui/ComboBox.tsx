@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react'
-import { useRef, useState, type AriaAttributes, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type AriaAttributes, type CSSProperties } from 'react'
 import {
   Button,
   ComboBox as AriaComboBox,
@@ -38,6 +38,8 @@ export interface ComboBoxProps {
   autoFocus?: boolean
   /** Applied to the root element, so width/flex classes size the whole control. */
   className?: string
+  /** Extra classes for the `<input>`, merged over the control look (e.g. borderless inside a field box). */
+  inputClassName?: string
   style?: CSSProperties
   onInputChange?: (text: string) => void
   /** Called with `item.value` when an item is picked (after `onChange`), never on typing. */
@@ -68,13 +70,15 @@ export function ComboBox({
   name,
   autoFocus,
   className,
+  inputClassName,
   style,
   onInputChange,
   onPick,
   filter,
   menuTrigger = 'input',
 }: ComboBoxProps) {
-  const needle = value.toLowerCase()
+  // Trimmed, so surrounding spaces don't change what matches.
+  const needle = value.trim().toLowerCase()
   // Like a datalist, the typed text matches the value as well as the label and description.
   const visible = items.filter((item) =>
     filter
@@ -86,8 +90,11 @@ export function ComboBox({
   // The key of an actual pick only (never derived from the text), cleared as soon as the text is edited.
   const [pickedKey, setPickedKey] = useState<string | null>(null)
   // Forget a pick once the text no longer shows it (edited or reset by the parent), so retyping
-  // that exact value later does not count as a pick and close the list.
-  if (pickedKey !== null && pickedKey !== value) setPickedKey(null)
+  // that exact value later does not count as a pick and close the list. Done after render, so RAC
+  // still sees the pick (and closes the list) when the parent replaces the text, e.g. TagInput clearing it.
+  useEffect(() => {
+    if (pickedKey !== null && pickedKey !== value) setPickedKey(null)
+  }, [pickedKey, value])
 
   return (
     <AriaComboBox
@@ -134,6 +141,7 @@ export function ComboBox({
             controlModifier(controlSize),
             control({ controlSize }),
             'pr-8 group-data-invalid:border-danger group-data-invalid:focus-visible:border-danger',
+            inputClassName,
           )}
         />
         <Button className="absolute inset-y-0 right-0 flex w-8 items-center justify-center border-0 bg-transparent p-0 text-fg-muted">

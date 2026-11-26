@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
@@ -61,11 +61,14 @@ describe('TagInput', () => {
     render(<Harness onChange={onChange} />)
     await user.type(screen.getByRole('combobox'), 'cma')
     await user.keyboard('{ArrowDown}{Enter}')
+    expect(onChange).toHaveBeenCalledTimes(1)
     expect(onChange).toHaveBeenLastCalledWith(['CMA CGM'])
     expect(screen.getByRole('combobox')).toHaveValue('')
+    // Keyboard adding keeps the list open for the next pick
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
   })
 
-  it('clicking a suggestion adds it', async () => {
+  it('clicking a suggestion adds it and closes the list', async () => {
     const onChange = vi.fn()
     const user = userEvent.setup()
     render(<Harness onChange={onChange} />)
@@ -74,6 +77,19 @@ describe('TagInput', () => {
     expect(onChange).toHaveBeenCalledTimes(1)
     expect(onChange).toHaveBeenLastCalledWith(['MSC'])
     expect(screen.getByRole('combobox')).toHaveValue('')
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
+    expect(screen.getByRole('combobox')).toHaveFocus()
+  })
+
+  it('clicking the field box focuses the input; chips sit inside the box', async () => {
+    const user = userEvent.setup()
+    render(<Harness initial={['MSC']} />)
+    const box = screen.getByRole('combobox').closest('.cursor-text') as HTMLElement
+    expect(box).toContainElement(screen.getByRole('row', { name: 'MSC' }))
+    expect(box).toHaveClass('border', 'border-line', 'rounded-control', 'bg-surface', 'focus-within:border-primary')
+    expect(screen.getByRole('combobox')).toHaveClass('border-0')
+    await user.click(box)
+    expect(screen.getByRole('combobox')).toHaveFocus()
   })
 
   it('shows de-duplicated suggestions on focus, without chosen values', async () => {

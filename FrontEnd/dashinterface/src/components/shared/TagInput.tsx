@@ -58,15 +58,33 @@ export default function TagInput({ values, onChange, suggestions, placeholder, f
     if (e.key === 'Enter') {
       // Never submit a surrounding form
       e.preventDefault()
-      // With a highlighted suggestion the ComboBox picks it (onPick); otherwise add the typed text
-      if (!e.target.getAttribute('aria-activedescendant')) addValue(input)
+      const activeId = e.target.getAttribute('aria-activedescendant')
+      const highlighted = activeId ? document.getElementById(activeId)?.dataset.key : undefined
+      if (highlighted !== undefined) {
+        // Add the highlighted suggestion here rather than through a ComboBox pick, so the list
+        // stays open for the next one (a mouse pick closes it)
+        e.stopPropagation()
+        addValue(highlighted)
+      } else {
+        addValue(input)
+      }
     } else if (e.key === 'Backspace' && !input && values.length > 0) {
       onChange(values.slice(0, -1))
     }
   }
 
+  // Clicking the box outside a tag focuses the input, as with a single field
+  const onClick = (e: React.MouseEvent) => {
+    if (!(e.target as Element).closest('[role="row"], input, button')) focusInput()
+  }
+
   return (
-    <div ref={wrapperRef} className="flex flex-wrap items-center gap-1" onKeyDownCapture={onKeyDownCapture}>
+    <div
+      ref={wrapperRef}
+      className="flex min-h-8 cursor-text flex-wrap items-center gap-1 rounded-control border border-line bg-surface px-1 focus-within:border-primary focus-within:shadow-focus"
+      onKeyDownCapture={onKeyDownCapture}
+      onClick={onClick}
+    >
       {values.length > 0 && (
         <TagGroup aria-label="Selected values" onRemove={removeTags} className="contents">
           <TagList className="flex flex-wrap gap-1">
@@ -99,6 +117,7 @@ export default function TagInput({ values, onChange, suggestions, placeholder, f
         aria-label={inputName}
         menuTrigger="focus"
         className="min-w-40 flex-1"
+        inputClassName="h-7 border-0 bg-transparent px-1 shadow-none"
       />
     </div>
   )
