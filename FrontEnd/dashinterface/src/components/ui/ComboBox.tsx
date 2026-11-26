@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react'
-import type { AriaAttributes, CSSProperties } from 'react'
+import { useRef, useState, type AriaAttributes, type CSSProperties } from 'react'
 import {
   Button,
   ComboBox as AriaComboBox,
@@ -69,9 +69,14 @@ export function ComboBox({
   menuTrigger = 'input',
 }: ComboBoxProps) {
   const needle = value.toLowerCase()
+  // Like a datalist, the typed text matches the value as well as the label and description.
   const visible = items.filter((item) =>
-    `${item.label ?? item.value} ${item.description ?? ''}`.toLowerCase().includes(needle),
+    `${item.value} ${item.label ?? ''} ${item.description ?? ''}`.toLowerCase().includes(needle),
   )
+  // Only used when allowsCustomValue is false: where to revert to on blur.
+  const lastPicked = useRef<string | null>(items.some((i) => i.value === value) ? value : null)
+  // The key of an actual pick only (never derived from the text), cleared as soon as the text is edited.
+  const [pickedKey, setPickedKey] = useState<string | null>(null)
 
   return (
     <AriaComboBox
@@ -83,10 +88,14 @@ export function ComboBox({
         onChange(text)
         onInputChange?.(text)
       }}
-      // Controlled, so RAC reports a pick here (not through onInputChange); typing clears the key, which is ignored.
-      selectedKey={items.some((i) => i.value === value) ? value : null}
+      // Selection comes only from an actual pick, so typing an exact item value does not close the list.
+      // RAC reports a pick here, not through onInputChange, and reports null when the text is edited.
+      selectedKey={pickedKey === value ? pickedKey : null}
       onSelectionChange={(key) => {
-        if (key !== null) onChange(String(key))
+        setPickedKey(key === null ? null : String(key))
+        if (key === null) return
+        lastPicked.current = String(key)
+        onChange(String(key))
       }}
       allowsCustomValue={allowsCustomValue}
       menuTrigger={menuTrigger}
@@ -105,6 +114,9 @@ export function ComboBox({
         <Input
           id={id}
           placeholder={placeholder}
+          onBlur={() => {
+            if (!allowsCustomValue && !items.some((i) => i.value === value)) onChange(lastPicked.current ?? '')
+          }}
           className={cn(
             'ui-control',
             controlModifier(controlSize),

@@ -76,11 +76,88 @@ describe('ComboBox', () => {
     expect(screen.getByRole('option', { name: /Shanghai/ })).toBeInTheDocument()
   })
 
-  it('does not filter by value when a label exists', async () => {
+  it('also matches the typed text against the value', async () => {
     const user = userEvent.setup()
     render(<Harness />)
     await user.type(screen.getByRole('combobox'), 'LKCMB')
-    expect(screen.queryByRole('option')).not.toBeInTheDocument()
+    expect(screen.getAllByRole('option')).toHaveLength(1)
+    expect(screen.getByRole('option', { name: /Colombo/ })).toBeInTheDocument()
+  })
+
+  it('after a pick, the input shows the value and the chevron lists the item', async () => {
+    const user = userEvent.setup()
+    render(<Harness />)
+    await user.type(screen.getByRole('combobox'), 'col')
+    await user.click(screen.getByRole('option', { name: /Colombo/ }))
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
+    expect(screen.getByRole('combobox')).toHaveValue('LKCMB')
+    await user.click(screen.getByRole('button', { hidden: true }))
+    expect(screen.getByRole('option', { name: /Colombo/ })).toBeInTheDocument()
+  })
+
+  it('typing text equal to an item value keeps the list open', async () => {
+    const user = userEvent.setup()
+    const acme = [{ value: 'Acme' }, { value: 'Acme Logistics' }]
+    render(<Harness items={acme} />)
+    await user.type(screen.getByRole('combobox'), 'Acme')
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
+    expect(screen.getAllByRole('option')).toHaveLength(2)
+  })
+
+  it('can pick the same item again after the parent clears the value', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    function Clearable() {
+      const [v, setV] = useState('')
+      return (
+        <>
+          <ComboBox aria-label="Port" items={items} value={v} onChange={(x) => { onChange(x); setV(x) }} />
+          <button onClick={() => setV('')}>clear</button>
+        </>
+      )
+    }
+    render(<Clearable />)
+    await user.type(screen.getByRole('combobox'), 'col')
+    await user.click(screen.getByRole('option', { name: /Colombo/ }))
+    await user.click(screen.getByRole('button', { name: 'clear' }))
+    expect(screen.getByRole('combobox')).toHaveValue('')
+    onChange.mockClear()
+    await user.type(screen.getByRole('combobox'), 'col')
+    await user.click(screen.getByRole('option', { name: /Colombo/ }))
+    expect(onChange).toHaveBeenLastCalledWith('LKCMB')
+    expect(screen.getByRole('combobox')).toHaveValue('LKCMB')
+  })
+
+  it('allowsCustomValue=false: free text reverts to empty on blur', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(<Harness onChange={onChange} allowsCustomValue={false} />)
+    await user.type(screen.getByRole('combobox'), 'XYZ')
+    await user.tab()
+    expect(onChange).toHaveBeenLastCalledWith('')
+    expect(screen.getByRole('combobox')).toHaveValue('')
+  })
+
+  it('allowsCustomValue=false: editing after a pick reverts to the picked value on blur', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(<Harness onChange={onChange} allowsCustomValue={false} />)
+    await user.type(screen.getByRole('combobox'), 'sha')
+    await user.click(screen.getByRole('option', { name: /Shanghai/ }))
+    await user.type(screen.getByRole('combobox'), 'x')
+    await user.tab()
+    expect(onChange).toHaveBeenLastCalledWith('CNSHA')
+    expect(screen.getByRole('combobox')).toHaveValue('CNSHA')
+  })
+
+  it('allowsCustomValue=false: a valid value is kept on blur, including an initial one', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(<Harness onChange={onChange} allowsCustomValue={false} initial="LKCMB" />)
+    await user.type(screen.getByRole('combobox'), 'x')
+    await user.tab()
+    expect(onChange).toHaveBeenLastCalledWith('LKCMB')
+    expect(screen.getByRole('combobox')).toHaveValue('LKCMB')
   })
 
   it('falls back to value as the label when label is missing', async () => {
