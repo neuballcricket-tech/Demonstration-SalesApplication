@@ -53,6 +53,11 @@ describe('Button', () => {
     expect(btn).toHaveClass('ui-button--danger', 'ui-button--lg', 'h-10', 'focus-visible:border-danger')
   })
 
+  it('secondary and ghost keep the navy border on keyboard focus', () => {
+    render(<><Button>A</Button><Button variant="ghost">B</Button></>)
+    for (const b of screen.getAllByRole('button')) expect(b).toHaveClass('focus-visible:border-primary')
+  })
+
   it('merges className and forwards ref', () => {
     const ref = createRef<HTMLButtonElement>()
     render(<Button ref={ref} className="extra" style={{ width: 50 }}>Go</Button>)

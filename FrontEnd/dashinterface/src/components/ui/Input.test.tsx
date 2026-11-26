@@ -13,6 +13,17 @@ describe('Input', () => {
     expect(ref.current).toHaveClass('ui-control', 'ui-control--lg', 'extra', 'h-10')
   })
 
+  it('keeps the navy border on focus, but red when invalid', () => {
+    render(<><Input aria-label="a" /><NumberInput aria-label="b" /><Textarea aria-label="c" /></>)
+    for (const label of ['a', 'b', 'c']) {
+      expect(screen.getByLabelText(label)).toHaveClass(
+        'focus-visible:border-primary',
+        'aria-invalid:border-danger',
+        'aria-invalid:focus-visible:border-danger',
+      )
+    }
+  })
+
   it('md has no size modifier class', () => {
     render(<Input aria-label="x" />)
     expect(screen.getByLabelText('x').className).not.toMatch(/ui-control--(sm|md|lg)/)

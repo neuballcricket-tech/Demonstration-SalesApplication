@@ -7,8 +7,8 @@ const button = tv({
   variants: {
     variant: {
       primary: 'bg-primary text-white hover:bg-primary-hover',
-      secondary: 'border border-line bg-surface text-fg hover:bg-surface-hover',
-      ghost: 'bg-transparent text-primary hover:bg-primary-subtle',
+      secondary: 'border border-line bg-surface text-fg hover:bg-surface-hover focus-visible:border-primary',
+      ghost: 'bg-transparent text-primary hover:bg-primary-subtle focus-visible:border-primary',
       danger: 'border border-danger bg-danger text-white hover:opacity-90 focus-visible:border-danger',
     },
     size: {

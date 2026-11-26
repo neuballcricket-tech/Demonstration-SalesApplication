@@ -1,6 +1,5 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import css from '../../styles/app.css?raw'
 import { CHART_SERIES, COLOR } from './tokens'
 
 // WCAG 2.x relative luminance and contrast ratio
@@ -33,7 +32,6 @@ describe('tokens', () => {
   })
 
   it('COLOR hex values match the @theme block in app.css', () => {
-    const css = readFileSync(resolve(import.meta.dirname, '../../styles/app.css'), 'utf8')
     const theme = (name: string) => new RegExp(`--color-${name}:\\s*(#[0-9a-fA-F]{3,8})`).exec(css)?.[1]
     const pairs: Record<string, string> = {
       primary: COLOR.primary,

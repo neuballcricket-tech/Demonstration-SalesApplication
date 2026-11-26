@@ -4,7 +4,7 @@ import { cn, tv } from '../../lib/cn'
 type ControlSize = 'sm' | 'md' | 'lg'
 
 const control = tv({
-  base: 'w-full rounded-control border border-line bg-surface px-2 text-control text-fg placeholder:text-fg-muted disabled:bg-disabled aria-invalid:border-danger',
+  base: 'w-full rounded-control border border-line bg-surface px-2 text-control text-fg placeholder:text-fg-muted disabled:bg-disabled focus-visible:border-primary aria-invalid:border-danger aria-invalid:focus-visible:border-danger',
   variants: {
     controlSize: {
       sm: 'h-7',
