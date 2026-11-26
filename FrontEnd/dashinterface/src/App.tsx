@@ -450,15 +450,16 @@ export default function App() {
     data: Parameters<typeof apiPatchInquiry>[1],
     commodityPatches?: Array<{ com_id: number; data: Parameters<typeof apiPatchCommodity>[2] }>,
     containerPatches?: Array<{ cont_id: number; data: Parameters<typeof apiPatchContainer>[2] }>
-  ) => {
+  ): Promise<void> => {
     const calls: Promise<unknown>[] = [
       apiPatchInquiry(inq_id, data),
       ...(commodityPatches ?? []).map(cp => apiPatchCommodity(inq_id, cp.com_id, cp.data)),
       ...(containerPatches ?? []).map(cp => apiPatchContainer(inq_id, cp.cont_id, cp.data)),
     ]
-    Promise.all(calls)
+    // Resolves when every patch is saved; rejects (after showing the error) so the caller keeps the form open
+    return Promise.all(calls)
       .then(() => { refreshData(); flash(`Inquiry #${inq_id} updated`) })
-      .catch(e => flash(`Failed to save inquiry: ${(e as Error).message}`))
+      .catch(e => { flash(`Failed to save inquiry: ${(e as Error).message}`); throw e })
   }
 
   const handleDeleteInquiry = (inq_id: number) => {

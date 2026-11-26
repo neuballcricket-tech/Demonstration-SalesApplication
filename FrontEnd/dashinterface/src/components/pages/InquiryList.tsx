@@ -26,7 +26,7 @@ interface InquiryListProps {
     data: { sbu?: string; origin?: string; incoterm?: string; cargo_ready_date?: string; priority?: string; preferred_liners?: string; preferred_rate?: number; service_mode?: 'DOOR_TO_DOOR' | 'PORT_TO_PORT' | 'PORT_TO_DOOR' | 'DOOR_TO_PORT' },
     commodityPatches?: Array<{ com_id: number; data: { com_type?: string; hs_code?: string; weight?: number } }>,
     containerPatches?: Array<{ cont_id: number; data: { container_type?: string; temperature?: number; qty?: number; destination?: string; address?: string; zip_code?: string; is_fully_loaded?: boolean; free_time?: string } }>
-  ) => void
+  ) => Promise<void>
   onDeleteInquiry: (inq_id: number) => void
 }
 
@@ -112,6 +112,7 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
   const followupRef = useRef<HTMLTextAreaElement>(null)
   const [editingInquiry, setEditingInquiry] = useState<Inquiry | null>(null)
   const [editDraft, setEditDraft] = useState<EditDraft | null>(null)
+  const [savingEdit, setSavingEdit] = useState(false)
   const [linerList, setLinerList] = useState<LinerRecord[]>([])
   useEffect(() => { apiGetLiners().then(setLinerList).catch(() => {}) }, [])
   // Map inquiry_id → most recent quote linked to it (for the Quote Status column).
@@ -217,7 +218,8 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
     })
   }
 
-  function handleSaveEdit() {
+  async function handleSaveEdit() {
+    if (savingEdit) return
     if (!editingInquiry?.inq_id || !editDraft) return
 
     const commodityPatches = editDraft.containers
@@ -247,26 +249,34 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
         },
       }))
 
-    onPatchInquiry(
-      editingInquiry.inq_id,
-      {
-        origin:           editDraft.origin           || undefined,
-        sbu:              editDraft.sbu              || undefined,
-        priority:         editDraft.priority         ? (BE_PRIORITY_REV[editDraft.priority] ?? editDraft.priority) : undefined,
-        service_mode:     editDraft.delivery_type === 'door-to-door' ? 'DOOR_TO_DOOR'
-          : editDraft.delivery_type === 'port-to-door' ? 'PORT_TO_DOOR'
-          : editDraft.delivery_type === 'door-to-port' ? 'DOOR_TO_PORT'
-          : 'PORT_TO_PORT',
-        incoterm:         editDraft.incoterm         || undefined,
-        cargo_ready_date: editDraft.cargo_ready_date || undefined,
-        preferred_rate:   editDraft.preferred_rate   ? (parseFloat(editDraft.preferred_rate) || undefined) : undefined,
-        preferred_liners: editDraft.preferred_liners || undefined,
-      },
-      commodityPatches,
-      containerPatches,
-    )
-    setEditingInquiry(null)
-    setEditDraft(null)
+    setSavingEdit(true)
+    try {
+      await onPatchInquiry(
+        editingInquiry.inq_id,
+        {
+          origin:           editDraft.origin           || undefined,
+          sbu:              editDraft.sbu              || undefined,
+          priority:         editDraft.priority         ? (BE_PRIORITY_REV[editDraft.priority] ?? editDraft.priority) : undefined,
+          service_mode:     editDraft.delivery_type === 'door-to-door' ? 'DOOR_TO_DOOR'
+            : editDraft.delivery_type === 'port-to-door' ? 'PORT_TO_DOOR'
+            : editDraft.delivery_type === 'door-to-port' ? 'DOOR_TO_PORT'
+            : 'PORT_TO_PORT',
+          incoterm:         editDraft.incoterm         || undefined,
+          cargo_ready_date: editDraft.cargo_ready_date || undefined,
+          preferred_rate:   editDraft.preferred_rate   ? (parseFloat(editDraft.preferred_rate) || undefined) : undefined,
+          preferred_liners: editDraft.preferred_liners || undefined,
+        },
+        commodityPatches,
+        containerPatches,
+      )
+      // Close only after every patch has been saved
+      setEditingInquiry(null)
+      setEditDraft(null)
+    } catch {
+      // App already showed the error; keep the dialog open so the user can retry
+    } finally {
+      setSavingEdit(false)
+    }
   }
 
   return (
@@ -1071,7 +1081,7 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
               <button className="db-btn" onClick={() => { setEditingInquiry(null); setEditDraft(null) }}>Cancel</button>
-              <button className="db-btn primary" onClick={handleSaveEdit}>Save Changes</button>
+              <button className="db-btn primary" onClick={handleSaveEdit} disabled={savingEdit}>{savingEdit ? 'Saving…' : 'Save Changes'}</button>
             </div>
           </div>
         </div>
