@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, type ReactNode } from 'react'
 import { ArrowLeft, Check, DollarSign, FileText, FileSpreadsheet, Plus, Upload, X } from 'lucide-react'
 import {
   RATE_SOURCE_COLORS, portOptions, linerDisplay,
@@ -7,8 +7,53 @@ import {
 } from '../../types'
 import { apiGetPorts, apiGetLiners, apiGetTradeLanes, apiGetEmployeesDb, apiGetClientsDb, apiCreateTariffRate, apiCreateContractedRate, apiCreateNacRate, apiPreviewBulkTariffRates, apiBulkCreateTariffRates, BACKEND_ACTOR_ID, type BulkTariffPreviewRow } from '../../api'
 import TagInput from '../shared/TagInput'
-import { FIELD_LABEL, INPUT_STYLE } from './pageStyles'
-import { COLOR } from '../ui/tokens'
+import { Button, ComboBox, DatePicker, Field, FileButton, Input, NumberInput, Select, Tooltip, type ComboBoxItem, type Option } from '../ui'
+import { labelClass } from '../ui/controlStyles'
+import { cn } from '../../lib/cn'
+
+/** Drops empty and repeated values (ComboBox items are keyed by value). */
+const uniqueItems = (items: ComboBoxItem[]): ComboBoxItem[] => {
+  const seen = new Set<string>()
+  return items.filter(item => {
+    if (!item.value || seen.has(item.value)) return false
+    seen.add(item.value)
+    return true
+  })
+}
+
+const TARIFF_CONTAINER_OPTIONS: Option[] = ['20GP', '40GP', '40HC', '20 Reefer', '40 Reefer', '20 Flat Rack', '40 Flat Rack', '20 Open Tops', '40 Open Tops'].map(v => ({ value: v, label: v }))
+const CONTRACTED_CONTAINER_OPTIONS: Option[] = ['20GP', '40GP', '40HC'].map(v => ({ value: v, label: v }))
+const CURRENCY_OPTIONS: Option[] = ['USD', 'EUR', 'LKR', 'GBP', 'SGD'].map(v => ({ value: v, label: v }))
+const MONTH_OPTIONS: Option[] = ['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, i) => ({ value: String(i + 1), label: m }))
+
+/** Section heading with a dot in the rate type's colour. */
+function SectionHead({ color, className, action, children }: { color: string; className?: string; action?: ReactNode; children: ReactNode }) {
+  return (
+    <div className={cn('col-span-full mt-2 flex items-center gap-2 border-b border-line-soft pb-2 text-label font-bold uppercase tracking-label text-fg-muted', className)}>
+      <span className="size-1.5 shrink-0 rounded-full" style={{ background: color }} />
+      {children}
+      {action && <span className="ml-auto">{action}</span>}
+    </div>
+  )
+}
+
+/** Icon-only "Remove" button. The tooltip is left off while disabled: a disabled button cannot be focused or hovered. */
+function RemoveButton({ label, size = 'md', disabled, onClick }: { label: string; size?: 'sm' | 'md'; disabled?: boolean; onClick: () => void }) {
+  const button = (
+    <Button variant="ghost" size={size} className={size === 'sm' ? 'w-7 px-0' : 'w-8 px-0'} icon={<X size={14} aria-hidden="true" />} aria-label={label} disabled={disabled} onClick={onClick} />
+  )
+  return disabled ? button : <Tooltip content="Remove">{button}</Tooltip>
+}
+
+/** Column heading above the container-rate rows. */
+function ColumnLabel({ required, children }: { required?: boolean; children: ReactNode }) {
+  return (
+    <span className={labelClass}>
+      {children}
+      {required && <span aria-hidden="true" className="ml-0.5 text-danger">*</span>}
+    </span>
+  )
+}
 
 interface TariffContainerRate {
   containerType: string
@@ -76,7 +121,6 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
   const [bulkSaving, setBulkSaving] = useState(false)
   const [saving, setSaving] = useState(false)
   const [bulkNote, setBulkNote] = useState('')
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const now = new Date()
   const [bulkLinerId, setBulkLinerId] = useState<number | ''>('')
   const [bulkMonth, setBulkMonth] = useState(now.getMonth() + 1) // 1-12
@@ -308,22 +352,38 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
     : rrType === 'Contracted'
       ? rrContractedContainers.some(c => c.rate !== '')
       : rrNacContainers.some(c => c.rate !== '')
-  const selectStyle = { width: '100%', padding: '10px 12px', fontSize: 13, borderRadius: 8 } as const
-  const secHead: React.CSSProperties = { gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid var(--border)', paddingBottom: 6, marginTop: 10 }
-  const secDot = (color: string): React.CSSProperties => ({ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 })
+
+  // Options for the shared controls
+  const linerOptions: Option[] = linerList.map(l => ({ value: String(l.lin_id), label: `${linerDisplay(l)}${l.is_on_inttra ? ' (INTTRA)' : ''}${l.has_portal ? ' (Portal)' : ''}` }))
+  const bulkLinerOptions = linerOptions.filter((_, i) => ['ONE', 'PIL', 'LAEC', 'Standardized'].includes(linerList[i].name))
+  const tradeLaneOptions: Option[] = tradeLaneList.map(t => ({ value: String(t.trln_id), label: t.trln_name }))
+  const salesOptions: Option[] = dbEmployeeList.map(e => ({ value: String(e.emp_id), label: `${e.name}${e.desig ? ` (${e.desig})` : ''}` }))
+  // Optional salesperson: the empty choice stays selectable
+  const optionalSalesOptions: Option[] = [{ value: '', label: '— Select salesperson —' }, ...salesOptions]
+  const yearOptions: Option[] = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 1 + i).map(y => ({ value: String(y), label: String(y) }))
+  const portItems = useMemo(() => uniqueItems(portOptions(portList).map(o => ({ value: o.value, description: o.label }))), [portList])
+  const serviceLaneItems = uniqueItems(tradeLaneList.map(t => ({ value: t.trln_name })))
+  const clientItems = uniqueItems(dbClientList.map(c => ({ value: c.name })))
+  const toId = (v: string): number | '' => v === '' ? '' : Number(v)
 
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+    <div className="mx-auto max-w-[1200px] p-6">
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <button className="lt-icon-btn" onClick={mode === 'review' ? () => setMode('edit') : onGoBack} title={mode === 'review' ? 'Back to Edit' : 'Back to Workspace'} style={{ padding: 6 }}>
-          <ArrowLeft size={18} />
-        </button>
+      <div className="mb-5 flex items-center gap-3">
+        <Tooltip content={mode === 'review' ? 'Back to Edit' : 'Back to Workspace'}>
+          <Button
+            size="sm"
+            className="w-7 px-0"
+            icon={<ArrowLeft size={16} aria-hidden="true" />}
+            aria-label={mode === 'review' ? 'Back to Edit' : 'Back to Workspace'}
+            onClick={mode === 'review' ? () => setMode('edit') : onGoBack}
+          />
+        </Tooltip>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            {mode === 'review' ? <><FileText size={18} style={{ color: COLOR.primary }} /> Review Rate</> : <><DollarSign size={18} style={{ color: COLOR.primary }} /> Record Rate</>}
+          <div className="flex items-center gap-2 text-title font-bold text-fg">
+            {mode === 'review' ? <><FileText size={18} className="text-primary" aria-hidden="true" /> Review Rate</> : <><DollarSign size={18} className="text-primary" aria-hidden="true" /> Record Rate</>}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+          <div className="mt-0.5 text-control text-fg-muted">
             {mode === 'review'
               ? 'Verify the details below. Click Back to make changes, or Confirm to save.'
               : 'Add a new rate to the database — select rate type and fill in the details.'}
@@ -332,52 +392,44 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
       </div>
 
       {/* Form / Review */}
-      <div style={{ background: 'var(--bg-card, #fff)', border: '1px solid var(--border)', borderRadius: 10, padding: 18 }}>
+      <div className="rounded-card border border-line-soft bg-surface p-4">
 
         {mode === 'edit' && <>
         {/* Rate Type Selector */}
-        <div style={{ marginBottom: 14 }}>
-          <label style={FIELD_LABEL}>Rate Type <span style={{ color: '#dc2626' }}>*</span></label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+        <div className="mb-4 flex flex-col gap-1">
+          <span id="rr-rate-type-label" className={labelClass}>Rate Type<span aria-hidden="true" className="ml-0.5 text-danger">*</span></span>
+          <div role="group" aria-labelledby="rr-rate-type-label" className="flex flex-wrap gap-2">
             {(['Tariff Rate', 'Contracted', 'NAC'] as RateSourceType[]).map(t => (
-              <button
+              <Button
                 key={t}
-                className="db-btn"
-                style={{
-                  fontSize: 11, padding: '5px 10px', borderRadius: 6,
-                  background: rrType === t ? RATE_SOURCE_COLORS[t] : 'var(--bg-card)',
-                  color: rrType === t ? '#fff' : 'var(--text-secondary)',
-                  border: rrType === t ? `1px solid ${RATE_SOURCE_COLORS[t]}` : '1px solid var(--border)',
-                }}
+                size="sm"
+                aria-pressed={rrType === t}
+                className={cn(rrType === t && 'text-white')}
+                style={rrType === t ? { background: RATE_SOURCE_COLORS[t], borderColor: RATE_SOURCE_COLORS[t] } : undefined}
                 onClick={() => setRrType(t)}
               >
                 {t}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
 
         {/* Entry mode toggle — only for Tariff Rate */}
         {rrType === 'Tariff Rate' && (
-          <div style={{ marginBottom: 14 }}>
-            <label style={FIELD_LABEL}>Entry Mode</label>
-            <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+          <div className="mb-4 flex flex-col gap-1">
+            <span id="rr-entry-mode-label" className={labelClass}>Entry Mode</span>
+            <div role="group" aria-labelledby="rr-entry-mode-label" className="flex gap-2">
               {([['manual', 'Manual Entry'], ['bulk', 'Excel Upload']] as const).map(([key, label]) => (
-                <button
+                <Button
                   key={key}
-                  className="db-btn"
-                  style={{
-                    fontSize: 11, padding: '5px 10px', borderRadius: 6,
-                    display: 'flex', alignItems: 'center', gap: 5,
-                    background: entryMode === key ? '#0d9488' : 'var(--bg-card)',
-                    color: entryMode === key ? '#fff' : 'var(--text-secondary)',
-                    border: entryMode === key ? '1px solid #0d9488' : '1px solid var(--border)',
-                  }}
+                  size="sm"
+                  aria-pressed={entryMode === key}
+                  className={cn(entryMode === key && 'border-accent bg-accent text-white hover:bg-accent')}
+                  icon={key === 'bulk' ? <FileSpreadsheet size={14} aria-hidden="true" /> : undefined}
                   onClick={() => setEntryMode(key)}
                 >
-                  {key === 'bulk' && <FileSpreadsheet size={12} />}
                   {label}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -385,103 +437,80 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
 
         {/* ---- Bulk Upload UI ---- */}
         {rrType === 'Tariff Rate' && entryMode === 'bulk' && (
-          <div style={{ marginBottom: 10 }}>
+          <div className="mb-3">
             {/* Liner, Month, Year selectors */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 16 }}>
-              <div>
-                <label style={FIELD_LABEL}>Liner <span style={{ color: '#dc2626' }}>*</span></label>
-                <select style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
-                        value={bulkLinerId} onChange={e => setBulkLinerId(e.target.value === '' ? '' : Number(e.target.value))}>
-                  <option value="">— Select liner —</option>
-                  {linerList.filter(l => ['ONE', 'PIL', 'LAEC', 'Standardized'].includes(l.name)).map(l => <option key={l.lin_id} value={l.lin_id}>{linerDisplay(l)}{l.is_on_inttra ? ' (INTTRA)' : ''}{l.has_portal ? ' (Portal)' : ''}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={FIELD_LABEL}>Month <span style={{ color: '#dc2626' }}>*</span></label>
-                <select style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
-                        value={bulkMonth} onChange={e => setBulkMonth(Number(e.target.value))}>
-                  {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, i) => (
-                    <option key={i + 1} value={i + 1}>{m}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label style={FIELD_LABEL}>Year <span style={{ color: '#dc2626' }}>*</span></label>
-                <select style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
-                        value={bulkYear} onChange={e => setBulkYear(Number(e.target.value))}>
-                  {Array.from({ length: 5 }, (_, i) => now.getFullYear() - 1 + i).map(y => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-              </div>
+            <div className="mb-4 grid grid-cols-3 gap-4">
+              <Field label="Liner" required>
+                {ids => <Select {...ids} value={String(bulkLinerId)} onChange={v => setBulkLinerId(toId(v))} placeholder="— Select liner —" options={bulkLinerOptions} />}
+              </Field>
+              <Field label="Month" required>
+                {ids => <Select {...ids} value={String(bulkMonth)} onChange={v => setBulkMonth(Number(v))} placeholder="— Select —" options={MONTH_OPTIONS} />}
+              </Field>
+              <Field label="Year" required>
+                {ids => <Select {...ids} value={String(bulkYear)} onChange={v => setBulkYear(Number(v))} placeholder="— Select —" options={yearOptions} />}
+              </Field>
             </div>
 
             {/* Upload area */}
-            <div style={{
-              border: '2px dashed var(--border)', borderRadius: 10,
-              padding: '20px 16px', marginBottom: 16, display: 'flex',
-              alignItems: 'center', gap: 14, flexWrap: 'wrap',
-              opacity: bulkLinerId === '' ? 0.5 : 1,
-              pointerEvents: bulkLinerId === '' ? 'none' : 'auto',
-            }}>
-              <FileSpreadsheet size={20} style={{ color: '#0d9488' }} />
+            <div className={cn(
+              'mb-4 flex flex-wrap items-center gap-4 rounded-card border-2 border-dashed border-line px-4 py-5',
+              bulkLinerId === '' && 'pointer-events-none opacity-50',
+            )}>
+              <FileSpreadsheet size={20} className="text-accent" aria-hidden="true" />
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>Upload tariff rate spreadsheet</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                <div className="text-control font-semibold text-fg">Upload tariff rate spreadsheet</div>
+                <div className="mt-0.5 text-label text-fg-muted">
                   Columns: Origin, Destination, Container Type, Rate, Currency, Free Time, Max Weight, Note
                 </div>
               </div>
-              <input
-                ref={fileInputRef}
-                type="file"
+              <FileButton
+                className="ml-auto"
                 accept=".xlsx,.xls"
-                disabled={bulkUploading || bulkLinerId === ''}
-                onChange={e => { const f = e.target.files?.[0]; if (f) handleBulkFile(f); e.target.value = '' }}
-                style={{ fontSize: 12, marginLeft: 'auto' }}
-              />
-              {bulkUploading && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Reading...</span>}
-              {bulkNote && <span style={{ fontSize: 12, color: '#0d9488' }}>{bulkNote}</span>}
+                isDisabled={bulkUploading || bulkLinerId === ''}
+                onSelect={files => { const f = files[0]; if (f) handleBulkFile(f) }}
+              >
+                Choose File
+              </FileButton>
+              {bulkUploading && <span className="text-control text-fg-muted">Reading...</span>}
+              {bulkNote && <span className="text-control text-accent">{bulkNote}</span>}
             </div>
-            {bulkLinerId === '' && <div style={{ fontSize: 11, color: '#d97706', marginTop: -10, marginBottom: 12 }}>Select a liner first to enable file upload</div>}
+            {bulkLinerId === '' && <div className="-mt-3 mb-3 text-label text-warning">Select a liner first to enable file upload</div>}
 
             {/* Preview table */}
             {bulkRows.length > 0 && (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                  <strong style={{ fontSize: 14 }}>Preview ({bulkRows.length} rates)</strong>
-                  <button className="db-btn" style={{ fontSize: 11, marginLeft: 'auto' }}
-                          onClick={() => { setBulkRows([]); setBulkNote(''); if (fileInputRef.current) fileInputRef.current.value = '' }}>
+                <div className="mb-3 flex items-center gap-3">
+                  <strong className="text-body text-fg">Preview ({bulkRows.length} rates)</strong>
+                  <Button size="sm" className="ml-auto" onClick={() => { setBulkRows([]); setBulkNote('') }}>
                     Clear
-                  </button>
+                  </Button>
                 </div>
-                <div style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <div className="overflow-x-auto rounded-card border border-line-soft">
+                  <table className="w-full border-collapse text-control">
                     <thead>
-                      <tr style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+                      <tr className="border-b border-line-soft bg-canvas">
                         {['#', 'Origin', 'Destination', 'Liner', 'Container', 'Rate', 'Curr', 'Valid From', 'Valid To', 'Free Time', 'Weight', 'Note', ''].map((h, i) => (
-                          <th key={i} style={{ padding: '8px 6px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
+                          <th key={i} className="whitespace-nowrap px-2 py-2 text-left font-semibold text-fg-muted">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {bulkRows.map((r, i) => (
-                        <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: '6px', color: 'var(--text-muted)' }}>{i + 1}</td>
-                          <td style={{ padding: '6px' }}>{r.origin}</td>
-                          <td style={{ padding: '6px' }}>{r.destination}</td>
-                          <td style={{ padding: '6px' }}>{r.liner}</td>
-                          <td style={{ padding: '6px' }}>{r.container_type}</td>
-                          <td style={{ padding: '6px', fontWeight: 600 }}>{r.rate}</td>
-                          <td style={{ padding: '6px' }}>{r.currency}</td>
-                          <td style={{ padding: '6px' }}>{r.valid_from}</td>
-                          <td style={{ padding: '6px' }}>{r.valid_to}</td>
-                          <td style={{ padding: '6px' }}>{r.free_time || '—'}</td>
-                          <td style={{ padding: '6px' }}>{r.max_weight || '—'}</td>
-                          <td style={{ padding: '6px', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.note || '—'}</td>
-                          <td style={{ padding: '6px' }}>
-                            <button className="lt-icon-btn" title="Remove" style={{ padding: 2 }} onClick={() => removeBulkRow(i)}>
-                              <X size={12} />
-                            </button>
+                        <tr key={i} className="border-b border-line-soft text-fg">
+                          <td className="px-2 py-1 text-fg-muted">{i + 1}</td>
+                          <td className="px-2 py-1">{r.origin}</td>
+                          <td className="px-2 py-1">{r.destination}</td>
+                          <td className="px-2 py-1">{r.liner}</td>
+                          <td className="px-2 py-1">{r.container_type}</td>
+                          <td className="px-2 py-1 font-semibold">{r.rate}</td>
+                          <td className="px-2 py-1">{r.currency}</td>
+                          <td className="px-2 py-1">{r.valid_from}</td>
+                          <td className="px-2 py-1">{r.valid_to}</td>
+                          <td className="px-2 py-1">{r.free_time || '—'}</td>
+                          <td className="px-2 py-1">{r.max_weight || '—'}</td>
+                          <td className="max-w-[120px] truncate px-2 py-1">{r.note || '—'}</td>
+                          <td className="px-2 py-1">
+                            <RemoveButton size="sm" label={`Remove row ${i + 1}`} onClick={() => removeBulkRow(i)} />
                           </td>
                         </tr>
                       ))}
@@ -490,16 +519,17 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
                 </div>
 
                 {/* Save button */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-                  <button className="db-btn" style={{ fontSize: 12 }} onClick={onGoBack}>Cancel</button>
-                  <button
-                    className="db-btn primary"
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12 }}
-                    disabled={bulkSaving || bulkRows.length === 0 || bulkLinerId === ''}
+                <div className="mt-4 flex justify-end gap-2">
+                  <Button onClick={onGoBack}>Cancel</Button>
+                  <Button
+                    variant="primary"
+                    isPending={bulkSaving}
+                    icon={<Upload size={14} aria-hidden="true" />}
+                    disabled={bulkRows.length === 0 || bulkLinerId === ''}
                     onClick={handleBulkSave}
                   >
-                    <Upload size={14} /> {bulkSaving ? 'Saving...' : `Save ${bulkRows.length} Tariff Rate(s)`}
-                  </button>
+                    {bulkSaving ? 'Saving...' : `Save ${bulkRows.length} Tariff Rate(s)`}
+                  </Button>
                 </div>
               </>
             )}
@@ -508,141 +538,90 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
 
         {/* ---- Tariff Rate fields (manual) ---- */}
         {rrType === 'Tariff Rate' && entryMode === 'manual' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <div className="mb-3 grid grid-cols-2 gap-x-4 gap-y-3">
             {/* — Carrier & Service — */}
-            <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['Tariff Rate'])} />Carrier & Service</div>
-            <div>
-              <label style={FIELD_LABEL}>Liner <span style={{ color: '#dc2626' }}>*</span></label>
-              <select style={{ ...INPUT_STYLE, ...selectStyle }} value={rrLinerId} onChange={e => setRrLinerId(e.target.value === '' ? '' : Number(e.target.value))}>
-                <option value="">— Select liner —</option>
-                {linerList.map(l => <option key={l.lin_id} value={l.lin_id}>{linerDisplay(l)}{l.is_on_inttra ? ' (INTTRA)' : ''}{l.has_portal ? ' (Portal)' : ''}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={FIELD_LABEL}>Trade Lane <span style={{ color: '#dc2626' }}>*</span></label>
-              <select style={{ ...INPUT_STYLE, ...selectStyle }} value={rrTradeLaneId} onChange={e => setRrTradeLaneId(e.target.value === '' ? '' : Number(e.target.value))}>
-                <option value="">— Select trade lane —</option>
-                {tradeLaneList.map(t => <option key={t.trln_id} value={t.trln_id}>{t.trln_name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={FIELD_LABEL}>Salesperson</label>
-              <select style={{ ...INPUT_STYLE, ...selectStyle }} value={rrSalesPersonId} onChange={e => setRrSalesPersonId(e.target.value === '' ? '' : Number(e.target.value))}>
-                <option value="">— Select salesperson —</option>
-                {dbEmployeeList.map(e => <option key={e.emp_id} value={e.emp_id}>{e.name}{e.desig ? ` (${e.desig})` : ''}</option>)}
-              </select>
-            </div>
+            <SectionHead color={RATE_SOURCE_COLORS['Tariff Rate']}>Carrier & Service</SectionHead>
+            <Field label="Liner" required>
+              {ids => <Select {...ids} value={String(rrLinerId)} onChange={v => setRrLinerId(toId(v))} placeholder="— Select liner —" options={linerOptions} />}
+            </Field>
+            <Field label="Trade Lane" required>
+              {ids => <Select {...ids} value={String(rrTradeLaneId)} onChange={v => setRrTradeLaneId(toId(v))} placeholder="— Select trade lane —" options={tradeLaneOptions} />}
+            </Field>
+            <Field label="Salesperson">
+              {ids => <Select {...ids} value={String(rrSalesPersonId)} onChange={v => setRrSalesPersonId(toId(v))} options={optionalSalesOptions} />}
+            </Field>
 
             {/* — Route — */}
-            <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['Tariff Rate'])} />Route</div>
-            <div>
-              <label style={FIELD_LABEL}>Origin <span style={{ color: '#dc2626' }}>*</span></label>
-              <input list="rr-tr-ports-origin" style={INPUT_STYLE} value={rrOrigin} onChange={e => setRrOrigin(e.target.value)} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />
-              <datalist id="rr-tr-ports-origin">
-                {portOptions(portList).map((o, i) => <option key={i} value={o.value} label={o.label} />)}
-              </datalist>
-            </div>
-            <div>
-              <label style={FIELD_LABEL}>Destination <span style={{ color: '#dc2626' }}>*</span></label>
-              <input list="rr-tr-ports-dest" style={INPUT_STYLE} value={rrDestination} onChange={e => setRrDestination(e.target.value)} placeholder="e.g. Hamburg/Germany or DEHAM" />
-              <datalist id="rr-tr-ports-dest">
-                {portOptions(portList).map((o, i) => <option key={i} value={o.value} label={o.label} />)}
-              </datalist>
-            </div>
-            <div>
-              <label style={FIELD_LABEL}>Free Time (days)</label>
-              <input type="number" style={INPUT_STYLE} value={rrFreeTime} onChange={e => setRrFreeTime(e.target.value)} min={0} placeholder="e.g. 14" />
-            </div>
-            <div>
-              <label style={FIELD_LABEL}>Service Lane</label>
-              <input list="rr-tr-service-lanes" style={INPUT_STYLE} value={rrServiceLane} onChange={e => setRrServiceLane(e.target.value)} placeholder="Type to filter..." />
-              <datalist id="rr-tr-service-lanes">
-                {tradeLaneList.map(t => <option key={t.trln_id} value={t.trln_name} />)}
-              </datalist>
-            </div>
+            <SectionHead color={RATE_SOURCE_COLORS['Tariff Rate']}>Route</SectionHead>
+            <Field label="Origin" required>
+              {ids => <ComboBox {...ids} value={rrOrigin} onChange={setRrOrigin} items={portItems} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />}
+            </Field>
+            <Field label="Destination" required>
+              {ids => <ComboBox {...ids} value={rrDestination} onChange={setRrDestination} items={portItems} placeholder="e.g. Hamburg/Germany or DEHAM" />}
+            </Field>
+            <Field label="Free Time (days)">
+              {ids => <NumberInput {...ids} value={rrFreeTime} onChange={e => setRrFreeTime(e.target.value)} min={0} placeholder="e.g. 14" />}
+            </Field>
+            <Field label="Service Lane">
+              {ids => <ComboBox {...ids} value={rrServiceLane} onChange={setRrServiceLane} items={serviceLaneItems} placeholder="Type to filter..." />}
+            </Field>
             {/* — Validity — */}
-            <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['Tariff Rate'])} />Validity</div>
-            <div>
-              <label style={FIELD_LABEL}>Valid From <span style={{ color: '#dc2626' }}>*</span></label>
-              <input type="date" style={INPUT_STYLE} value={rrValidFrom} onChange={e => setRrValidFrom(e.target.value)} />
-            </div>
-            <div>
-              <label style={FIELD_LABEL}>Valid To <span style={{ color: '#dc2626' }}>*</span></label>
-              <input type="date" style={INPUT_STYLE} value={rrValidTo} onChange={e => setRrValidTo(e.target.value)} />
-            </div>
+            <SectionHead color={RATE_SOURCE_COLORS['Tariff Rate']}>Validity</SectionHead>
+            <Field label="Valid From" required>
+              {ids => <DatePicker {...ids} value={rrValidFrom} onChange={setRrValidFrom} />}
+            </Field>
+            <Field label="Valid To" required>
+              {ids => <DatePicker {...ids} value={rrValidTo} onChange={setRrValidTo} />}
+            </Field>
 
             {/* — Container Rates — */}
-            <div style={{ ...secHead, justifyContent: 'space-between' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={secDot(RATE_SOURCE_COLORS['Tariff Rate'])} />Container Rates</span>
-              <button type="button" className="db-btn" style={{ fontSize: 11, padding: '2px 8px', display: 'flex', alignItems: 'center', gap: 3 }} onClick={addTariffContainer}><Plus size={11} /> Add</button>
-            </div>
-            <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 1fr 0.65fr 28px', gap: 8 }}>
-                <label style={{ ...FIELD_LABEL, margin: 0 }}>Container Type <span style={{ color: '#dc2626' }}>*</span></label>
-                <label style={{ ...FIELD_LABEL, margin: 0 }}>Max Weight</label>
-                <label style={{ ...FIELD_LABEL, margin: 0 }}>Rate <span style={{ color: '#dc2626' }}>*</span></label>
-                <label style={{ ...FIELD_LABEL, margin: 0 }}>Currency</label>
+            <SectionHead color={RATE_SOURCE_COLORS['Tariff Rate']} action={<Button size="sm" icon={<Plus size={14} aria-hidden="true" />} onClick={addTariffContainer}>Add</Button>}>Container Rates</SectionHead>
+            <div className="col-span-full flex flex-col gap-2">
+              <div className="grid grid-cols-[1.2fr_0.8fr_1fr_0.65fr_32px] gap-2">
+                <ColumnLabel required>Container Type</ColumnLabel>
+                <ColumnLabel>Max Weight</ColumnLabel>
+                <ColumnLabel required>Rate</ColumnLabel>
+                <ColumnLabel>Currency</ColumnLabel>
                 <div />
               </div>
               {rrTariffContainers.map((ct, idx) => (
-                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr 1fr 0.65fr 28px', gap: 8, alignItems: 'center' }}>
-                  <select style={{ ...INPUT_STYLE, fontSize: 12, padding: '8px 10px', borderRadius: 8 }} value={ct.containerType} onChange={e => updateTariffContainer(idx, { containerType: e.target.value })}>
-                    <option value="">— Select —</option>
-                    <option value="20GP">20GP</option><option value="40GP">40GP</option><option value="40HC">40HC</option>
-                    <option value="20 Reefer">20 Reefer</option><option value="40 Reefer">40 Reefer</option>
-                    <option value="20 Flat Rack">20 Flat Rack</option><option value="40 Flat Rack">40 Flat Rack</option>
-                    <option value="20 Open Tops">20 Open Tops</option><option value="40 Open Tops">40 Open Tops</option>
-                  </select>
-                  <input style={INPUT_STYLE} value={ct.weight} onChange={e => updateTariffContainer(idx, { weight: e.target.value })} placeholder="e.g. 28000 kg" />
-                  <input type="number" style={INPUT_STYLE} value={ct.rate} onChange={e => updateTariffContainer(idx, { rate: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 2100.00" />
-                  <select style={{ ...INPUT_STYLE, fontSize: 12, padding: '8px 6px', borderRadius: 8 }} value={ct.currency} onChange={e => updateTariffContainer(idx, { currency: e.target.value })}>
-                    <option value="USD">USD</option><option value="EUR">EUR</option><option value="LKR">LKR</option><option value="GBP">GBP</option><option value="SGD">SGD</option>
-                  </select>
-                  <button type="button" className="lt-icon-btn" title="Remove" style={{ padding: 3, opacity: rrTariffContainers.length > 1 ? 1 : 0.3, cursor: rrTariffContainers.length > 1 ? 'pointer' : 'not-allowed' }} disabled={rrTariffContainers.length === 1} onClick={() => removeTariffContainer(idx)}>
-                    <X size={13} />
-                  </button>
+                <div key={idx} className="grid grid-cols-[1.2fr_0.8fr_1fr_0.65fr_32px] items-center gap-2">
+                  <Select aria-label={`Container type, row ${idx + 1}`} value={ct.containerType} onChange={v => updateTariffContainer(idx, { containerType: v })} placeholder="— Select —" options={TARIFF_CONTAINER_OPTIONS} />
+                  <Input aria-label={`Max weight, row ${idx + 1}`} value={ct.weight} onChange={e => updateTariffContainer(idx, { weight: e.target.value })} placeholder="e.g. 28000 kg" />
+                  <NumberInput aria-label={`Rate, row ${idx + 1}`} value={ct.rate} onChange={e => updateTariffContainer(idx, { rate: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 2100.00" />
+                  <Select aria-label={`Currency, row ${idx + 1}`} value={ct.currency} onChange={v => updateTariffContainer(idx, { currency: v })} placeholder="— Select —" options={CURRENCY_OPTIONS} />
+                  <RemoveButton label={`Remove row ${idx + 1}`} disabled={rrTariffContainers.length === 1} onClick={() => removeTariffContainer(idx)} />
                 </div>
               ))}
             </div>
 
             {/* — Additional Information — */}
-            <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['Tariff Rate'])} />Additional Information</div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={FIELD_LABEL}>Note</label>
-              <input style={INPUT_STYLE} value={rrNote} onChange={e => setRrNote(e.target.value)} placeholder="Any notes..." />
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={FIELD_LABEL}>Analysis Note</label>
-              <input style={INPUT_STYLE} value={rrSpecialRemark} onChange={e => setRrSpecialRemark(e.target.value)} placeholder="Special remarks..." />
-            </div>
+            <SectionHead color={RATE_SOURCE_COLORS['Tariff Rate']}>Additional Information</SectionHead>
+            <Field label="Note" className="col-span-full">
+              {ids => <Input {...ids} value={rrNote} onChange={e => setRrNote(e.target.value)} placeholder="Any notes..." />}
+            </Field>
+            <Field label="Analysis Note" className="col-span-full">
+              {ids => <Input {...ids} value={rrSpecialRemark} onChange={e => setRrSpecialRemark(e.target.value)} placeholder="Special remarks..." />}
+            </Field>
           </div>
         )}
 
         {/* ---- Contracted fields ---- */}
         {rrType === 'Contracted' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <div className="mb-3 grid grid-cols-2 gap-x-4 gap-y-3">
             {/* — Contract & Assignment — */}
-            <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['Contracted'])} />Contract & Assignment</div>
-            <div>
-              <label style={FIELD_LABEL}>Contract Reference <span style={{ color: '#dc2626' }}>*</span></label>
-              <input style={INPUT_STYLE} value={rrContractId} onChange={e => setRrContractId(e.target.value)} placeholder="Sent by the liner" />
-            </div>
-            <div>
-              <label style={FIELD_LABEL}>Liner <span style={{ color: '#dc2626' }}>*</span></label>
-              <select style={{ ...INPUT_STYLE, ...selectStyle }} value={rrLinerId} onChange={e => setRrLinerId(e.target.value === '' ? '' : Number(e.target.value))}>
-                <option value="">— Select liner —</option>
-                {linerList.map(l => <option key={l.lin_id} value={l.lin_id}>{linerDisplay(l)}{l.is_on_inttra ? ' (INTTRA)' : ''}{l.has_portal ? ' (Portal)' : ''}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={FIELD_LABEL}>Sales Person</label>
-              <select style={{ ...INPUT_STYLE, ...selectStyle }} value={rrSalesPersonId} onChange={e => setRrSalesPersonId(e.target.value === '' ? '' : Number(e.target.value))}>
-                <option value="">— Select salesperson —</option>
-                {dbEmployeeList.map(e => <option key={e.emp_id} value={e.emp_id}>{e.name}{e.desig ? ` (${e.desig})` : ''}</option>)}
-              </select>
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={FIELD_LABEL}>Applicable Customers</label>
+            <SectionHead color={RATE_SOURCE_COLORS['Contracted']}>Contract & Assignment</SectionHead>
+            <Field label="Contract Reference" required>
+              {ids => <Input {...ids} value={rrContractId} onChange={e => setRrContractId(e.target.value)} placeholder="Sent by the liner" />}
+            </Field>
+            <Field label="Liner" required>
+              {ids => <Select {...ids} value={String(rrLinerId)} onChange={v => setRrLinerId(toId(v))} placeholder="— Select liner —" options={linerOptions} />}
+            </Field>
+            <Field label="Sales Person">
+              {ids => <Select {...ids} value={String(rrSalesPersonId)} onChange={v => setRrSalesPersonId(toId(v))} options={optionalSalesOptions} />}
+            </Field>
+            <div className="col-span-full flex flex-col gap-1">
+              <span className={labelClass}>Applicable Customers</span>
               <TagInput
                 values={rrApplicableCustomers}
                 onChange={setRrApplicableCustomers}
@@ -652,215 +631,148 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             </div>
 
             {/* — Route — */}
-            <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['Contracted'])} />Route</div>
-            <div>
-              <label style={FIELD_LABEL}>Origin <span style={{ color: '#dc2626' }}>*</span></label>
-              <input list="rr-c-ports-origin" style={INPUT_STYLE} value={rrOrigin} onChange={e => setRrOrigin(e.target.value)} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />
-              <datalist id="rr-c-ports-origin">
-                {portOptions(portList).map((o, i) => <option key={i} value={o.value} label={o.label} />)}
-              </datalist>
-            </div>
-            <div>
-              <label style={FIELD_LABEL}>Destination <span style={{ color: '#dc2626' }}>*</span></label>
-              <input list="rr-c-ports-dest" style={INPUT_STYLE} value={rrDestination} onChange={e => setRrDestination(e.target.value)} placeholder="e.g. Hamburg/Germany or DEHAM" />
-              <datalist id="rr-c-ports-dest">
-                {portOptions(portList).map((o, i) => <option key={i} value={o.value} label={o.label} />)}
-              </datalist>
-            </div>
-            <div>
-              <label style={FIELD_LABEL}>Free Time (days)</label>
-              <input type="number" style={INPUT_STYLE} value={rrFreeTime} onChange={e => setRrFreeTime(e.target.value)} min={0} placeholder="e.g. 14" />
-            </div>
-            <div>
-              <label style={FIELD_LABEL}>Service Lane</label>
-              <input list="rr-service-lanes" style={INPUT_STYLE} value={rrServiceLane} onChange={e => setRrServiceLane(e.target.value)} placeholder="Type to filter..." />
-              <datalist id="rr-service-lanes">
-                {tradeLaneList.map(t => <option key={t.trln_id} value={t.trln_name} />)}
-              </datalist>
-            </div>
+            <SectionHead color={RATE_SOURCE_COLORS['Contracted']}>Route</SectionHead>
+            <Field label="Origin" required>
+              {ids => <ComboBox {...ids} value={rrOrigin} onChange={setRrOrigin} items={portItems} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />}
+            </Field>
+            <Field label="Destination" required>
+              {ids => <ComboBox {...ids} value={rrDestination} onChange={setRrDestination} items={portItems} placeholder="e.g. Hamburg/Germany or DEHAM" />}
+            </Field>
+            <Field label="Free Time (days)">
+              {ids => <NumberInput {...ids} value={rrFreeTime} onChange={e => setRrFreeTime(e.target.value)} min={0} placeholder="e.g. 14" />}
+            </Field>
+            <Field label="Service Lane">
+              {ids => <ComboBox {...ids} value={rrServiceLane} onChange={setRrServiceLane} items={serviceLaneItems} placeholder="Type to filter..." />}
+            </Field>
             {/* — Validity — */}
-            <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['Contracted'])} />Validity</div>
-            <div>
-              <label style={FIELD_LABEL}>Valid From <span style={{ color: '#dc2626' }}>*</span></label>
-              <input type="date" style={INPUT_STYLE} value={rrValidFrom} onChange={e => setRrValidFrom(e.target.value)} />
-            </div>
-            <div>
-              <label style={FIELD_LABEL}>Valid To <span style={{ color: '#dc2626' }}>*</span></label>
-              <input type="date" style={INPUT_STYLE} value={rrValidTo} onChange={e => setRrValidTo(e.target.value)} />
-            </div>
+            <SectionHead color={RATE_SOURCE_COLORS['Contracted']}>Validity</SectionHead>
+            <Field label="Valid From" required>
+              {ids => <DatePicker {...ids} value={rrValidFrom} onChange={setRrValidFrom} />}
+            </Field>
+            <Field label="Valid To" required>
+              {ids => <DatePicker {...ids} value={rrValidTo} onChange={setRrValidTo} />}
+            </Field>
 
             {/* — Container Rates — */}
-            <div style={{ ...secHead, justifyContent: 'space-between' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={secDot(RATE_SOURCE_COLORS['Contracted'])} />Container Rates</span>
-              <button type="button" className="db-btn" style={{ fontSize: 11, padding: '2px 8px', display: 'flex', alignItems: 'center', gap: 3 }} onClick={addContractedContainer}><Plus size={11} /> Add</button>
-            </div>
-            <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.65fr 0.75fr 0.85fr 0.6fr 28px', gap: 8 }}>
-                <label style={{ ...FIELD_LABEL, margin: 0 }}>Container Type <span style={{ color: '#dc2626' }}>*</span></label>
-                <label style={{ ...FIELD_LABEL, margin: 0 }}>Contracted TUs</label>
-                <label style={{ ...FIELD_LABEL, margin: 0 }}>Max Weight</label>
-                <label style={{ ...FIELD_LABEL, margin: 0 }}>Rate <span style={{ color: '#dc2626' }}>*</span></label>
-                <label style={{ ...FIELD_LABEL, margin: 0 }}>Currency</label>
+            <SectionHead color={RATE_SOURCE_COLORS['Contracted']} action={<Button size="sm" icon={<Plus size={14} aria-hidden="true" />} onClick={addContractedContainer}>Add</Button>}>Container Rates</SectionHead>
+            <div className="col-span-full flex flex-col gap-2">
+              <div className="grid grid-cols-[1.1fr_0.65fr_0.75fr_0.85fr_0.6fr_32px] gap-2">
+                <ColumnLabel required>Container Type</ColumnLabel>
+                <ColumnLabel>Contracted TUs</ColumnLabel>
+                <ColumnLabel>Max Weight</ColumnLabel>
+                <ColumnLabel required>Rate</ColumnLabel>
+                <ColumnLabel>Currency</ColumnLabel>
                 <div />
               </div>
               {rrContractedContainers.map((cc, idx) => (
-                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.65fr 0.75fr 0.85fr 0.6fr 28px', gap: 8, alignItems: 'center' }}>
-                  <select style={{ ...INPUT_STYLE, fontSize: 12, padding: '8px 10px', borderRadius: 8 }} value={cc.containerType} onChange={e => updateContractedContainer(idx, { containerType: e.target.value })}>
-                    <option value="">— Select —</option>
-                    <option value="20GP">20GP</option><option value="40GP">40GP</option><option value="40HC">40HC</option>
-                  </select>
-                  <input type="number" style={INPUT_STYLE} value={cc.contractedVolume} onChange={e => updateContractedContainer(idx, { contractedVolume: e.target.value })} min={0} placeholder="e.g. 500" />
-                  <input style={INPUT_STYLE} value={cc.weight} onChange={e => updateContractedContainer(idx, { weight: e.target.value })} placeholder="e.g. 28000 kg" />
-                  <input type="number" style={INPUT_STYLE} value={cc.rate} onChange={e => updateContractedContainer(idx, { rate: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 2450.00" />
-                  <select style={{ ...INPUT_STYLE, fontSize: 12, padding: '8px 6px', borderRadius: 8 }} value={cc.currency} onChange={e => updateContractedContainer(idx, { currency: e.target.value })}>
-                    <option value="USD">USD</option><option value="EUR">EUR</option><option value="LKR">LKR</option><option value="GBP">GBP</option><option value="SGD">SGD</option>
-                  </select>
-                  <button type="button" className="lt-icon-btn" title="Remove" style={{ padding: 3, opacity: rrContractedContainers.length > 1 ? 1 : 0.3, cursor: rrContractedContainers.length > 1 ? 'pointer' : 'not-allowed' }} disabled={rrContractedContainers.length === 1} onClick={() => removeContractedContainer(idx)}>
-                    <X size={13} />
-                  </button>
+                <div key={idx} className="grid grid-cols-[1.1fr_0.65fr_0.75fr_0.85fr_0.6fr_32px] items-center gap-2">
+                  <Select aria-label={`Container type, row ${idx + 1}`} value={cc.containerType} onChange={v => updateContractedContainer(idx, { containerType: v })} placeholder="— Select —" options={CONTRACTED_CONTAINER_OPTIONS} />
+                  <NumberInput aria-label={`Contracted TUs, row ${idx + 1}`} value={cc.contractedVolume} onChange={e => updateContractedContainer(idx, { contractedVolume: e.target.value })} min={0} placeholder="e.g. 500" />
+                  <Input aria-label={`Max weight, row ${idx + 1}`} value={cc.weight} onChange={e => updateContractedContainer(idx, { weight: e.target.value })} placeholder="e.g. 28000 kg" />
+                  <NumberInput aria-label={`Rate, row ${idx + 1}`} value={cc.rate} onChange={e => updateContractedContainer(idx, { rate: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 2450.00" />
+                  <Select aria-label={`Currency, row ${idx + 1}`} value={cc.currency} onChange={v => updateContractedContainer(idx, { currency: v })} placeholder="— Select —" options={CURRENCY_OPTIONS} />
+                  <RemoveButton label={`Remove row ${idx + 1}`} disabled={rrContractedContainers.length === 1} onClick={() => removeContractedContainer(idx)} />
                 </div>
               ))}
             </div>
 
             {/* — Additional Information — */}
-            <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['Contracted'])} />Additional Information</div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={FIELD_LABEL}>Note</label>
-              <input style={INPUT_STYLE} value={rrNote} onChange={e => setRrNote(e.target.value)} placeholder="Any notes..." />
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={FIELD_LABEL}>Analysis Note</label>
-              <input style={INPUT_STYLE} value={rrSpecialRemark} onChange={e => setRrSpecialRemark(e.target.value)} placeholder="Special remarks..." />
-            </div>
+            <SectionHead color={RATE_SOURCE_COLORS['Contracted']}>Additional Information</SectionHead>
+            <Field label="Note" className="col-span-full">
+              {ids => <Input {...ids} value={rrNote} onChange={e => setRrNote(e.target.value)} placeholder="Any notes..." />}
+            </Field>
+            <Field label="Analysis Note" className="col-span-full">
+              {ids => <Input {...ids} value={rrSpecialRemark} onChange={e => setRrSpecialRemark(e.target.value)} placeholder="Special remarks..." />}
+            </Field>
           </div>
         )}
 
         {/* ---- NAC fields ---- */}
         {rrType === 'NAC' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <div className="mb-3 grid grid-cols-2 gap-x-4 gap-y-3">
             {/* — Customer & Reference — */}
-            <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['NAC'])} />Customer & Reference</div>
-            <div>
-              <label style={FIELD_LABEL}>NAC Reference No</label>
-              <input style={INPUT_STYLE} value={rrNacRefNo} onChange={e => setRrNacRefNo(e.target.value)} placeholder="e.g. NAC-2026-001" />
-            </div>
-            <div>
-              <label style={FIELD_LABEL}>Customer Name <span style={{ color: '#dc2626' }}>*</span></label>
-              <input list="rr-nac-clients" style={INPUT_STYLE} value={rrNacCustomerName} onChange={e => setRrNacCustomerName(e.target.value)} placeholder="Type to filter..." />
-              <datalist id="rr-nac-clients">
-                {dbClientList.map(c => <option key={c.cli_id} value={c.name} />)}
-              </datalist>
-            </div>
-            <div>
-              <label style={FIELD_LABEL}>Sales Person <span style={{ color: '#dc2626' }}>*</span></label>
-              <select style={{ ...INPUT_STYLE, ...selectStyle }} value={rrSalesPersonId} onChange={e => setRrSalesPersonId(e.target.value === '' ? '' : Number(e.target.value))}>
-                <option value="">— Select salesperson —</option>
-                {dbEmployeeList.map(e => <option key={e.emp_id} value={e.emp_id}>{e.name}{e.desig ? ` (${e.desig})` : ''}</option>)}
-              </select>
-            </div>
+            <SectionHead color={RATE_SOURCE_COLORS['NAC']}>Customer & Reference</SectionHead>
+            <Field label="NAC Reference No">
+              {ids => <Input {...ids} value={rrNacRefNo} onChange={e => setRrNacRefNo(e.target.value)} placeholder="e.g. NAC-2026-001" />}
+            </Field>
+            <Field label="Customer Name" required>
+              {ids => <ComboBox {...ids} value={rrNacCustomerName} onChange={setRrNacCustomerName} items={clientItems} placeholder="Type to filter..." />}
+            </Field>
+            <Field label="Sales Person" required>
+              {ids => <Select {...ids} value={String(rrSalesPersonId)} onChange={v => setRrSalesPersonId(toId(v))} placeholder="— Select salesperson —" options={salesOptions} />}
+            </Field>
 
             {/* — Carrier & Route — */}
-            <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['NAC'])} />Carrier & Route</div>
-            <div>
-              <label style={FIELD_LABEL}>Liner <span style={{ color: '#dc2626' }}>*</span></label>
-              <select style={{ ...INPUT_STYLE, ...selectStyle }} value={rrLinerId} onChange={e => setRrLinerId(e.target.value === '' ? '' : Number(e.target.value))}>
-                <option value="">— Select liner —</option>
-                {linerList.map(l => <option key={l.lin_id} value={l.lin_id}>{linerDisplay(l)}{l.is_on_inttra ? ' (INTTRA)' : ''}{l.has_portal ? ' (Portal)' : ''}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={FIELD_LABEL}>Origin <span style={{ color: '#dc2626' }}>*</span></label>
-              <input list="rr-nac-ports-origin" style={INPUT_STYLE} value={rrOrigin} onChange={e => setRrOrigin(e.target.value)} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />
-              <datalist id="rr-nac-ports-origin">
-                {portOptions(portList).map((o, i) => <option key={i} value={o.value} label={o.label} />)}
-              </datalist>
-            </div>
-            <div>
-              <label style={FIELD_LABEL}>Destination <span style={{ color: '#dc2626' }}>*</span></label>
-              <input list="rr-nac-ports-dest" style={INPUT_STYLE} value={rrDestination} onChange={e => setRrDestination(e.target.value)} placeholder="e.g. Hamburg/Germany or DEHAM" />
-              <datalist id="rr-nac-ports-dest">
-                {portOptions(portList).map((o, i) => <option key={i} value={o.value} label={o.label} />)}
-              </datalist>
-            </div>
-            <div>
-              <label style={FIELD_LABEL}>Free Time (days)</label>
-              <input type="number" style={INPUT_STYLE} value={rrFreeTime} onChange={e => setRrFreeTime(e.target.value)} min={0} placeholder="e.g. 14" />
-            </div>
+            <SectionHead color={RATE_SOURCE_COLORS['NAC']}>Carrier & Route</SectionHead>
+            <Field label="Liner" required>
+              {ids => <Select {...ids} value={String(rrLinerId)} onChange={v => setRrLinerId(toId(v))} placeholder="— Select liner —" options={linerOptions} />}
+            </Field>
+            <Field label="Origin" required>
+              {ids => <ComboBox {...ids} value={rrOrigin} onChange={setRrOrigin} items={portItems} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />}
+            </Field>
+            <Field label="Destination" required>
+              {ids => <ComboBox {...ids} value={rrDestination} onChange={setRrDestination} items={portItems} placeholder="e.g. Hamburg/Germany or DEHAM" />}
+            </Field>
+            <Field label="Free Time (days)">
+              {ids => <NumberInput {...ids} value={rrFreeTime} onChange={e => setRrFreeTime(e.target.value)} min={0} placeholder="e.g. 14" />}
+            </Field>
 
             {/* — Validity — */}
-            <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['NAC'])} />Validity</div>
-            <div>
-              <label style={FIELD_LABEL}>Valid From <span style={{ color: '#dc2626' }}>*</span></label>
-              <input type="date" style={INPUT_STYLE} value={rrValidFrom} onChange={e => setRrValidFrom(e.target.value)} />
-            </div>
-            <div>
-              <label style={FIELD_LABEL}>Valid To <span style={{ color: '#dc2626' }}>*</span></label>
-              <input type="date" style={INPUT_STYLE} value={rrValidTo} onChange={e => setRrValidTo(e.target.value)} />
-            </div>
+            <SectionHead color={RATE_SOURCE_COLORS['NAC']}>Validity</SectionHead>
+            <Field label="Valid From" required>
+              {ids => <DatePicker {...ids} value={rrValidFrom} onChange={setRrValidFrom} />}
+            </Field>
+            <Field label="Valid To" required>
+              {ids => <DatePicker {...ids} value={rrValidTo} onChange={setRrValidTo} />}
+            </Field>
 
             {/* — Container Rates — */}
-            <div style={{ ...secHead, justifyContent: 'space-between' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={secDot(RATE_SOURCE_COLORS['NAC'])} />Container Rates</span>
-              <button type="button" className="db-btn" style={{ fontSize: 11, padding: '2px 8px', display: 'flex', alignItems: 'center', gap: 3 }} onClick={addNacContainer}><Plus size={11} /> Add</button>
-            </div>
-            <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.65fr 0.75fr 0.85fr 0.6fr 28px', gap: 8 }}>
-                <label style={{ ...FIELD_LABEL, margin: 0 }}>Container Type <span style={{ color: '#dc2626' }}>*</span></label>
-                <label style={{ ...FIELD_LABEL, margin: 0 }}>Contracted TUs</label>
-                <label style={{ ...FIELD_LABEL, margin: 0 }}>Max Weight</label>
-                <label style={{ ...FIELD_LABEL, margin: 0 }}>Rate <span style={{ color: '#dc2626' }}>*</span></label>
-                <label style={{ ...FIELD_LABEL, margin: 0 }}>Currency</label>
+            <SectionHead color={RATE_SOURCE_COLORS['NAC']} action={<Button size="sm" icon={<Plus size={14} aria-hidden="true" />} onClick={addNacContainer}>Add</Button>}>Container Rates</SectionHead>
+            <div className="col-span-full flex flex-col gap-2">
+              <div className="grid grid-cols-[1.1fr_0.65fr_0.75fr_0.85fr_0.6fr_32px] gap-2">
+                <ColumnLabel required>Container Type</ColumnLabel>
+                <ColumnLabel>Contracted TUs</ColumnLabel>
+                <ColumnLabel>Max Weight</ColumnLabel>
+                <ColumnLabel required>Rate</ColumnLabel>
+                <ColumnLabel>Currency</ColumnLabel>
                 <div />
               </div>
               {rrNacContainers.map((nc, idx) => (
-                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.65fr 0.75fr 0.85fr 0.6fr 28px', gap: 8, alignItems: 'center' }}>
-                  <select style={{ ...INPUT_STYLE, fontSize: 12, padding: '8px 10px', borderRadius: 8 }} value={nc.containerType} onChange={e => updateNacContainer(idx, { containerType: e.target.value })}>
-                    <option value="">— Select —</option>
-                    <option value="20GP">20GP</option><option value="40GP">40GP</option><option value="40HC">40HC</option>
-                  </select>
-                  <input type="number" style={INPUT_STYLE} value={nc.contractedVolume} onChange={e => updateNacContainer(idx, { contractedVolume: e.target.value })} min={0} placeholder="e.g. 500" />
-                  <input style={INPUT_STYLE} value={nc.weight} onChange={e => updateNacContainer(idx, { weight: e.target.value })} placeholder="e.g. 28000 kg" />
-                  <input type="number" style={INPUT_STYLE} value={nc.rate} onChange={e => updateNacContainer(idx, { rate: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 3200.00" />
-                  <select style={{ ...INPUT_STYLE, fontSize: 12, padding: '8px 6px', borderRadius: 8 }} value={nc.currency} onChange={e => updateNacContainer(idx, { currency: e.target.value })}>
-                    <option value="USD">USD</option><option value="EUR">EUR</option><option value="LKR">LKR</option><option value="GBP">GBP</option><option value="SGD">SGD</option>
-                  </select>
-                  <button type="button" className="lt-icon-btn" title="Remove" style={{ padding: 3, opacity: rrNacContainers.length > 1 ? 1 : 0.3, cursor: rrNacContainers.length > 1 ? 'pointer' : 'not-allowed' }} disabled={rrNacContainers.length === 1} onClick={() => removeNacContainer(idx)}>
-                    <X size={13} />
-                  </button>
+                <div key={idx} className="grid grid-cols-[1.1fr_0.65fr_0.75fr_0.85fr_0.6fr_32px] items-center gap-2">
+                  <Select aria-label={`Container type, row ${idx + 1}`} value={nc.containerType} onChange={v => updateNacContainer(idx, { containerType: v })} placeholder="— Select —" options={CONTRACTED_CONTAINER_OPTIONS} />
+                  <NumberInput aria-label={`Contracted TUs, row ${idx + 1}`} value={nc.contractedVolume} onChange={e => updateNacContainer(idx, { contractedVolume: e.target.value })} min={0} placeholder="e.g. 500" />
+                  <Input aria-label={`Max weight, row ${idx + 1}`} value={nc.weight} onChange={e => updateNacContainer(idx, { weight: e.target.value })} placeholder="e.g. 28000 kg" />
+                  <NumberInput aria-label={`Rate, row ${idx + 1}`} value={nc.rate} onChange={e => updateNacContainer(idx, { rate: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 3200.00" />
+                  <Select aria-label={`Currency, row ${idx + 1}`} value={nc.currency} onChange={v => updateNacContainer(idx, { currency: v })} placeholder="— Select —" options={CURRENCY_OPTIONS} />
+                  <RemoveButton label={`Remove row ${idx + 1}`} disabled={rrNacContainers.length === 1} onClick={() => removeNacContainer(idx)} />
                 </div>
               ))}
             </div>
 
             {/* — Additional Information — */}
-            <div style={secHead}><span style={secDot(RATE_SOURCE_COLORS['NAC'])} />Additional Information</div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={FIELD_LABEL}>Note</label>
-              <input style={INPUT_STYLE} value={rrNote} onChange={e => setRrNote(e.target.value)} placeholder="Any notes..." />
-            </div>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <label style={FIELD_LABEL}>Analysis Note</label>
-              <input style={INPUT_STYLE} value={rrSpecialRemark} onChange={e => setRrSpecialRemark(e.target.value)} placeholder="Special remarks..." />
-            </div>
+            <SectionHead color={RATE_SOURCE_COLORS['NAC']}>Additional Information</SectionHead>
+            <Field label="Note" className="col-span-full">
+              {ids => <Input {...ids} value={rrNote} onChange={e => setRrNote(e.target.value)} placeholder="Any notes..." />}
+            </Field>
+            <Field label="Analysis Note" className="col-span-full">
+              {ids => <Input {...ids} value={rrSpecialRemark} onChange={e => setRrSpecialRemark(e.target.value)} placeholder="Special remarks..." />}
+            </Field>
           </div>
         )}
 
 
         {/* Edit Actions (manual mode only) */}
         {!(rrType === 'Tariff Rate' && entryMode === 'bulk') && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 16 }}>
-          <button className="db-btn" style={{ fontSize: 12 }} onClick={onGoBack}>Back to Workspace</button>
-          <button
-            className="db-btn primary"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 5, fontSize: 12,
-              opacity: canSave ? 1 : 0.5,
-              cursor: canSave ? 'pointer' : 'not-allowed',
-            }}
+        <div className="mt-4 flex justify-end gap-2 border-t border-line-soft pt-4">
+          <Button onClick={onGoBack}>Back to Workspace</Button>
+          <Button
+            variant="primary"
+            icon={<FileText size={14} aria-hidden="true" />}
             disabled={!canSave}
             onClick={() => setMode('review')}
           >
-            <FileText size={12} /> Review & Save
-          </button>
+            Review & Save
+          </Button>
         </div>
         )}
         </>}
@@ -869,34 +781,34 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
         {mode === 'review' && (() => {
           const accent = RATE_SOURCE_COLORS[rrType]
           const row = (label: string, value: string) => (
-            <div className="ws-doc-row" style={{ display: 'flex', justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{label}</span>
-              <strong style={{ fontSize: 12, color: 'var(--text)' }}>{value || '—'}</strong>
+            <div className="flex justify-between border-b border-line-soft py-1 text-control">
+              <span className="text-fg-muted">{label}</span>
+              <strong className="font-semibold text-fg">{value || '—'}</strong>
             </div>
           )
           const containerRows = (arr: (TariffContainerRate | ContractedContainerRate)[]) =>
             arr.filter(c => c.rate !== '').map((c, i) => (
-              <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 10, background: 'var(--bg)', marginTop: i > 0 ? 6 : 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Container {i + 1}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 16px', fontSize: 12 }}>
-                  <span style={{ color: 'var(--text-muted)' }}>Type</span><strong>{c.containerType || '—'}</strong>
-                  {'contractedVolume' in c && c.contractedVolume && <><span style={{ color: 'var(--text-muted)' }}>Contracted TUs</span><strong>{c.contractedVolume}</strong></>}
-                  {c.weight && <><span style={{ color: 'var(--text-muted)' }}>Max Weight</span><strong>{c.weight}</strong></>}
-                  <span style={{ color: 'var(--text-muted)' }}>Rate</span><strong>{c.rate} {c.currency}</strong>
+              <div key={i} className={cn('rounded-card border border-line-soft bg-canvas p-3', i > 0 && 'mt-2')}>
+                <div className="mb-1 text-label font-bold uppercase text-fg-muted">Container {i + 1}</div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-control text-fg">
+                  <span className="text-fg-muted">Type</span><strong>{c.containerType || '—'}</strong>
+                  {'contractedVolume' in c && c.contractedVolume && <><span className="text-fg-muted">Contracted TUs</span><strong>{c.contractedVolume}</strong></>}
+                  {c.weight && <><span className="text-fg-muted">Max Weight</span><strong>{c.weight}</strong></>}
+                  <span className="text-fg-muted">Rate</span><strong>{c.rate} {c.currency}</strong>
                 </div>
               </div>
             ))
 
           return <>
             {/* Rate type badge */}
-            <div style={{ marginBottom: 16 }}>
-              <span style={{ display: 'inline-block', padding: '4px 12px', borderRadius: 6, fontSize: 11, fontWeight: 700, color: '#fff', background: accent }}>{rrType}</span>
+            <div className="mb-4">
+              <span className="inline-block rounded-control px-3 py-1 text-label font-bold text-white" style={{ background: accent }}>{rrType}</span>
             </div>
 
             {/* Common fields */}
-            <div style={{ marginBottom: 16 }}>
+            <div className="mb-4">
               {rrType === 'Tariff Rate' && <>
-                <div style={secHead}><span style={secDot(accent)} />Carrier & Service</div>
+                <SectionHead color={accent}>Carrier & Service</SectionHead>
                 {row('Liner', linerName)}
                 {row('Trade Lane', laneName)}
                 {row('Salesperson', salesName)}
@@ -904,7 +816,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
               </>}
 
               {rrType === 'Contracted' && <>
-                <div style={secHead}><span style={secDot(accent)} />Contract & Assignment</div>
+                <SectionHead color={accent}>Contract & Assignment</SectionHead>
                 {row('Contract Reference', rrContractId)}
                 {row('Liner', linerName)}
                 {row('Sales Person', salesName)}
@@ -913,58 +825,58 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
               </>}
 
               {rrType === 'NAC' && <>
-                <div style={secHead}><span style={secDot(accent)} />Customer & Reference</div>
+                <SectionHead color={accent}>Customer & Reference</SectionHead>
                 {row('NAC Reference No', rrNacRefNo)}
                 {row('Customer Name', rrNacCustomerName)}
                 {row('Sales Person', salesName)}
-                <div style={{ ...secHead, marginTop: 16 }}><span style={secDot(accent)} />Carrier</div>
+                <SectionHead color={accent} className="mt-4">Carrier</SectionHead>
                 {row('Liner', linerName)}
               </>}
             </div>
 
             {/* Route */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={secHead}><span style={secDot(accent)} />Route</div>
+            <div className="mb-4">
+              <SectionHead color={accent}>Route</SectionHead>
               {row('Origin', rrOrigin)}
               {row('Destination', rrDestination)}
               {row('Free Time', rrFreeTime ? `${rrFreeTime} days` : '—')}
             </div>
 
             {/* Validity */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={secHead}><span style={secDot(accent)} />Validity</div>
+            <div className="mb-4">
+              <SectionHead color={accent}>Validity</SectionHead>
               {row('Valid From', rrValidFrom)}
               {row('Valid To', rrValidTo)}
             </div>
 
             {/* Container Rates */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={secHead}><span style={secDot(accent)} />Container Rates</div>
+            <div className="mb-4">
+              <SectionHead color={accent} className="mb-2">Container Rates</SectionHead>
               {rrType === 'Tariff Rate' && containerRows(rrTariffContainers)}
               {rrType === 'Contracted' && containerRows(rrContractedContainers)}
               {rrType === 'NAC' && containerRows(rrNacContainers)}
             </div>
 
             {/* Additional Info */}
-            {(rrNote || rrSpecialRemark) && <div style={{ marginBottom: 8 }}>
-              <div style={secHead}><span style={secDot(accent)} />Additional Information</div>
+            {(rrNote || rrSpecialRemark) && <div className="mb-2">
+              <SectionHead color={accent}>Additional Information</SectionHead>
               {rrNote && row('Note', rrNote)}
               {rrSpecialRemark && row('Analysis Note', rrSpecialRemark)}
             </div>}
 
             {/* Review Actions */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 16 }}>
-              <button className="db-btn" style={{ fontSize: 12 }} onClick={() => setMode('edit')}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><ArrowLeft size={12} /> Back to Edit</span>
-              </button>
-              <button
-                className="db-btn primary"
-                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, ...(saving ? { opacity: 0.6, cursor: 'wait' } : {}) }}
+            <div className="mt-4 flex justify-end gap-2 border-t border-line-soft pt-4">
+              <Button icon={<ArrowLeft size={14} aria-hidden="true" />} onClick={() => setMode('edit')}>
+                Back to Edit
+              </Button>
+              <Button
+                variant="primary"
+                isPending={saving}
+                icon={<Check size={14} aria-hidden="true" />}
                 onClick={handleSave}
-                disabled={saving}
               >
-                <Check size={12} /> {saving ? 'Saving…' : 'Confirm & Save'}
-              </button>
+                {saving ? 'Saving…' : 'Confirm & Save'}
+              </Button>
             </div>
           </>
         })()}
