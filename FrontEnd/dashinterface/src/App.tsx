@@ -1169,7 +1169,7 @@ export default function App() {
           />
         )
       case 'rate-list':
-        return <RateList />
+        return <RateList onFlash={flash} />
       case 'booking-list':
         return <BookingList bookings={bookings} activityLog={activityLog} />
       case 'followups':
@@ -1348,19 +1348,26 @@ export default function App() {
           </main>
         </div>
 
-        {toast && (
-          <div className="lt-toast">
-            {toast.message}
-            {toast.action && (
-              <button
-                className="lt-toast-action"
-                onClick={() => { toast.action!.onClick(); setToast(null) }}
-              >
-                {toast.action.label} &rarr;
-              </button>
-            )}
-          </div>
-        )}
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          className="pointer-events-none fixed bottom-6 left-1/2 z-(--z-toast) -translate-x-1/2"
+        >
+          {toast && (
+            <div className="pointer-events-auto flex items-center gap-2.5 rounded-card bg-primary-strong px-4 py-2.5 text-control font-semibold text-white shadow-popover">
+              {toast.message}
+              {toast.action && (
+                <button
+                  className="cursor-pointer whitespace-nowrap border-none bg-transparent p-0 font-bold text-accent-on-dark underline"
+                  onClick={() => { toast.action!.onClick(); setToast(null) }}
+                >
+                  {toast.action.label} &rarr;
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </RoleContext.Provider>
   )

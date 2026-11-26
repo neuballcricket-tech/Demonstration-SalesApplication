@@ -3882,7 +3882,7 @@ export default function InlineStepForms({
       })
       .catch(err => {
         console.error('[Workspace] Failed to fetch quotation file:', err)
-        alert('Could not download the quotation file. It may not have been saved yet.')
+        onFlash('Could not download the quotation file. It may not have been saved yet.')
       })
       .finally(() => setPdfDownloading(false))
   }

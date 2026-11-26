@@ -241,7 +241,7 @@ function detailFields(r: UnifiedRate): [string, string][] {
 // Component
 // ---------------------------------------------------------------------------
 
-export default function RateList() {
+export default function RateList({ onFlash }: { onFlash: (msg: string) => void }) {
   const { activeRole } = useRole()
   const isRestrictedRole = activeRole === 'CS' || activeRole === 'Sales'
 
@@ -299,7 +299,7 @@ export default function RateList() {
         setRemarkFocused(false)
         loadRates()
       })
-      .catch(() => alert('Failed to save remark'))
+      .catch(() => onFlash('Failed to save remark'))
       .finally(() => setRemarkSaving(false))
   }
 
@@ -354,7 +354,7 @@ export default function RateList() {
     }
     apiUpdateRate(editing.id, payload)
       .then(() => { setEditing(null); loadRates() })
-      .catch(() => alert('Failed to update rate'))
+      .catch(() => onFlash('Failed to update rate'))
       .finally(() => setSaving(false))
   }
 
