@@ -1,6 +1,6 @@
 import { parseDate, type DateValue } from '@internationalized/date'
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
-import type { AriaAttributes, CSSProperties } from 'react'
+import { useRef, type AriaAttributes, type CSSProperties } from 'react'
 import {
   Button,
   Calendar,
@@ -20,6 +20,7 @@ import {
 } from 'react-aria-components'
 import { cn } from '../../lib/cn'
 import { control, controlModifier } from './controlStyles'
+import { usePopoverLayer } from './modalContext'
 
 export interface DatePickerProps {
   /** `'YYYY-MM-DD'` (a longer ISO datetime is cut to its date part). `''`, `null`, `undefined` or invalid text shows empty. */
@@ -92,6 +93,8 @@ export function DatePicker({
   className,
   style,
 }: DatePickerProps) {
+  const layer = usePopoverLayer()
+  const popoverRef = useRef<HTMLElement>(null)
   const parsed = parseISODate(value)
   return (
     <AriaDatePicker<DateValue>
@@ -116,6 +119,9 @@ export function DatePicker({
       {label && <Label className="text-label font-semibold text-fg-label">{label}</Label>}
       <Group
         onBlur={(e) => {
+          // The calendar popover is a portal, so opening it moves focus out of the group without leaving the field.
+          // Closing it returns focus to the calendar button, so leaving the field always ends with this blur.
+          if (e.relatedTarget instanceof Node && popoverRef.current?.contains(e.relatedTarget)) return
           if (parsed && isPartiallyFilled(e.currentTarget, e.relatedTarget)) onChange('')
         }}
         className={cn(
@@ -138,8 +144,9 @@ export function DatePicker({
         </Button>
       </Group>
       <Popover
+        ref={popoverRef}
         placement="bottom start"
-        className="z-(--z-popover) rounded-card border border-line-popover bg-surface p-2 shadow-popover"
+        className={cn(layer, 'rounded-card border border-line-popover bg-surface p-2 shadow-popover')}
       >
         <Dialog className="outline-hidden">
           <Calendar className="w-56">

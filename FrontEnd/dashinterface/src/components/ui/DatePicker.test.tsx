@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nProvider } from 'react-aria-components'
 import { useState } from 'react'
@@ -110,6 +110,50 @@ describe('DatePicker', () => {
     await user.tab()
     expect(onChange).toHaveBeenLastCalledWith('')
     expect(segmentTexts().join('')).toBe('ddmmyyyy')
+  })
+
+  it('does not clear a partially filled date when the calendar is opened', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(wrap(<Harness initial="2026-11-26" onChange={onChange} />))
+    await clearSegment(user, segments()[0], 2)
+    expect(onChange.mock.calls).toEqual([['2026-11-02']])
+    await user.click(screen.getByRole('button', { name: /calendar/i }))
+    expect(screen.getByRole('grid')).toBeInTheDocument()
+    expect(onChange).not.toHaveBeenCalledWith('')
+  })
+
+  it('clears a partially filled date when focus leaves after the calendar was closed', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(
+      wrap(
+        <>
+          <Harness initial="2026-11-26" onChange={onChange} />
+          <button type="button">After</button>
+        </>,
+      ),
+    )
+    await clearSegment(user, segments()[0], 2)
+    await user.click(screen.getByRole('button', { name: /calendar/i }))
+    await user.keyboard('{Escape}')
+    // RAC returns focus to the calendar button after the popover closes.
+    await waitFor(() => expect(screen.getByRole('button', { name: /calendar/i })).toHaveFocus())
+    expect(onChange).not.toHaveBeenCalledWith('')
+    await user.click(screen.getByRole('button', { name: 'After' }))
+    expect(onChange).toHaveBeenLastCalledWith('')
+  })
+
+  it('does not emit when tabbing between segments of a partially filled date', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(wrap(<Harness initial="2026-11-26" onChange={onChange} />))
+    await clearSegment(user, segments()[0], 2)
+    onChange.mockClear()
+    await user.tab()
+    await user.tab()
+    await user.tab({ shift: true })
+    expect(onChange).not.toHaveBeenCalled()
   })
 
   it('does not emit on blur for a complete date', async () => {
