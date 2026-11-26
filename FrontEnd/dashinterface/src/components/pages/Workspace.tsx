@@ -1805,7 +1805,7 @@ export default function Workspace({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: compact ? 9 : 11,
+                  fontSize: 11,
                   fontWeight: 700,
                   background: isGreyedOut ? 'rgba(0,0,0,0.06)' : isActive ? roleColor : isEmpty ? 'rgba(0,0,0,0.06)' : roleColor + '18',
                   color: isGreyedOut ? '#aaa' : isActive ? '#fff' : isEmpty ? 'var(--text-muted)' : roleColor,
@@ -1815,7 +1815,7 @@ export default function Workspace({
                   {step.stepNumber}
                 </div>
                 <span style={{
-                  fontSize: compact ? 9 : 10,
+                  fontSize: 11,
                   fontWeight: isActive && !isGreyedOut ? 700 : 600,
                   color: isGreyedOut ? '#aaa' : isActive ? roleColor : isEmpty ? 'var(--text-muted)' : 'var(--text-secondary)',
                   whiteSpace: 'nowrap',
@@ -1826,13 +1826,13 @@ export default function Workspace({
                 {count > 0 && (
                   <span style={{
                     ...(compact ? {} : { position: 'absolute' as const, top: 2, right: 6 }),
-                    minWidth: compact ? 14 : 16,
-                    height: compact ? 14 : 16,
-                    borderRadius: compact ? 7 : 8,
+                    minWidth: compact ? 16 : 18,
+                    height: compact ? 16 : 18,
+                    borderRadius: compact ? 8 : 9,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: compact ? 8 : 9,
+                    fontSize: 11,
                     fontWeight: 700,
                     background: isActive ? roleColor : '#ef4444',
                     color: '#fff',
