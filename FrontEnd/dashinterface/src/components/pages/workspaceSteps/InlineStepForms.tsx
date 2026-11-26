@@ -3838,7 +3838,7 @@ export default function InlineStepForms({
   const emailSubject = `Quotation for ${stcInquiry.customer_name} — ${stcInquiry.id}`
 
   // Resolve quote_id for fetching the saved PDF from S3
-  const resolvedQuoteId = lastQuotationId ?? lookupQuotationId(stcInquiry.inq_id) ?? unsentQuote?.quote_id ?? (stcInquiry as any).quotation_id ?? null
+  const resolvedQuoteId = lastQuotationId ?? lookupQuotationId(stcInquiry.inq_id) ?? unsentQuote?.quote_id ?? (stcInquiry as Inquiry & { quotation_id?: number }).quotation_id ?? null
 
   const handleOpenOutlook = () => {
     openMailto(customerContactEmail, emailSubject, quotationText)

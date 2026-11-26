@@ -1491,10 +1491,10 @@ export function detectIntent(text: string, existingCustomers: string[] = []): Ch
   }
 
   // 3. Add task
-  if (/\b(add|create|new|set|schedule)\s+(?:a\s+)?(?:task|todo|reminder)|\btask\s*[:\-]/i.test(lower) || /\bremind\s+me\b/.test(lower)) {
+  if (/\b(add|create|new|set|schedule)\s+(?:a\s+)?(?:task|todo|reminder)|\btask\s*[:-]/i.test(lower) || /\bremind\s+me\b/.test(lower)) {
     const customer = findCust()
     let task = trimmed
-    const tm = trimmed.match(/(?:task|todo|reminder)\s*[:\-]?\s*(.+?)(?:\s+by\s+|\s+due\s+|$)/i)
+    const tm = trimmed.match(/(?:task|todo|reminder)\s*[:-]?\s*(.+?)(?:\s+by\s+|\s+due\s+|$)/i)
     if (tm) task = tm[1].trim()
     let due = ''
     const dm = trimmed.match(/\b(?:by|due)\s+([0-9]{4}-[0-9]{2}-[0-9]{2}|tomorrow|today|next\s+\w+|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i)

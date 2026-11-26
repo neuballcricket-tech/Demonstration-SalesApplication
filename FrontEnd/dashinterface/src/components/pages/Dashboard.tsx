@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { Clock, CheckCircle2, Users as UsersIcon, AlertTriangle, ArrowRight, ShieldCheck, Target, Building2, LayoutDashboard } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, type TooltipContentProps } from 'recharts'
 import KPICard from '../shared/KPICard'
 import NLQBox from '../shared/NLQBox'
 import { EMPLOYEES, SBUS, isOverdue, type Inquiry, type Task, type Followup, type MissingItem, type KPIItem, type PageId, type SBU, type Quote } from '../../types'
@@ -15,12 +15,14 @@ interface DashboardProps {
   onGoTo: (page: PageId) => void
 }
 
-const Tip = ({ active, payload, label }: any) => {
+type TipProps = Partial<Pick<TooltipContentProps<number, string>, 'active' | 'payload' | 'label'>>
+
+const Tip = ({ active, payload, label }: TipProps) => {
   if (!active || !payload?.length) return null
   return (
     <div className="db-tooltip">
       <div className="db-tooltip-label">{label}</div>
-      {payload.map((p: any, i: number) => (
+      {payload.map((p, i) => (
         <div key={i} className="db-tooltip-val" style={{ color: p.color || '#1e293b' }}>
           {p.name}: {p.value}
         </div>

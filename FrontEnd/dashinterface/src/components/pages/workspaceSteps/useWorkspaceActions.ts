@@ -655,7 +655,8 @@ CLSynergy (Pvt) Ltd`
               final_amt: o.final_amt,
               currency: o.option_currency,
             }))
-          setQuotationOptions(opts as any)
+          // Only the option_* fields are read downstream; quote-level fields are not available here
+          setQuotationOptions(opts as unknown as QuotationOptionRow[])
           if (opts.length === 1) setSelectedOptionRateId(opts[0].rate_id)
         }
         setActionModal(item)
@@ -669,7 +670,7 @@ CLSynergy (Pvt) Ltd`
         // Use accepted quotation data for structured pre-fill when available
         if (aq) {
           // Resolve liner name from lin_id
-          const resolvedLiner = aq.lin_id ? linerList.find((l: any) => l.lin_id === aq.lin_id)?.name ?? '' : ''
+          const resolvedLiner = aq.lin_id ? linerList.find(l => l.lin_id === aq.lin_id)?.name ?? '' : ''
           const ctFmt = (ct: string) => ct.replace(/\s+/g, '').replace(/(\d{2})(.*)/,(_, sz: string, tp: string) => `${sz}'${tp}`)
           const fmtContainer = ctFmt(aq.container_type || "20GP")
 

@@ -689,7 +689,7 @@ export default function App() {
       const bkg = prev.find(b => b.id === bookingId)
       if (bkg?.booking_id) {
         // No dedicated revert endpoint — clear fields via PATCH
-        apiPatchBookingRequest(bkg.booking_id, { ra_number: '', vessel: '' } as any)
+        apiPatchBookingRequest(bkg.booking_id, { ra_number: '', vessel: '' })
           .catch(err => console.error('[revertBookingRequest] API failed:', err))
       }
       return prev.map(b =>
@@ -722,9 +722,10 @@ export default function App() {
           cargo_desc: fields.cargo_description || undefined,
         }
         apiCreateReleaseOrder(roPayload)
-          .then((result: any) => {
-            if (result.ro_id) {
-              setBookings(p => p.map(b => b.id === bookingId ? { ...b, ro_id: result.ro_id } : b))
+          .then(result => {
+            const roId = result.ro_id
+            if (typeof roId === 'number' && roId) {
+              setBookings(p => p.map(b => b.id === bookingId ? { ...b, ro_id: roId } : b))
             }
           })
           .catch(err => console.error('[attachReleaseOrder] API failed:', err))

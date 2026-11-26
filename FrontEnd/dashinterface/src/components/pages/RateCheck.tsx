@@ -962,7 +962,7 @@ export default function RateCheck({
         }
         console.log('[RateCheck] vessel-spot payload →', JSON.stringify(vesselPayload, null, 2))
         apiCreateVesselRate(vesselPayload).then(res => {
-          const id = (res as any).srid as number | undefined
+          const id = res.srid as number | undefined
           if (id) setCreatedManualRateIds(prev => [...prev, { rateType: 'vessel_by_vessel_rate', rateId: id, scheduleId: currentLinkedSchedule?.scheduleId }])
         }).catch(err => { console.error('[RateCheck] vessel-spot POST failed:', err); onFlash(`ERROR saving vessel rate: ${(err as Error).message}`) })
       })
@@ -988,7 +988,7 @@ export default function RateCheck({
           surcharges: surchargePayload.length > 0 ? surchargePayload : undefined,
           schedule_id: currentLinkedSchedule?.scheduleId ?? undefined,
         }).then(res => {
-          const id = (res as any).fak_id as number | undefined
+          const id = res.fak_id as number | undefined
           if (id) setCreatedManualRateIds(prev => [...prev, { rateType: 'fak_rates', rateId: id, scheduleId: currentLinkedSchedule?.scheduleId }])
         }).catch(err => { console.error('[RateCheck] fak POST failed:', err); onFlash(`ERROR saving FAK rate: ${(err as Error).message}`) })
       })
@@ -1017,7 +1017,7 @@ export default function RateCheck({
           surcharges: surchargePayload.length > 0 ? surchargePayload : undefined,
           schedule_id: currentLinkedSchedule?.scheduleId ?? undefined,
         }).then(res => {
-          const id = (res as any).sprid as number | undefined
+          const id = res.sprid as number | undefined
           if (id) setCreatedManualRateIds(prev => [...prev, { rateType: 'special_rate', rateId: id, scheduleId: currentLinkedSchedule?.scheduleId }])
         }).catch(err => { console.error('[RateCheck] special POST failed:', err); onFlash(`ERROR saving special rate: ${(err as Error).message}`) })
       })

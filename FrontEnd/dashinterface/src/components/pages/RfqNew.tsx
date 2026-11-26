@@ -21,6 +21,10 @@ interface Props {
   onGoBack: () => void
 }
 
+function FieldError({ message }: { message?: string }) {
+  return message ? <div style={{ color: '#dc2626', fontSize: 11, marginTop: 3 }}>{message}</div> : null
+}
+
 export default function RfqNew({ clientList, onFlash, onGoBack }: Props) {
   const [customer, setCustomer] = useState('')
   const [contactName, setContactName] = useState('')
@@ -136,9 +140,6 @@ export default function RfqNew({ clientList, onFlash, onGoBack }: Props) {
     }
   }
 
-  const Err = ({ k }: { k: string }) =>
-    errors[k] ? <div style={{ color: '#dc2626', fontSize: 11, marginTop: 3 }}>{errors[k]}</div> : null
-
   return (
     <div style={PAGE_WRAPPER}>
       <div style={PAGE_TITLE_ROW}>
@@ -194,13 +195,13 @@ export default function RfqNew({ clientList, onFlash, onGoBack }: Props) {
               items={clientList.map(c => ({ label: c.name, sublabel: c.city ?? undefined }))}
               placeholder="Type or select customer"
             />
-            <Err k="customer" />
+            <FieldError message={errors.customer} />
           </div>
           <div>
             <label style={FIELD_LABEL}>Contact Person <span style={{ color: '#dc2626' }}>*</span></label>
             <input style={INPUT_STYLE} value={contactName}
                    onChange={e => setContactName(e.target.value)} maxLength={100} placeholder="e.g. John Silva" />
-            <Err k="contact" />
+            <FieldError message={errors.contact} />
           </div>
           <div>
             <label style={FIELD_LABEL}>Contact Email</label>
@@ -220,7 +221,7 @@ export default function RfqNew({ clientList, onFlash, onGoBack }: Props) {
             <Plus size={13} /> Add route
           </button>
         </div>
-        <Err k="rows" />
+        <FieldError message={errors.rows} />
 
         {rows.map((r, i) => (
           <div key={i} style={{
@@ -235,12 +236,12 @@ export default function RfqNew({ clientList, onFlash, onGoBack }: Props) {
             <div>
               {i === 0 && <label style={FIELD_LABEL}>Origin</label>}
               <PortCombobox value={r.origin} onChange={v => update(i, { origin: v })} placeholder="e.g. Colombo" />
-              <Err k={`r${i}.origin`} />
+              <FieldError message={errors[`r${i}.origin`]} />
             </div>
             <div>
               {i === 0 && <label style={FIELD_LABEL}>Destination</label>}
               <PortCombobox value={r.destination} onChange={v => update(i, { destination: v })} placeholder="e.g. Hamburg" />
-              <Err k={`r${i}.destination`} />
+              <FieldError message={errors[`r${i}.destination`]} />
             </div>
             <div>
               {i === 0 && <label style={FIELD_LABEL}>Container</label>}
@@ -253,7 +254,7 @@ export default function RfqNew({ clientList, onFlash, onGoBack }: Props) {
               {i === 0 && <label style={FIELD_LABEL}>Qty</label>}
               <input type="number" min={1} style={INPUT_STYLE} value={r.qty}
                      onChange={e => update(i, { qty: Math.max(1, Number(e.target.value)) })} />
-              <Err k={`r${i}.qty`} />
+              <FieldError message={errors[`r${i}.qty`]} />
             </div>
             <div style={{ paddingTop: i === 0 ? 22 : 0 }}>
               <button className="db-btn" title="Remove"

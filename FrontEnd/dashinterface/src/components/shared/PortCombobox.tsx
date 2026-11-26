@@ -120,7 +120,7 @@ async function getReversePorts(): Promise<Map<string, string>> {
  * all normalise to "rotterdam netherlands".
  */
 function normPort(s: string): string {
-  return s.toLowerCase().replace(/[\/,]+/g, ' ').replace(/\s+/g, ' ').trim()
+  return s.toLowerCase().replace(/[/,]+/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 function curatedLabel(code: string): string | undefined {
@@ -228,7 +228,7 @@ export default function PortCombobox({ value, onChange, placeholder, id, style }
     if (!raw || validation.status === 'valid') return
 
     // 1. Extract leading token as a potential UNLOCODE (letters/digits only)
-    const potentialCode = raw.split(/[\s—\-]+/)[0].toUpperCase().replace(/[^A-Z0-9]/g, '')
+    const potentialCode = raw.split(/[\s—-]+/)[0].toUpperCase().replace(/[^A-Z0-9]/g, '')
 
     // 2. Check curated list by code
     const curatedByCode = CURATED_PORTS.find(p => p.code === potentialCode)
@@ -271,7 +271,7 @@ export default function PortCombobox({ value, onChange, placeholder, id, style }
       }
 
       // 4c. Not found — show similar curated suggestions
-      const words = raw.toLowerCase().split(/[\s\/,]+/).filter(w => w.length >= 2)
+      const words = raw.toLowerCase().split(/[\s/,]+/).filter(w => w.length >= 2)
       const similar = CURATED_PORTS.filter(p =>
         words.some(w => p.code.toLowerCase().includes(w) || normPort(p.label).includes(w))
       ).slice(0, 5)

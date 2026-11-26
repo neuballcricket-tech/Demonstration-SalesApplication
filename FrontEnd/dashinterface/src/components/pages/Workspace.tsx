@@ -1208,10 +1208,10 @@ export default function Workspace({
       if (first && IMMEDIATE_FIRE_KINDS.has(first.actionKind)) return null
       return first
     }
-    return filteredItems.find(i => `${i.type}-${i.refId}-${i.actionKind}-${(i.sourceData as any)?.containerIdx ?? 0}` === selectedItemId) ?? filteredItems[0] ?? null
+    return filteredItems.find(i => `${i.type}-${i.refId}-${i.actionKind}-${(i.sourceData as { containerIdx?: number } | undefined)?.containerIdx ?? 0}` === selectedItemId) ?? filteredItems[0] ?? null
   }, [selectedItemId, filteredItems, IMMEDIATE_FIRE_KINDS])
 
-  const getItemKey = (item: WorkspaceItem) => `${item.type}-${item.refId}-${item.actionKind}-${(item.sourceData as any)?.containerIdx ?? 0}`
+  const getItemKey = (item: WorkspaceItem) => `${item.type}-${item.refId}-${item.actionKind}-${(item.sourceData as { containerIdx?: number } | undefined)?.containerIdx ?? 0}`
   // ---------------------------------------------------------------------------
 
   const { handleAction, handleModalSubmit } = useWorkspaceActions({

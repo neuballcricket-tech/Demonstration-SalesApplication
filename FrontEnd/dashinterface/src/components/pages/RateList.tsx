@@ -282,6 +282,14 @@ export default function RateList() {
     setRemarkFocused(true)
   }
 
+  const loadRates = () => {
+    setLoading(true)
+    apiFetchAllRates()
+      .then(data => { setRates(data); setLoaded(true) })
+      .catch(err => { console.error('[RateList] apiFetchAllRates failed:', err); setLoaded(true) })
+      .finally(() => setLoading(false))
+  }
+
   const handleRemarkSave = () => {
     if (!viewing) return
     setRemarkSaving(true)
@@ -356,14 +364,6 @@ export default function RateList() {
     apiGetTradeLanes().then(setTradeLanes).catch(() => {})
     loadRates()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const loadRates = () => {
-    setLoading(true)
-    apiFetchAllRates()
-      .then(data => { setRates(data); setLoaded(true) })
-      .catch(err => { console.error('[RateList] apiFetchAllRates failed:', err); setLoaded(true) })
-      .finally(() => setLoading(false))
-  }
 
   // ---- Filtering ----
   const filtered = useMemo(() => {
