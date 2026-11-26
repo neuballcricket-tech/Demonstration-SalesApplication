@@ -1,5 +1,6 @@
 import { Bell, Settings } from 'lucide-react'
-import { ROLE_LABELS, ROLE_COLORS, type UserRole, type Employee } from '../../types'
+import { ROLE_LABELS, type UserRole, type Employee } from '../../types'
+import { COLOR } from '../ui/tokens'
 
 interface TopBarProps {
   currentPageLabel: string
@@ -14,7 +15,8 @@ function getInitials(name: string): string {
 
 export default function TopBar({ currentPageLabel, activeEmployee, activeRole, onNavigateProfile }: TopBarProps) {
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-  const roleColor = ROLE_COLORS[activeRole]
+  // The bar is dark navy, so role accents use the on-dark teal rather than the (navy) role colour.
+  const roleColor = COLOR.accentOnDark
 
   return (
     <header className="db-topbar">
@@ -58,7 +60,7 @@ export default function TopBar({ currentPageLabel, activeEmployee, activeRole, o
         >
           <div
             className="db-topbar-avatar"
-            style={{ background: `linear-gradient(135deg, ${roleColor}, ${roleColor}cc)` }}
+            style={{ background: `linear-gradient(135deg, ${roleColor}, ${roleColor}cc)`, color: COLOR.primary }}
           >
             {getInitials(activeEmployee.name)}
           </div>
