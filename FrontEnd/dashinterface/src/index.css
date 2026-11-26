@@ -46,6 +46,9 @@
   --topbar-height: 56px;
   --sidebar-width: 196px;
   --chat-panel-width: 264px;
+  --control-h-sm: 28px;
+  --control-h-md: 32px;
+  --control-h-lg: 40px;
 }
 
 html, body, #root {

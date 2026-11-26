@@ -61,19 +61,23 @@ export const SECTION_LABEL: CSSProperties = {
 /* ---- Form fields ---- */
 
 export const FIELD_LABEL: CSSProperties = {
-  fontSize: 10,
-  color: 'var(--text-muted)',
-  marginBottom: 3,
+  fontSize: 11,
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.04em',
+  color: 'var(--color-fg-label)',
+  marginBottom: 4,
   display: 'block',
 }
 
 export const INPUT_STYLE: CSSProperties = {
   width: '100%',
-  padding: '7px 10px',
-  fontSize: 12,
-  borderRadius: 6,
-  border: '1px solid var(--border)',
-  background: 'var(--bg-card, #fff)',
+  minHeight: 32,
+  padding: '0 10px',
+  fontSize: 13,
+  borderRadius: 'var(--radius-control)',
+  border: '1px solid var(--color-line)',
+  background: '#fff',
   color: 'var(--text)',
   outline: 'none',
 }
@@ -81,18 +85,20 @@ export const INPUT_STYLE: CSSProperties = {
 /* ---- Tables ---- */
 
 export const TABLE_TH: CSSProperties = {
-  fontSize: 10,
-  fontWeight: 700,
+  fontSize: 11,
+  fontWeight: 600,
   textTransform: 'uppercase',
-  color: 'var(--text-secondary)',
-  padding: '8px 10px',
+  color: 'var(--color-fg-label)',
+  height: 32,
+  padding: '0 12px',
   textAlign: 'left',
-  letterSpacing: 0.3,
+  letterSpacing: '0.04em',
 }
 
 export const TABLE_TD: CSSProperties = {
-  fontSize: 12,
-  padding: '8px 10px',
+  fontSize: 13,
+  height: 36,
+  padding: '0 12px',
   borderBottom: '1px solid var(--border)',
   color: 'var(--text)',
 }
