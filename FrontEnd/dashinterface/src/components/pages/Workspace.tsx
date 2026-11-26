@@ -283,6 +283,12 @@ export default function Workspace({
   const [customerDecision, setCustomerDecision] = useState<'accepted' | 'rejected'>('accepted')
   // Liner booking confirmation state (Procurement Booking step)
   const [linerBooked, setLinerBooked] = useState<'yes' | 'no' | ''>('')
+  const [procBookingTab, setProcBookingTab] = useState<'manual' | 'inttra'>('manual')
+  const [inttraForm, setInttraForm] = useState<Record<string, string>>({})
+  const inttraField = (key: string) => inttraForm[key] ?? ''
+  const setInttraField = (key: string, value: string) => setInttraForm(prev => ({ ...prev, [key]: value }))
+  const [inttraLoading, setInttraLoading] = useState(false)
+  const [inttraError, setInttraError] = useState<string | null>(null)
   // Backend quotation ID — set in prepare-quotation, used in customer-response
   const [lastQuotationId, setLastQuotationId] = useState<number | null>(null)
   // Quotation options loaded from backend for the customer-response modal
@@ -1222,7 +1228,7 @@ export default function Workspace({
     lastQuotationId, quotationContent, selectedRateOptionIds, bestRateOptionId,
     optionOverrides,
     sendMethod, customerContactEmail, customerContactPhone,
-    customerDecision, linerBooked, selectedOptionRateId,
+    customerDecision, linerBooked, procBookingTab, inttraField, inttraLoading, selectedOptionRateId,
     bkShippingLine, bkContainerType, bkQuantity, bkContainers,
     bkCommodity, bkCargoReadyDate, bkVessel, bkVesselEtd, bkVoyage, bkPod,
     bkContractNo, bkAgreedRate, bkRateRemark, bkDeliveryTerm,
@@ -1251,7 +1257,7 @@ export default function Workspace({
     setOptionOverrides,
     setSendMethod, setWaConfirmed, setEmailConfirmed, setDraftCollapsed,
     setCustomerContactEmail, setCustomerContactPhone, setQuotationSending,
-    setCustomerDecision, setLinerBooked,
+    setCustomerDecision, setLinerBooked, setInttraForm, setInttraLoading, setInttraError,
     setLastQuotationId, setQuotationOptions, setSelectedOptionRateId, setQuotationOptionsLoading,
     setBkShippingLine, setBkContainerType, setBkQuantity, setBkContainers,
     setBkCommodity, setBkCargoReadyDate, setBkVessel, setBkVesselEtd, setBkVoyage, setBkPod,
@@ -1409,24 +1415,6 @@ export default function Workspace({
             <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.03em', marginBottom: 4, color: 'var(--text)' }}>{selectedItem.customerName}</h1>
             <p style={{ fontSize: 15, color: '#475569', marginBottom: 24 }}>{selectedItem.title}</p>
 
-            {/* Where it came from - context card */}
-            {selectedItem.previousContext && (
-              <div style={{ padding: '14px 16px', background: '#fff', border: '1px solid #e2e8f0', borderLeft: '3px solid #0f8fa8', borderRadius: 10, marginBottom: 26 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#94a3b8', marginBottom: 6 }}>Where it came from</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                  <User size={11} style={{ color: 'var(--text-muted)' }} />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
-                    {empName(selectedItem.previousContext.actor_id)} ({ROLE_LABELS[selectedItem.previousContext.actor_role]})
-                  </span>
-                  <span style={{ fontSize: 10, color: 'var(--text-muted)', marginLeft: 'auto' }}>{selectedItem.previousContext.timestamp}</span>
-                </div>
-                <div style={{ fontSize: 13.5, color: '#334155', lineHeight: 1.55 }}>{selectedItem.previousContext.action}</div>
-                {selectedItem.previousContext.notes && (
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>{selectedItem.previousContext.notes}</div>
-                )}
-              </div>
-            )}
-
             {/* Complete this step */}
             <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#94a3b8', marginBottom: 14 }}>Complete this step</div>
 
@@ -1545,6 +1533,13 @@ export default function Workspace({
               setRoFields={setRoFields}
               linerBooked={linerBooked}
               setLinerBooked={setLinerBooked}
+              procBookingTab={procBookingTab}
+              setProcBookingTab={setProcBookingTab}
+              inttraField={inttraField}
+              setInttraField={setInttraField}
+              inttraLoading={inttraLoading}
+              inttraError={inttraError}
+              onSubmitInttraBooking={handleModalSubmit}
               siContent={siContent}
               setSiContent={setSiContent}
               siFileName={siFileName}

@@ -165,27 +165,26 @@ function mapBackendBooking(
   liners: LinerRecord[],
 ): Booking {
   const feStatus = BE_TO_FE_BOOKING_STATUS[r.status as BackendBookingStatus] ?? 'Pending Liner'
-  const client = clients.find(c => c.cli_id === r.cli_id)
   const liner  = liners.find(l => l.lin_id === r.lin_id)
   return {
     id:                   `BKG-${r.booking_id}`,
     quote_id:             '',
-    customer_name:        client?.name ?? `Client #${r.cli_id}`,
+    customer_name:        r.client_name ?? `Client #${r.cli_id}`,
     origin:               r.origin,
     destination:          r.destination,
     shipping_line:        liner?.name ?? `Liner #${r.lin_id}`,
-    vessel_name:          r.vessel,
-    voyage_number:        r.voyage,
-    container_type:       '',   // not stored in booking-request; populated from inquiry
-    quantity:             1,    // not stored in booking-request; populated from inquiry
+    vessel_name:          r.vessel ?? '',
+    voyage_number:        r.voyage ?? '',
+    container_type:       r.container_type ?? '',
+    quantity:             r.qty ?? 1,
     status:               feStatus,
     is_urgent:            false,
-    booked_by:            0,
-    confirmed_by:         feStatus !== 'Pending Liner' ? 0 : null,
+    booked_by:            r.emp_id_cs,
+    confirmed_by:         feStatus !== 'Pending Liner' ? (r.emp_id_proc ?? 0) : null,
     released_by:          feStatus === 'Released' ? 0 : null,
     created_at:           r.created_at,
-    confirmed_at:         feStatus !== 'Pending Liner' ? r.created_at : null,
-    released_at:          feStatus === 'Released' ? r.created_at : null,
+    confirmed_at:         feStatus !== 'Pending Liner' ? (r.reviewed_at ?? r.created_at) : null,
+    released_at:          feStatus === 'Released' ? (r.updated_at ?? r.created_at) : null,
     procurement_notified: feStatus !== 'Pending Liner',
     notes:                r.notes ?? '',
     delivery_type:        r.delivery_type ? BE_DELIVERY_TYPE[r.delivery_type] : undefined,
@@ -195,18 +194,20 @@ function mapBackendBooking(
     cli_id:               r.cli_id,
     lin_id:               r.lin_id,
     // structured booking fields
-    vessel_etd:           r.vessel_etd,
-    agreed_rate:          r.agreed_rate,
-    delivery_term:        r.delivery_term,
-    hs_code:              r.hs_code,
-    bl_type:              r.bl_type,
-    booking_type:         r.booking_type,
-    ra_number:            r.ra_number,
-    specific_routing:     r.specific_routing,
-    reefer_temp:          r.reefer_temp,
-    delivery_agent:       r.delivery_agent,
-    cargo_ready_date:     r.cargo_ready_date,
-    contract_no:          r.contract_no,
+    vessel_etd:           r.vessel_etd ?? undefined,
+    agreed_rate:          r.agreed_rate ?? undefined,
+    rate_remark:          r.rate_remark ?? undefined,
+    delivery_term:        r.delivery_term ?? undefined,
+    commodity:            r.commodity != null ? String(r.commodity) : undefined,
+    hs_code:              r.hs_code != null ? String(r.hs_code) : undefined,
+    bl_type:              r.bl_type ?? undefined,
+    booking_type:         r.booking_type ?? undefined,
+    ra_number:            r.ra_number ?? undefined,
+    specific_routing:     r.specific_routing ?? undefined,
+    reefer_temp:          r.reefer_temp ?? undefined,
+    delivery_agent:       r.delivery_agent ?? undefined,
+    cargo_ready_date:     r.cargo_ready_date ?? undefined,
+    contract_no:          r.contract_no ?? undefined,
   }
 }
 
@@ -672,9 +673,12 @@ export default function App() {
       const bkg = prev.find(b => b.id === bookingId)
       if (bkg?.booking_id) {
         apiReviewBookingRequest(bkg.booking_id, {
+          inq_id: bkg.inq_id,
+          cli_id: bkg.cli_id,
+          bl_type: bkg.bl_type || 'OBL',
           ra_number: raNumber || undefined,
           vessel: vessel || undefined,
-        }).catch(err => console.error('[markRaAssigned] API failed:', err))
+        } as any).catch(err => console.error('[markRaAssigned] API failed:', err))
       }
       return prev.map(b =>
         b.id === bookingId
@@ -689,8 +693,12 @@ export default function App() {
       const bkg = prev.find(b => b.id === bookingId)
       if (bkg?.booking_id) {
         // No dedicated revert endpoint — clear fields via PATCH
-        apiPatchBookingRequest(bkg.booking_id, { ra_number: '', vessel: '' } as any)
-          .catch(err => console.error('[revertBookingRequest] API failed:', err))
+        apiPatchBookingRequest(bkg.booking_id, {
+          inq_id: bkg.inq_id,
+          cli_id: bkg.cli_id,
+          bl_type: bkg.bl_type || 'OBL',
+          ra_number: '', vessel: '',
+        } as any).catch(err => console.error('[revertBookingRequest] API failed:', err))
       }
       return prev.map(b =>
         b.id === bookingId

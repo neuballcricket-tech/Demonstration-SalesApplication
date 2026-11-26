@@ -1578,39 +1578,50 @@ export interface BookingRequestPayload {
   delivery_agent?: string
 }
 
-/** Shape of a single booking request record returned by GET /booking-requests */
+/** Shape of a single booking request record returned by GET /booking-requests/made */
 export interface BackendBookingRecord {
   booking_id: number
   inq_id: number
   cli_id: number
-  lin_id: number
+  emp_id_cs: number
+  emp_id_proc: number | null
+  lin_id: number | null
   origin: string
   destination: string
-  vessel: string
-  voyage: string
+  vessel: string | null
+  vessel_etd: string | null
+  voyage: string | null
+  cargo_ready_date: string | null
+  delivery_type: string | null
+  agreed_rate: number | null
+  rate_remark: string | null
+  delivery_term: string | null
+  commodity: string | null
+  hs_code: string | null
+  contract_no: string | null
+  ra_number: string | null
+  specific_routing: string | null
+  bl_type: string | null
+  booking_type: string | null
+  reefer_temp: string | null
+  delivery_agent: string | null
   status: string              // BackendBookingStatus enum value
+  notes: string | null
   created_at: string
-  vessel_etd?: string
-  cargo_ready_date?: string
-  delivery_type?: string
-  agreed_rate?: number
-  delivery_term?: string
-  commodity?: number
-  hs_code?: string
-  bl_type?: string
-  booking_type?: string
-  ra_number?: string
-  specific_routing?: string
-  reefer_temp?: string
-  delivery_agent?: string
-  notes?: string
-  rate_remark?: string
-  contract_no?: string
+  reviewed_at: string | null
+  updated_at: string | null
+  updated_by: number | null
+  // Joined fields
+  client_name: string
+  inq_origin: string
+  cont_destination: string
+  qty: number
+  container_type: string
 }
 
 /** Fetch all booking requests for the current user. */
 export function apiGetBookingRequests(): Promise<BackendBookingRecord[]> {
-  return get<BackendBookingRecord[]>('/booking-requests')
+  return get<BackendBookingRecord[]>('/booking-requests/made')
 }
 
 /** Shape of a release order record returned by GET /booking-requests/release-orders */
@@ -1661,6 +1672,55 @@ export function apiConfirmBookingRequest(
   bookingId: number
 ): Promise<Record<string, unknown>> {
   return patch<Record<string, unknown>>(`/booking-requests/${bookingId}/confirm`)
+}
+
+// ---------------------------------------------------------------------------
+// INTTRA Booking
+// ---------------------------------------------------------------------------
+
+/** Submit an INTTRA booking request for the given inquiry. */
+export function apiSubmitInttraBooking(
+  inqId: number,
+  payload: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  return post<Record<string, unknown>>(`/booking-requests/${inqId}/inttra-booking`, payload)
+}
+
+/** Shape of an INTTRA booking record returned by GET /booking-requests/inttra-bookings */
+export interface InttraBookingRecord {
+  bkg_id: number
+  booking_id: number
+  inq_id: number
+  cli_id: number
+  lin_id: number | null
+  origin: string
+  destination: string
+  status: string
+  inttra_reference_number: string
+  inttra_acceptence: boolean
+  inttra_booking_reference_id: string | null
+  inttra_response: Record<string, unknown> | null
+  liner_name: string | null
+  liner_scac: string | null
+  client_name: string
+  incoterm: string | null
+  cargo_ready_date: string | null
+  service_mode: string | null
+  inq_origin: string | null
+  priority: string | null
+}
+
+/** Fetch all bookings that have an INTTRA reference number. */
+export function apiFetchAllInttraBookings(): Promise<InttraBookingRecord[]> {
+  return get<InttraBookingRecord[]>('/booking-requests/inttra-bookings')
+}
+
+/** Search an INTTRA booking by reference number or reference ID. */
+export function apiSearchInttraBooking(
+  inttraRef: string,
+  searchBy: 'number' | 'id' = 'number'
+): Promise<Record<string, unknown>> {
+  return get<Record<string, unknown>>(`/booking-requests/${encodeURIComponent(inttraRef)}/inttra-booking?search_by=${searchBy}`)
 }
 
 // ---------------------------------------------------------------------------

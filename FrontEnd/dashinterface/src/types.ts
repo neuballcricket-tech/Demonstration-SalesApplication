@@ -1027,7 +1027,9 @@ export interface Booking {
   // --- Structured fields stored alongside notes for API payloads ---
   vessel_etd?: string
   agreed_rate?: number
+  rate_remark?: string
   delivery_term?: string
+  commodity?: string        // Commodity description from booking_request
   contract_no?: string
   hs_code?: string
   bl_type?: string
