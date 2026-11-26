@@ -1,5 +1,6 @@
 import { useId, type CSSProperties, type ReactNode } from 'react'
 import { cn } from '../../lib/cn'
+import { labelClass } from './controlStyles'
 
 export interface FieldControlProps {
   id: string
@@ -27,7 +28,7 @@ export function Field({ label, required, hint, error, children, className, style
 
   return (
     <div className={cn('ui-field flex flex-col gap-1', className)} style={style}>
-      <label id={labelId} htmlFor={id} className="text-label font-semibold text-fg-label">
+      <label id={labelId} htmlFor={id} className={labelClass}>
         {label}
         {required && <span aria-hidden="true" className="ml-0.5 text-danger">*</span>}
       </label>

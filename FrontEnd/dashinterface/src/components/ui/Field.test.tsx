@@ -49,4 +49,9 @@ describe('Field', () => {
     expect(container.firstElementChild).toHaveClass('extra')
     expect(container.firstElementChild).toHaveStyle({ width: '120px' })
   })
+
+  it('label is uppercase and tracked', () => {
+    render(<Field label="Valid until">{(ids) => <input {...ids} />}</Field>)
+    expect(screen.getByText('Valid until')).toHaveClass('text-label', 'font-semibold', 'uppercase', 'tracking-label')
+  })
 })

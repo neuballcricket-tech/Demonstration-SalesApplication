@@ -1,11 +1,8 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
-import { I18nProvider } from 'react-aria-components'
 import { describe, expect, it, vi } from 'vitest'
 import { Button } from './Button'
-import { ComboBox } from './ComboBox'
-import { DatePicker } from './DatePicker'
 import { Modal } from './Modal'
 import { Select } from './Select'
 
@@ -142,6 +139,16 @@ describe('Modal', () => {
     expect(bar).toHaveClass('border-t', 'border-line-soft', 'justify-end', 'gap-2')
   })
 
+  it('stacks body children with a 12px gap', () => {
+    render(
+      <Modal isOpen onClose={() => {}} title="Edit customer">
+        <p>First</p>
+        <p>Second</p>
+      </Modal>,
+    )
+    expect(screen.getByText('First').parentElement).toHaveClass('flex', 'flex-col', 'gap-3')
+  })
+
   it.each([
     ['sm', 'max-w-[420px]'],
     ['md', 'max-w-[640px]'],
@@ -178,8 +185,6 @@ describe('Modal', () => {
     )
     await user.click(screen.getByRole('button', { name: /service/i }))
     const listbox = screen.getByRole('listbox')
-    expect(listbox.parentElement).toHaveClass('z-(--z-popover-modal)')
-    expect(listbox.parentElement).not.toHaveClass('z-(--z-popover)')
     await user.click(within(listbox).getByRole('option', { name: 'Ocean Exports' }))
     expect(onChange).toHaveBeenCalledWith('ocean')
     expect(onClose).not.toHaveBeenCalled()
@@ -200,41 +205,5 @@ describe('Modal', () => {
     await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
     expect(onClose).not.toHaveBeenCalled()
     expect(screen.getByRole('dialog')).toBeInTheDocument()
-  })
-
-  it('ComboBox popover inside a modal uses the modal popover layer', async () => {
-    const user = userEvent.setup()
-    function Harness() {
-      const [v, setV] = useState('')
-      return <ComboBox aria-label="Port" value={v} onChange={setV} items={[{ value: 'LKCMB', label: 'Colombo' }]} />
-    }
-    render(
-      <Modal isOpen onClose={() => {}} title="Edit customer">
-        <Harness />
-      </Modal>,
-    )
-    await user.type(screen.getByRole('combobox'), 'co')
-    expect(screen.getByRole('listbox').parentElement).toHaveClass('z-(--z-popover-modal)')
-  })
-
-  it('DatePicker popover inside a modal uses the modal popover layer', async () => {
-    const user = userEvent.setup()
-    render(
-      <I18nProvider locale="en-GB">
-        <Modal isOpen onClose={() => {}} title="Edit customer">
-          <DatePicker aria-label="Date" value="2026-11-26" onChange={() => {}} />
-        </Modal>
-      </I18nProvider>,
-    )
-    await user.click(screen.getByRole('button', { name: /calendar/i }))
-    const calendarDialog = screen.getAllByRole('dialog').find((d) => within(d).queryByRole('grid'))
-    expect(calendarDialog?.parentElement).toHaveClass('z-(--z-popover-modal)')
-  })
-
-  it('popovers outside a modal keep the normal popover layer', async () => {
-    const user = userEvent.setup()
-    render(<Select aria-label="Service" value="" onChange={() => {}} options={options} placeholder="Pick…" />)
-    await user.click(screen.getByRole('button'))
-    expect(screen.getByRole('listbox').parentElement).toHaveClass('z-(--z-popover)')
   })
 })

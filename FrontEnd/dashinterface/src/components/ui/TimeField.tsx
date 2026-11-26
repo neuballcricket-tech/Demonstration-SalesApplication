@@ -2,7 +2,7 @@ import { parseTime } from '@internationalized/date'
 import { useRef, type AriaAttributes, type CSSProperties } from 'react'
 import { DateInput, DateSegment, Label, TimeField as AriaTimeField } from 'react-aria-components'
 import { cn } from '../../lib/cn'
-import { control, controlModifier } from './controlStyles'
+import { control, controlModifier, labelClass } from './controlStyles'
 
 export interface TimeFieldProps {
   /** `'HH:mm'`. `''` or invalid text shows empty. */
@@ -92,7 +92,7 @@ export function TimeField({
       className={cn('group flex flex-col gap-1', className)}
       style={style}
     >
-      {label && <Label className="text-label font-semibold text-fg-label">{label}</Label>}
+      {label && <Label className={labelClass}>{label}</Label>}
       <DateInput
         ref={inputRef}
         className={cn(

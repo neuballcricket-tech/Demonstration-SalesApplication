@@ -14,4 +14,7 @@ export const control = tv({
   defaultVariants: { controlSize: 'md' },
 })
 
+/** Field and control labels: 11px / 600 / uppercase / 0.04em. */
+export const labelClass = 'text-label font-semibold uppercase tracking-label text-fg-label'
+
 export const controlModifier = (size: ControlSize) => (size === 'md' ? null : `ui-control--${size}`)

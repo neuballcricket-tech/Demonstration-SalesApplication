@@ -12,8 +12,7 @@ import {
   SelectValue,
 } from 'react-aria-components'
 import { cn } from '../../lib/cn'
-import { control, controlModifier } from './controlStyles'
-import { usePopoverLayer } from './modalContext'
+import { control, controlModifier, labelClass } from './controlStyles'
 
 export type Option = { value: string; label: string; disabled?: boolean }
 export type OptionGroup = { label: string; options: Option[] }
@@ -86,7 +85,6 @@ export function Select({
   className,
   style,
 }: SelectProps) {
-  const layer = usePopoverLayer()
   const known = options.some((o) => (isGroup(o) ? o.options.some((x) => x.value === value) : o.value === value))
   // A value that matches no option (e.g. legacy data) is shown as raw text; it is never rewritten.
   const unknown = value !== '' && !known
@@ -108,7 +106,7 @@ export function Select({
       className={cn('group flex flex-col gap-1', className)}
       style={style}
     >
-      {label && <Label className="text-label font-semibold text-fg-label">{label}</Label>}
+      {label && <Label className={labelClass}>{label}</Label>}
       <Button
         id={id}
         className={cn(
@@ -125,7 +123,7 @@ export function Select({
       </Button>
       <Popover
         placement="bottom start"
-        className={cn(layer, 'w-(--trigger-width) rounded-card border border-line-popover bg-surface shadow-popover')}
+        className="w-(--trigger-width) rounded-card border border-line-popover bg-surface shadow-popover"
       >
         <ListBox className="max-h-70 overflow-auto p-1">
           {options.map((o) =>

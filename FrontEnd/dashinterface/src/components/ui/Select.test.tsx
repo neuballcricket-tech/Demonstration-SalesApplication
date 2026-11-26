@@ -190,4 +190,9 @@ describe('Select', () => {
     render(<Select aria-label="S" value="" onChange={() => {}} options={options} />)
     expect(screen.getByRole('button').className).not.toMatch(/cursor-/)
   })
+
+  it('own label is uppercase and tracked', () => {
+    render(<Select label="Service" value="" onChange={() => {}} options={options} />)
+    expect(screen.getByText('Service')).toHaveClass('text-label', 'font-semibold', 'uppercase', 'tracking-label')
+  })
 })

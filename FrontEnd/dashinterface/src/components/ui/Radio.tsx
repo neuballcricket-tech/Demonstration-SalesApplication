@@ -1,6 +1,7 @@
 import type { AriaAttributes, CSSProperties, ReactNode } from 'react'
 import { Label, Radio as AriaRadio, RadioGroup as AriaRadioGroup } from 'react-aria-components'
 import { cn } from '../../lib/cn'
+import { labelClass } from './controlStyles'
 
 export interface RadioGroupProps {
   value: string
@@ -50,7 +51,7 @@ export function RadioGroup({
       className={cn('group flex flex-col gap-1', className)}
       {...rest}
     >
-      {label && <Label className="text-label font-semibold text-fg-label">{label}</Label>}
+      {label && <Label className={labelClass}>{label}</Label>}
       <div className={cn('flex gap-x-4 gap-y-2', orientation === 'vertical' ? 'flex-col' : 'flex-row flex-wrap')}>
         {children}
       </div>

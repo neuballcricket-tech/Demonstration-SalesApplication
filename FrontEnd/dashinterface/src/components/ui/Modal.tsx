@@ -3,13 +3,16 @@ import type { CSSProperties, ReactNode } from 'react'
 import { Dialog, Heading, Modal as AriaModal, ModalOverlay } from 'react-aria-components'
 import { cn } from '../../lib/cn'
 import { Button } from './Button'
-import { InModalContext } from './modalContext'
 
 export interface ModalProps {
   isOpen: boolean
   onClose: () => void
   /** Also the dialog's accessible name. */
   title: string
+  /**
+   * Stacked with a 12px gap (`flex flex-col gap-3`). The gap applies to direct children only, so a
+   * `<form>` wrapping the fields needs `className="flex flex-col gap-3"` itself.
+   */
   children: ReactNode
   /** Rendered in a right-aligned bar under the body (e.g. Cancel / Save buttons). */
   footer?: ReactNode
@@ -62,9 +65,7 @@ export function Modal({
               <Button variant="ghost" size="sm" icon={<X size={16} aria-hidden="true" />} aria-label="Close" onClick={onClose} />
             )}
           </div>
-          <div className="min-h-0 flex-1 overflow-auto px-5 pb-4">
-            <InModalContext.Provider value={true}>{children}</InModalContext.Provider>
-          </div>
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto px-5 pb-4">{children}</div>
           {footer && <div className="flex justify-end gap-2 border-t border-line-soft px-5 py-3">{footer}</div>}
         </Dialog>
       </AriaModal>

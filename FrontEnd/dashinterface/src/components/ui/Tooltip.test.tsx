@@ -27,7 +27,7 @@ describe('Tooltip', () => {
     const tip = await screen.findByRole('tooltip')
     expect(tip).toHaveTextContent('Remove row')
     expect(trigger).toHaveAccessibleDescription('Remove row')
-    expect(tip).toHaveClass('z-(--z-tooltip)', 'bg-fg', 'text-white', 'text-label', 'rounded-control')
+    expect(tip).toHaveClass('bg-fg', 'text-white', 'text-label', 'rounded-control')
   })
 
   it('hides on Escape', async () => {

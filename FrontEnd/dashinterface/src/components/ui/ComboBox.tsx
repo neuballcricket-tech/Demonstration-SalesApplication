@@ -11,8 +11,7 @@ import {
   Text,
 } from 'react-aria-components'
 import { cn } from '../../lib/cn'
-import { control, controlModifier } from './controlStyles'
-import { usePopoverLayer } from './modalContext'
+import { control, controlModifier, labelClass } from './controlStyles'
 
 export type ComboBoxItem = { value: string; label?: string; description?: string }
 
@@ -78,7 +77,6 @@ export function ComboBox({
   filter,
   menuTrigger = 'input',
 }: ComboBoxProps) {
-  const layer = usePopoverLayer()
   // Trimmed, so surrounding spaces don't change what matches.
   const needle = value.trim().toLowerCase()
   // Like a datalist, the typed text matches the value as well as the label and description.
@@ -138,7 +136,7 @@ export function ComboBox({
       className={cn('group flex flex-col gap-1', className)}
       style={style}
     >
-      {label && <Label className="text-label font-semibold text-fg-label">{label}</Label>}
+      {label && <Label className={labelClass}>{label}</Label>}
       <div className="relative">
         <Input
           id={id}
@@ -160,7 +158,7 @@ export function ComboBox({
       </div>
       <Popover
         placement="bottom start"
-        className={cn(layer, 'w-(--trigger-width) rounded-card border border-line-popover bg-surface shadow-popover')}
+        className="w-(--trigger-width) rounded-card border border-line-popover bg-surface shadow-popover"
       >
         <ListBox className="max-h-70 overflow-auto p-1">
           {(item: ComboBoxItem) => (

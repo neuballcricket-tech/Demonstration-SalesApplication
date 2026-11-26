@@ -20,7 +20,7 @@ export function Tooltip({ content, children, placement = 'top', className, style
       <AriaTooltip
         placement={placement}
         offset={6}
-        className={cn('z-(--z-tooltip) rounded-control bg-fg px-2 py-1 text-label text-white', className)}
+        className={cn('rounded-control bg-fg px-2 py-1 text-label text-white', className)}
         style={style}
       >
         {content}

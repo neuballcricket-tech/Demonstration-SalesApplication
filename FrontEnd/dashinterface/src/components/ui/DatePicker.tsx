@@ -19,8 +19,7 @@ import {
   Popover,
 } from 'react-aria-components'
 import { cn } from '../../lib/cn'
-import { control, controlModifier } from './controlStyles'
-import { usePopoverLayer } from './modalContext'
+import { control, controlModifier, labelClass } from './controlStyles'
 
 export interface DatePickerProps {
   /** `'YYYY-MM-DD'` (a longer ISO datetime is cut to its date part). `''`, `null`, `undefined` or invalid text shows empty. */
@@ -93,7 +92,6 @@ export function DatePicker({
   className,
   style,
 }: DatePickerProps) {
-  const layer = usePopoverLayer()
   const popoverRef = useRef<HTMLElement>(null)
   const parsed = parseISODate(value)
   return (
@@ -116,7 +114,7 @@ export function DatePicker({
       className={cn('group flex flex-col gap-1', className)}
       style={style}
     >
-      {label && <Label className="text-label font-semibold text-fg-label">{label}</Label>}
+      {label && <Label className={labelClass}>{label}</Label>}
       <Group
         onBlur={(e) => {
           // The calendar popover is a portal, so opening it moves focus out of the group without leaving the field.
@@ -146,7 +144,7 @@ export function DatePicker({
       <Popover
         ref={popoverRef}
         placement="bottom start"
-        className={cn(layer, 'rounded-card border border-line-popover bg-surface p-2 shadow-popover')}
+        className="rounded-card border border-line-popover bg-surface p-2 shadow-popover"
       >
         <Dialog className="outline-hidden">
           <Calendar className="w-56">
