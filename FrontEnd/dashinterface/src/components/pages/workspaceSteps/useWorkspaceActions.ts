@@ -17,13 +17,14 @@ import type { CompletedRateRequest } from '../../../types'
 import {
   apiCreateKycRequest, apiCreateQuotation, apiPatchQuotation,
   apiMarkQuotationSent, apiFetchQuotation, apiRecordQuotationResponse,
-  apiUpdateKycStage, apiUploadQuotationDocument,
+  apiUpdateKycStage, apiUploadQuotationDocument, apiSubmitInttraBooking,
   type KycPendingClient, type KycRequestRecord,
   type QuotationOptionPayload, type QuotationOptionRow,
 } from '../../../api'
 import type { WorkspaceItem, StepDef, BlContainerRow, MblContainerRow, QuotationOptionOverride } from './types'
 import { buildRateSection, buildQuotationHtml, generateQuotationPdfBlob, generateReleaseOrderDraft, openMailto, empName } from './utils'
 import { NVOCC_LINES } from './constants'
+import { EXPECTED_HAULAGE, expectedPaymentUnloc, routeFromForm } from './inttraValidation'
 
 // ---------------------------------------------------------------------------
 // Module-scope cache: inq_id → quote_id
@@ -82,6 +83,9 @@ export interface UseWorkspaceActionsParams {
   customerContactPhone: string
   customerDecision: 'accepted' | 'rejected'
   linerBooked: 'yes' | 'no' | ''
+  procBookingTab: 'manual' | 'inttra'
+  inttraField: (key: string) => string
+  inttraLoading: boolean
   selectedOptionRateId: number | null
   bkShippingLine: string
   bkContainerType: string
@@ -197,6 +201,9 @@ export interface UseWorkspaceActionsParams {
   setQuotationSending: React.Dispatch<React.SetStateAction<boolean>>
   setCustomerDecision: React.Dispatch<React.SetStateAction<'accepted' | 'rejected'>>
   setLinerBooked: React.Dispatch<React.SetStateAction<'yes' | 'no' | ''>>
+  setInttraForm: React.Dispatch<React.SetStateAction<Record<string, string>>>
+  setInttraLoading: React.Dispatch<React.SetStateAction<boolean>>
+  setInttraError: React.Dispatch<React.SetStateAction<string | null>>
   setLastQuotationId: React.Dispatch<React.SetStateAction<number | null>>
   setQuotationOptions: React.Dispatch<React.SetStateAction<QuotationOptionRow[]>>
   setSelectedOptionRateId: React.Dispatch<React.SetStateAction<number | null>>
@@ -334,7 +341,7 @@ export function useWorkspaceActions(p: UseWorkspaceActionsParams) {
     lastQuotationId, quotationContent, selectedRateOptionIds, bestRateOptionId,
     optionOverrides,
     sendMethod, customerContactEmail, customerContactPhone,
-    customerDecision, linerBooked, selectedOptionRateId,
+    customerDecision, linerBooked, procBookingTab, inttraField, inttraLoading, selectedOptionRateId,
     bkShippingLine, bkContainerType, bkQuantity, bkContainers,
     bkCommodity, bkCargoReadyDate, bkVessel, bkVesselEtd, bkVoyage, bkPod,
     bkContractNo, bkAgreedRate, bkRateRemark, bkDeliveryTerm,
@@ -363,7 +370,7 @@ export function useWorkspaceActions(p: UseWorkspaceActionsParams) {
     setOptionOverrides,
     setSendMethod, setWaConfirmed, setEmailConfirmed, setDraftCollapsed,
     setCustomerContactEmail, setCustomerContactPhone, setQuotationSending,
-    setCustomerDecision, setLinerBooked,
+    setCustomerDecision, setLinerBooked, setInttraForm, setInttraLoading, setInttraError,
     setLastQuotationId, setQuotationOptions, setSelectedOptionRateId, setQuotationOptionsLoading,
     setBkShippingLine, setBkContainerType, setBkQuantity, setBkContainers,
     setBkCommodity, setBkCargoReadyDate, setBkVessel, setBkVesselEtd, setBkVoyage, setBkPod,
@@ -744,45 +751,29 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'review-booking-request': {
-        // Pre-fill all form fields by parsing the booking's stored notes
+        // Pre-fill form fields from the backend booking record
         const { booking: rbBkg } = item.sourceData
-        const noteParts = (rbBkg.notes ?? '').split(' | ')
-        const getNote = (prefix: string) =>
-          noteParts.find((p: string) => p.startsWith(prefix + ':'))?.slice(prefix.length + 1).trim() ?? ''
         setBkShippingLine(rbBkg.shipping_line ?? '')
         setBkContainerType(rbBkg.container_type ?? "20'GP")
         setBkQuantity(rbBkg.quantity ?? 1)
-        // Parse containers from notes: "Containers: 2x20'GP, 1x40'HC"
-        const ctnNote = getNote('Containers')
-        if (ctnNote) {
-          const parsed = ctnNote.split(',').map((s: string) => s.trim()).map((s: string) => {
-            const m = s.match(/(\d+)\s*x\s*(.+)/)
-            return m ? { type: m[2].trim(), qty: parseInt(m[1], 10) || 1 } : null
-          }).filter(Boolean) as { type: string; qty: number }[]
-          setBkContainers(parsed.length > 0 ? parsed : [{ type: rbBkg.container_type ?? "20'GP", qty: rbBkg.quantity ?? 1 }])
-        } else {
-          setBkContainers([{ type: rbBkg.container_type ?? "20'GP", qty: rbBkg.quantity ?? 1 }])
-        }
-        setBkCommodity(getNote('Commodity'))
-        setBkCargoReadyDate(getNote('Cargo Ready'))
-        setBkVessel(getNote('Vessel'))
+        setBkContainers([{ type: rbBkg.container_type ?? "20'GP", qty: rbBkg.quantity ?? 1 }])
+        setBkCommodity(rbBkg.commodity ?? '')
+        setBkCargoReadyDate(rbBkg.cargo_ready_date ?? '')
+        setBkVessel(rbBkg.vessel_name ?? '')
         setBkVesselEtd(rbBkg.vessel_etd ?? '')
-        setBkVoyage(getNote('Voyage'))
+        setBkVoyage(rbBkg.voyage_number ?? '')
         setBkPod(rbBkg.destination ?? '')
-        setBkContractNo(getNote('Contract'))
-        setBkAgreedRate(getNote('Rate'))
-        setBkRateRemark(getNote('Rate Remark'))
-        setBkDeliveryTerm(getNote('Term'))
-        setBkHsCode(getNote('HS'))
-        setBkBlType((getNote('BL') as 'OBL' | 'Seaway Bill' | '') || '')
-        setBkBookingType(
-          noteParts.includes('Spot Booking') ? 'Spot' :
-          noteParts.includes('FAK Booking')  ? 'FAK' : ''
-        )
-        setBkReeferTemp(getNote('Reefer/PTI'))
-        setBkDeliveryAgent(getNote('Agent'))
-        setBkSpecificRouting(getNote('Routing'))
-        setBkRaNumber('')
+        setBkContractNo(rbBkg.contract_no ?? '')
+        setBkAgreedRate(rbBkg.agreed_rate != null ? String(rbBkg.agreed_rate) : '')
+        setBkRateRemark(rbBkg.rate_remark ?? '')
+        setBkDeliveryTerm(rbBkg.delivery_term ?? '')
+        setBkHsCode(rbBkg.hs_code ?? '')
+        setBkBlType((rbBkg.bl_type as 'OBL' | 'Seaway Bill' | '') ?? '')
+        setBkBookingType(rbBkg.booking_type ?? '')
+        setBkReeferTemp(rbBkg.reefer_temp ?? '')
+        setBkDeliveryAgent(rbBkg.delivery_agent ?? '')
+        setBkSpecificRouting(rbBkg.specific_routing ?? '')
+        setBkRaNumber(rbBkg.ra_number ?? '')
         setFormNote('')
         setActionModal(item)
         break
@@ -801,6 +792,101 @@ CLSynergy (Pvt) Ltd`
       case 'confirm-liner-booking': {
         setLinerBooked('')
         setFormNote('')
+        // Prefill INTTRA form from booking + inquiry data
+        const cbBkg = item.sourceData.booking as Booking
+        const cbInq = inquiries.find(i => i.inq_id === cbBkg.inq_id)
+        const cbLiner = linerList.find(l => l.name.toLowerCase() === cbBkg.shipping_line.toLowerCase())
+        const moveTypeMap: Record<string, string> = {
+          'port-to-port': 'PortToPort', 'door-to-door': 'DoorToDoor',
+          'port-to-door': 'PortToDoor', 'door-to-port': 'DoorToPort',
+        }
+        const isoMap: Record<string, string> = {
+          "20'GP": '22G1', "40'GP": '42G1', "40'HC": '45G1',
+          "20'RF": '22R1', "40'RF": '42R1', "20'OT": '22U1', "40'OT": '42U1',
+          "20'FR": '22P1', "40'FR": '42P1', "45'HC": '45G1',
+          '20 GP': '22G1', '40 GP': '42G1', '40 HC': '45G1',
+          '20 REEFER': '22R1', '40 REEFER': '42R1',
+          '20 OPEN TOP': '22U1', '40 OPEN TOP': '42U1',
+          '20 FLAT RACK': '22P1', '40 FLAT RACK': '42P1',
+        }
+        const isReefer = /RF|REEFER/i.test(cbBkg.container_type || '')
+        setInttraForm({
+          // Transaction contact
+          contactName: activeEmployee.name,
+          contactType: 'InformationContact',
+          contactEmail: '',
+          contactPhone: '',
+          // Shipment
+          moveType: moveTypeMap[cbBkg.delivery_type || ''] || 'PortToPort',
+          incoterm: cbInq?.incoterm || '',
+          serviceType: cbInq?.is_fcl !== false ? 'FCL' : 'LCL',
+          shipmentId: '',
+          // Cargo indicators
+          cargoHazardous: 'false',
+          cargoControlledEnvironment: isReefer ? 'true' : 'false',
+          cargoEnvironmentalPollutant: 'false',
+          cargoOutOfGauge: 'false',
+          // Locations
+          placeOfReceipt: cbBkg.origin || '',
+          receiptIdentifierType: 'UNLOC',
+          placeOfDelivery: cbBkg.destination || '',
+          deliveryIdentifierType: 'UNLOC',
+          locationDateType: 'EarliestDepartureDate',
+          earliestDepartureDate: cbBkg.vessel_etd || cbInq?.cargo_ready_date || '',
+          locationDateFormat: 'CCYYMMDDHHMM',
+          // --- Dynamic Parties (indexed) ---
+          partyCount: '5',
+          // 0: Carrier
+          party_0_role: 'Carrier', party_0_name: cbBkg.shipping_line || '', party_0_inttraId: '', party_0_alias: '', party_0_address: '', party_0_city: '', party_0_country: '', party_0_chargeCount: '0',
+          // 1: Booker
+          party_1_role: 'Booker', party_1_name: 'CL SYNERGY LIMITED', party_1_inttraId: '', party_1_alias: '', party_1_address: '', party_1_city: '', party_1_country: '', party_1_chargeCount: '0',
+          // 2: Shipper (with freight charge)
+          party_2_role: 'Shipper', party_2_name: cbBkg.customer_name || '', party_2_inttraId: '', party_2_alias: '', party_2_address: '', party_2_city: '', party_2_country: '',
+          party_2_chargeCount: '1', party_2_charge_0_type: 'OceanFreight', party_2_charge_0_term: 'Prepaid',
+          // 3: Consignee
+          party_3_role: 'Consignee', party_3_name: '', party_3_inttraId: '', party_3_alias: '', party_3_address: '', party_3_city: '', party_3_country: '', party_3_chargeCount: '0',
+          // 4: Forwarder
+          party_4_role: 'Forwarder', party_4_name: 'CL SYNERGY LIMITED', party_4_inttraId: '', party_4_alias: '', party_4_address: '', party_4_city: '', party_4_country: '', party_4_chargeCount: '0',
+          // --- Dynamic References (indexed) ---
+          refCount: '1',
+          ref_0_type: 'ContractNumber', ref_0_value: cbBkg.contract_no || cbBkg.ra_number || '',
+          // --- Dynamic Package Details (indexed) ---
+          pkgCount: '1',
+          pkg_0_goodsDesc: String(cbBkg.commodity ?? cbInq?.containers?.[0]?.commodityName ?? cbInq?.commodity_type ?? ''),
+          pkg_0_hsCode: String(cbBkg.hs_code ?? cbInq?.containers?.[0]?.hs_code ?? ''),
+          pkg_0_classType: 'WCO',
+          pkg_0_weight: cbInq?.cargo_weight ? String(cbInq.cargo_weight) : '',
+          pkg_0_weightUnit: 'KGM',
+          pkg_0_volume: '',
+          pkg_0_volumeUnit: 'MTQ',
+          pkg_0_pkgCount: '',
+          pkg_0_pkgCode: '',
+          pkg_0_pkgDesc: '',
+          // --- Dynamic Equipment (indexed) ---
+          eqCount: '1',
+          eq_0_count: String(cbBkg.quantity || 1),
+          eq_0_sizeCode: isoMap[cbBkg.container_type] || '22G1',
+          eq_0_haulage: EXPECTED_HAULAGE[moveTypeMap[cbBkg.delivery_type || ''] || 'PortToPort'] || 'MerchantMerchant',
+          eq_0_supplier: 'CarrierSupplied',
+          eq_0_svcType: '',
+          eq_0_reeferTemp: cbBkg.reefer_temp || '',
+          eq_0_reeferUnit: 'CEL',
+          eq_0_comments: '',
+          // --- Dynamic Transport Legs (indexed) ---
+          legCount: '1',
+          leg_0_stage: 'MainCarriage',
+          leg_0_scac: cbLiner?.scac || '',
+          leg_0_vessel: cbBkg.vessel_name || '',
+          leg_0_voyage: cbBkg.voyage_number || '',
+          leg_0_mode: 'MaritimeTransport',
+          leg_0_means: 'OceanVessel',
+          // Flags
+          perContainerReleaseFlag: 'false',
+          // Other
+          generalComments: '',
+          notifyMe: 'true',
+        })
+        setInttraError(null)
         setActionModal(item)
         break
       }
@@ -1831,6 +1917,220 @@ CLSynergy (Pvt) Ltd`
       }
       case 'confirm-liner-booking': {
         const { booking: cbBkg } = actionModal.sourceData
+
+        // --- INTTRA booking submission ---
+        if (procBookingTab === 'inttra') {
+          setInttraLoading(true)
+          setInttraError(null)
+          try {
+            // Build transactionContact
+            const txContact: Record<string, unknown> = {
+              name: inttraField('contactName'),
+              contactType: inttraField('contactType') || 'InformationContact',
+              emails: inttraField('contactEmail') ? [inttraField('contactEmail')] : null,
+              phones: inttraField('contactPhone') ? [inttraField('contactPhone')] : null,
+            }
+
+            // Build transactionLocations with optional location date
+            const dateType = inttraField('locationDateType') || 'EarliestDepartureDate'
+            const dateFmt = inttraField('locationDateFormat') || 'CCYYMMDDHHMM'
+            const fmtLen: Record<string, number> = { CCYYMMDDHHMMSS: 14, CCYYMMDDHHMM: 12, YYMMDDHHMM: 10, CCYYMMDD: 8 }
+            const dateRaw = inttraField('earliestDepartureDate').replace(/[-T:]/g, '').slice(0, fmtLen[dateFmt] ?? 12)
+            const dateOnReceipt = ['EarliestDepartureDate', 'EstimatedDepartureDate', 'ClosingDate', 'AMSFilingDueDate'].includes(dateType)
+            const locationDate = dateRaw ? [{ dateValue: dateRaw, dateFormat: dateFmt, type: dateType }] : undefined
+            const txLocations: Record<string, unknown>[] = [
+              {
+                identifierValue: inttraField('placeOfReceipt'),
+                identifierType: inttraField('receiptIdentifierType') || 'UNLOC',
+                locationType: 'PlaceOfReceipt',
+                ...(dateOnReceipt && locationDate ? { locationDates: locationDate } : {}),
+              },
+              {
+                identifierValue: inttraField('placeOfDelivery'),
+                identifierType: inttraField('deliveryIdentifierType') || 'UNLOC',
+                locationType: 'PlaceOfDelivery',
+                ...(!dateOnReceipt && locationDate ? { locationDates: locationDate } : {}),
+              },
+            ]
+
+            // Build references from indexed keys
+            const refCount = parseInt(inttraField('refCount')) || 0
+            const refs: Record<string, unknown>[] = []
+            for (let ri = 0; ri < refCount; ri++) {
+              const rType = inttraField(`ref_${ri}_type`)
+              const rVal = inttraField(`ref_${ri}_value`)
+              if (rType && rVal) refs.push({ referenceType: rType, referenceValue: rVal })
+            }
+
+            // Build parties from indexed keys (with per-party charges)
+            const partyCount = parseInt(inttraField('partyCount')) || 0
+            const parties: Record<string, unknown>[] = []
+            for (let pi = 0; pi < partyCount; pi++) {
+              const pRole = inttraField(`party_${pi}_role`)
+              const pName = inttraField(`party_${pi}_name`)
+              const pAlias = inttraField(`party_${pi}_alias`)
+              const pInttraId = inttraField(`party_${pi}_inttraId`)
+              if (!pRole || (!pName && !pAlias && !pInttraId)) continue
+              const party: Record<string, unknown> = { partyRole: pRole, partyName1: pName || '' }
+              if (pAlias) party.partyAlias = pAlias
+              if (pInttraId) party.partyINTTRACompanyId = pInttraId
+              // Address
+              const pAddr = inttraField(`party_${pi}_address`)
+              const pCity = inttraField(`party_${pi}_city`)
+              const pCountry = inttraField(`party_${pi}_country`)
+              if (pAddr || pCity || pCountry) {
+                party.address = {
+                  ...(pAddr ? { unstructuredAddress01: pAddr } : {}),
+                  ...(pCity ? { city: pCity } : {}),
+                  ...(pCountry ? { country: { countryCodeType: 'ISO', countryCodeValue: pCountry } } : {}),
+                }
+              }
+              // Per-party charges
+              const chCount = parseInt(inttraField(`party_${pi}_chargeCount`)) || 0
+              if (chCount > 0) {
+                const charges: Record<string, unknown>[] = []
+                for (let ci = 0; ci < chCount; ci++) {
+                  const cType = inttraField(`party_${pi}_charge_${ci}_type`)
+                  const cTerm = inttraField(`party_${pi}_charge_${ci}_term`)
+                  if (cType && cTerm) {
+                    const charge: Record<string, unknown> = { chargeType: cType, paymentTerm: cTerm }
+                    const payLoc = expectedPaymentUnloc(cType, cTerm, routeFromForm(inttraField))
+                    if (payLoc) charge.chargeLocation = { identifierValue: payLoc, identifierType: 'UNLOC', locationType: 'PlaceOfPayment' }
+                    charges.push(charge)
+                  }
+                }
+                if (charges.length) party.charges = charges
+              }
+              parties.push(party)
+            }
+
+            // Build packageDetails from indexed keys
+            const pkgCount = parseInt(inttraField('pkgCount')) || 0
+            const packageDetails: Record<string, unknown>[] = []
+            for (let ki = 0; ki < pkgCount; ki++) {
+              const pkg: Record<string, unknown> = {
+                lineNumber: ki + 1,
+                goodsDescription: inttraField(`pkg_${ki}_goodsDesc`),
+                goodsClassificationValue: inttraField(`pkg_${ki}_hsCode`),
+                goodsClassificationType: inttraField(`pkg_${ki}_classType`) || 'WCO',
+                goodsGrossWeight: { weightValue: inttraField(`pkg_${ki}_weight`), weightType: inttraField(`pkg_${ki}_weightUnit`) || 'KGM' },
+              }
+              if (inttraField(`pkg_${ki}_pkgCount`)) pkg.count = parseInt(inttraField(`pkg_${ki}_pkgCount`)) || null
+              if (inttraField(`pkg_${ki}_pkgCode`)) { pkg.typeCode = 'EDI'; pkg.typeValue = inttraField(`pkg_${ki}_pkgCode`) }
+              if (inttraField(`pkg_${ki}_pkgDesc`)) pkg.typeDescription = inttraField(`pkg_${ki}_pkgDesc`)
+              if (inttraField(`pkg_${ki}_volume`)) pkg.goodsGrossVolume = { volumeValue: inttraField(`pkg_${ki}_volume`), volumeType: inttraField(`pkg_${ki}_volumeUnit`) || 'MTQ' }
+              packageDetails.push(pkg)
+            }
+
+            // Build equipments from indexed keys
+            const eqCount = parseInt(inttraField('eqCount')) || 0
+            const equipments: Record<string, unknown>[] = []
+            for (let ei = 0; ei < eqCount; ei++) {
+              const eSvcType = inttraField(`eq_${ei}_svcType`) || (inttraField('serviceType') === 'FCL' ? 'FCLFCL' : null)
+              const eq: Record<string, unknown> = {
+                count: parseInt(inttraField(`eq_${ei}_count`)) || 1,
+                equipmentSizeCode: { sizeCodeType: 'ISO', sizeCodeValue: inttraField(`eq_${ei}_sizeCode`) },
+                ...(eSvcType ? { serviceType: eSvcType } : {}),
+                haulage: { arrangement: inttraField(`eq_${ei}_haulage`) },
+              }
+              if (inttraField(`eq_${ei}_supplier`)) eq.supplierType = inttraField(`eq_${ei}_supplier`)
+              if (inttraField(`eq_${ei}_reeferTemp`)) eq.temperature = { value: inttraField(`eq_${ei}_reeferTemp`), type: inttraField(`eq_${ei}_reeferUnit`) || 'CEL' }
+              if (inttraField(`eq_${ei}_comments`)) eq.comments = inttraField(`eq_${ei}_comments`)
+              equipments.push(eq)
+            }
+
+            // Build transportLegs from indexed keys
+            const legCount = parseInt(inttraField('legCount')) || 0
+            const transportLegs: Record<string, unknown>[] = []
+            for (let li = 0; li < legCount; li++) {
+              transportLegs.push({
+                stage: inttraField(`leg_${li}_stage`) || 'MainCarriage',
+                sequenceNumber: String(li + 1),
+                carrierScac: inttraField(`leg_${li}_scac`),
+                vesselName: inttraField(`leg_${li}_vessel`) || undefined,
+                conveyanceNumber: inttraField(`leg_${li}_voyage`) || undefined,
+                mode: inttraField(`leg_${li}_mode`) || 'MaritimeTransport',
+                means: inttraField(`leg_${li}_means`) || 'OceanVessel',
+                startLocation: { identifierValue: inttraField('placeOfReceipt'), identifierType: inttraField('receiptIdentifierType') || 'UNLOC', locationType: 'PlaceOfLoad' },
+                endLocation: { identifierValue: inttraField('placeOfDelivery'), identifierType: inttraField('deliveryIdentifierType') || 'UNLOC', locationType: 'PlaceOfDischarge' },
+              })
+            }
+
+            const payload: Record<string, unknown> = {
+              bookingState: 'REQUEST',
+              customerChangeSummary: null,
+              transactionContact: txContact,
+              moveType: inttraField('moveType'),
+              serviceType: inttraField('serviceType'),
+              ...(inttraField('shipmentId') ? { shipmentId: inttraField('shipmentId') } : {}),
+              cargoHazardousIndicator: inttraField('cargoHazardous') === 'true',
+              cargoControlledEnvironmentIndicator: inttraField('cargoControlledEnvironment') === 'true',
+              cargoEnvironmentalPollutantIndicator: inttraField('cargoEnvironmentalPollutant') === 'true',
+              cargoOutofGaugeIndicator: inttraField('cargoOutOfGauge') === 'true',
+              transactionLocations: txLocations,
+              references: refs,
+              parties,
+              transportLegs,
+              packageDetails,
+              equipments,
+              ...(inttraField('generalComments') ? { generalComments: inttraField('generalComments') } : {}),
+              ...(inttraField('perContainerReleaseFlag') === 'true' ? { perContainerReleaseFlag: true } : {}),
+              ...(inttraField('notifyMe') === 'true' ? { notifyMe: true } : {}),
+            }
+            await apiSubmitInttraBooking(cbBkg.inq_id, payload)
+            onConfirmBooking(cbBkg.id, cbBkg.vessel_name, cbBkg.voyage_number)
+            onLogActivity({
+              actor_role: activeRole,
+              actor_id: activeEmployee.id,
+              action: `INTTRA booking submitted for ${cbBkg.customer_name}. Carrier: ${inttraField('party_0_name')}.`,
+              ref_type: 'booking',
+              ref_id: cbBkg.id,
+              customer_name: cbBkg.customer_name,
+              pushed_to: 'CS',
+              notes: `INTTRA booking via ${inttraField('leg_0_scac')}. ${inttraField('placeOfReceipt')} → ${inttraField('placeOfDelivery')}`,
+            })
+            onFlash(`INTTRA booking submitted — ${cbBkg.customer_name}`, nextStepAction)
+          } catch (err: unknown) {
+            const raw = err instanceof Error ? err.message : 'INTTRA booking submission failed'
+            // Try to extract JSON from the error message (after " — ")
+            const jsonMatch = raw.match(/\s\u2014\s(.+)$/)
+            if (jsonMatch) {
+              try {
+                const parsed = JSON.parse(jsonMatch[1])
+                // Handle FastAPI detail array: {detail: [{loc, msg, type}, ...]}
+                const details = Array.isArray(parsed?.detail) ? parsed.detail : Array.isArray(parsed) ? parsed : null
+                if (details && details.length > 0) {
+                  const lines = details.map((d: Record<string, unknown>) => {
+                    // FastAPI validation: {loc: [...], msg: "...", type: "..."}
+                    if (d.loc && d.msg) {
+                      const path = (d.loc as string[]).filter(s => s !== 'body').join(' > ')
+                      const msg = String(d.msg).replace(/^Value error,?\s*/i, '').replace(/^Field /i, 'Field ').trim()
+                      return path ? `${path}: ${msg}` : msg
+                    }
+                    // INTTRA error: {code: "224099", message: "..."}
+                    if (d.message) {
+                      return d.code ? `[${d.code}] ${d.message}` : String(d.message)
+                    }
+                    return JSON.stringify(d)
+                  })
+                  setInttraError(lines.join('\n'))
+                  return
+                }
+                // Handle plain string detail
+                if (typeof parsed?.detail === 'string') {
+                  setInttraError(parsed.detail)
+                  return
+                }
+              } catch { /* fall through to raw message */ }
+            }
+            setInttraError(raw)
+          } finally {
+            setInttraLoading(false)
+          }
+          break
+        }
+
+        // --- Manual booking confirmation ---
         if (linerBooked === 'yes') {
           onConfirmBooking(cbBkg.id, cbBkg.vessel_name, cbBkg.voyage_number)
           onLogActivity({

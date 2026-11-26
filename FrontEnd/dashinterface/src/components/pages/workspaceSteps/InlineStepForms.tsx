@@ -13,6 +13,7 @@ import {
 } from "../../../types"
 import { apiGetQuotationFile, type KycPendingClient, type QuotationOptionRow, type UnsentQuotation } from "../../../api"
 import type { CompletedRateRequest } from "../../../types"
+import { EXPECTED_HAULAGE, INCOTERM_TERMS, UNLOC_RE, expectedPaymentUnloc, incotermPaymentTerm, routeFromForm, computeAdvisories } from "./inttraValidation"
 import type { WorkspaceItem, BlContainerRow, MblContainerRow, QuotationOptionOverride } from "./types"
 import { empName, openMailto, buildRateSection, generateQuotationPdf } from "./utils"
 import { lookupQuotationId } from "./useWorkspaceActions"
@@ -76,6 +77,11 @@ export interface InlineStepFormsProps {
   mkReleaseOrderDraft: (bkg: Booking, method: "email" | "whatsapp") => string
   roFields: ReleaseOrderFields; setRoFields: (v: ReleaseOrderFields | ((prev: ReleaseOrderFields) => ReleaseOrderFields)) => void
   linerBooked: "yes" | "no" | ""; setLinerBooked: (v: "yes" | "no" | "") => void
+  procBookingTab: "manual" | "inttra"; setProcBookingTab: (v: "manual" | "inttra") => void
+  inttraField: (key: string) => string; setInttraField: (key: string, value: string) => void
+  inttraLoading: boolean
+  inttraError: string | null
+  onSubmitInttraBooking: () => void
   siContent: string; setSiContent: (v: string) => void
   siFileName: string; setSiFileName: (v: string) => void
   siMode: "paste" | "upload"; setSiMode: (v: "paste" | "upload") => void
@@ -186,7 +192,8 @@ export default function InlineStepForms({
   vgmCertFileName, setVgmCertFileName, setVgmCertContent,
   paField, setPaField, paCopied, setPaCopied,
   releasePhase, setReleasePhase, releaseDraft, setReleaseDraft, mkReleaseOrderDraft,
-  roFields, setRoFields, linerBooked, setLinerBooked,
+  roFields, setRoFields, linerBooked, setLinerBooked, procBookingTab, setProcBookingTab,
+  inttraField, setInttraField, inttraLoading, inttraError, onSubmitInttraBooking,
   siContent, setSiContent, siFileName, setSiFileName, siMode, setSiMode, inttraSiLoading,
   siField, setSiField, siIsNvocc, siEmailShow, setSiEmailShow,
   siEmailDraft, setSiEmailDraft, siLinerEmail, setSiLinerEmail,
@@ -2031,61 +2038,578 @@ export default function InlineStepForms({
   const { booking: cbBkg } = actionModal.sourceData
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      {/* Form header */}
-      <div style={{ padding: '8px 14px', background: '#16a34a', borderRadius: '8px 8px 0 0', marginBottom: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>LINER BOOKING CONFIRMATION</span>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>RA# {cbBkg.voyage_number || '—'}</span>
-      </div>
-      {/* Booking summary — read-only */}
-      <div style={{ border: '1px solid var(--border)', borderRadius: '0 0 8px 8px', overflow: 'hidden', marginBottom: 16 }}>
-        {[
-          { label: 'Customer', value: cbBkg.customer_name },
-          { label: 'Carrier', value: cbBkg.shipping_line || '—' },
-          { label: 'Container', value: `${cbBkg.quantity}x ${cbBkg.container_type}` },
-          { label: 'RA Number', value: cbBkg.voyage_number || 'Not assigned' },
-          { label: 'Vessel', value: cbBkg.vessel_name || '—' },
-          { label: 'Route', value: `${cbBkg.origin} → ${cbBkg.destination}` },
-        ].map(({ label, value }) => (
-          <div key={label} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>{label}</div>
-            <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text)', fontWeight: label === 'RA Number' ? 700 : 400 }}>{value}</div>
-          </div>
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 0, marginBottom: 16, borderBottom: '2px solid var(--border)' }}>
+        {([['manual', 'Manual Booking'], ['inttra', 'INTTRA Booking']] as const).map(([key, label]) => (
+          <button key={key} onClick={() => setProcBookingTab(key)}
+            style={{
+              padding: '10px 20px', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+              background: 'transparent',
+              color: procBookingTab === key ? '#16a34a' : 'var(--text-muted)',
+              borderBottom: procBookingTab === key ? '2px solid #16a34a' : '2px solid transparent',
+              marginBottom: -2,
+            }}>
+            {label}
+          </button>
         ))}
       </div>
-      {/* Booked? toggle */}
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 10 }}>Was the liner booking confirmed?</div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          {(['yes', 'no'] as const).map(v => (
-            <button key={v} onClick={() => setLinerBooked(v)}
-              style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: `2px solid ${linerBooked === v ? (v === 'yes' ? '#16a34a' : '#dc2626') : 'var(--border)'}`,
-                background: linerBooked === v ? (v === 'yes' ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.06)') : '#fff',
-                color: linerBooked === v ? (v === 'yes' ? '#16a34a' : '#dc2626') : 'var(--text-secondary)',
-                fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-              {v === 'yes' ? '✓ Yes, booked' : '✗ No, couldn\'t book'}
+
+      {procBookingTab === 'manual' ? (
+        <>
+          {/* Form header */}
+          <div style={{ padding: '8px 14px', background: '#16a34a', borderRadius: '8px 8px 0 0', marginBottom: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>LINER BOOKING CONFIRMATION</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>RA# {cbBkg.voyage_number || '—'}</span>
+          </div>
+          {/* Booking summary — read-only */}
+          <div style={{ border: '1px solid var(--border)', borderRadius: '0 0 8px 8px', overflow: 'hidden', marginBottom: 16 }}>
+            {[
+              { label: 'Customer', value: cbBkg.customer_name },
+              { label: 'Carrier', value: cbBkg.shipping_line || '—' },
+              { label: 'Container', value: `${cbBkg.quantity}x ${cbBkg.container_type}` },
+              { label: 'RA Number', value: cbBkg.voyage_number || 'Not assigned' },
+              { label: 'Vessel', value: cbBkg.vessel_name || '—' },
+              { label: 'Route', value: `${cbBkg.origin} → ${cbBkg.destination}` },
+            ].map(({ label, value }) => (
+              <div key={label} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>{label}</div>
+                <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text)', fontWeight: label === 'RA Number' ? 700 : 400 }}>{value}</div>
+              </div>
+            ))}
+          </div>
+          {/* Booked? toggle */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 10 }}>Was the liner booking confirmed?</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {(['yes', 'no'] as const).map(v => (
+                <button key={v} onClick={() => setLinerBooked(v)}
+                  style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: `2px solid ${linerBooked === v ? (v === 'yes' ? '#16a34a' : '#dc2626') : 'var(--border)'}`,
+                    background: linerBooked === v ? (v === 'yes' ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.06)') : '#fff',
+                    color: linerBooked === v ? (v === 'yes' ? '#16a34a' : '#dc2626') : 'var(--text-secondary)',
+                    fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                  {v === 'yes' ? '✓ Yes, booked' : '✗ No, couldn\'t book'}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Reason — shown only when No */}
+          {linerBooked === 'no' && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#dc2626', marginBottom: 6 }}>Reason (required)</div>
+              <textarea className="lt-input" rows={3} style={{ width: '100%', resize: 'vertical' as const, fontSize: 13 }}
+                value={formNote} onChange={e => setFormNote(e.target.value)}
+                placeholder="Explain why the booking couldn't be made…" />
+            </div>
+          )}
+          {/* Submit */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+            <button className="db-btn primary"
+              disabled={!linerBooked || (linerBooked === 'no' && !formNote.trim())}
+              style={{ background: linerBooked === 'no' ? '#dc2626' : '#16a34a', borderColor: linerBooked === 'no' ? '#dc2626' : '#16a34a',
+                opacity: (!linerBooked || (linerBooked === 'no' && !formNote.trim())) ? 0.5 : 1 }}
+              onClick={handleModalSubmit}>
+              {linerBooked === 'no' ? 'Revert to Pending Liner' : 'Confirm Liner Booking'}
             </button>
-          ))}
-        </div>
-      </div>
-      {/* Reason — shown only when No */}
-      {linerBooked === 'no' && (
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#dc2626', marginBottom: 6 }}>Reason (required)</div>
-          <textarea className="lt-input" rows={3} style={{ width: '100%', resize: 'vertical' as const, fontSize: 13 }}
-            value={formNote} onChange={e => setFormNote(e.target.value)}
-            placeholder="Explain why the booking couldn't be made…" />
+          </div>
+        </>
+      ) : (
+        <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* Error banner */}
+          {inttraError && (
+            <div style={{ padding: '10px 12px', background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, fontSize: 12, color: '#dc2626' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, marginBottom: inttraError.includes('\n') ? 6 : 0 }}>
+                <AlertTriangle size={14} /> {inttraError.includes('\n') ? 'Booking validation failed' : inttraError}
+              </div>
+              {inttraError.includes('\n') && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginLeft: 20 }}>
+                  {inttraError.split('\n').map((line, i) => {
+                    const colonIdx = line.indexOf(': ')
+                    const fieldPath = colonIdx > -1 ? line.slice(0, colonIdx) : null
+                    const message = colonIdx > -1 ? line.slice(colonIdx + 2) : line
+                    return (
+                      <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'baseline', fontSize: 11, lineHeight: 1.4 }}>
+                        <span style={{ color: '#ef4444' }}>•</span>
+                        <span>
+                          {fieldPath && <span style={{ fontFamily: 'monospace', fontSize: 10, background: 'rgba(220,38,38,0.08)', padding: '1px 4px', borderRadius: 3, marginRight: 4 }}>{fieldPath}</span>}
+                          {message}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Contact ── */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: 8 }}>Transaction Contact</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' }}>Name *</label>
+                <input className="lt-input" style={{ width: '100%', fontSize: 12 }} value={inttraField('contactName')} onChange={e => setInttraField('contactName', e.target.value)} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' }}>Contact Type *</label>
+                <select className="lt-input" style={{ width: '100%', fontSize: 12 }} value={inttraField('contactType')} onChange={e => setInttraField('contactType', e.target.value)}>
+                  <option value="InformationContact">Information Contact</option>
+                  <option value="NotificationContact">Notification Contact</option>
+                  <option value="ConfirmedWith">Confirmed With</option>
+                  <option value="EquipmentContact">Equipment Contact</option>
+                  <option value="EmergencyDangerousGoodsContact">Emergency DG Contact</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' }}>Email *</label>
+                <input className="lt-input" type="email" style={{ width: '100%', fontSize: 12 }} value={inttraField('contactEmail')} onChange={e => setInttraField('contactEmail', e.target.value)} placeholder="email@example.com" />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' }}>Phone</label>
+                <input className="lt-input" style={{ width: '100%', fontSize: 12 }} value={inttraField('contactPhone')} onChange={e => setInttraField('contactPhone', e.target.value)} placeholder="+94 11 234 5678" />
+              </div>
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>At least one of email or phone is required</div>
+          </div>
+
+          {/* ── Shipment ── */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: 8 }}>Shipment</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' }}>Move Type *</label>
+                <select className="lt-input" style={{ width: '100%', fontSize: 12 }} value={inttraField('moveType')} onChange={e => {
+                  const mt = e.target.value; setInttraField('moveType', mt)
+                  const h = EXPECTED_HAULAGE[mt]; if (h) { const ec = parseInt(inttraField('eqCount')) || 0; for (let i = 0; i < ec; i++) setInttraField(`eq_${i}_haulage`, h) }
+                }}>
+                  <option value="PortToPort">Port to Port</option>
+                  <option value="DoorToDoor">Door to Door</option>
+                  <option value="PortToDoor">Port to Door</option>
+                  <option value="DoorToPort">Door to Port</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' }}>Service Type</label>
+                <select className="lt-input" style={{ width: '100%', fontSize: 12 }} value={inttraField('serviceType')} onChange={e => setInttraField('serviceType', e.target.value)}>
+                  <option value="FCL">FCL</option>
+                  <option value="LCL">LCL</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' }}>Shipment ID</label>
+                <input className="lt-input" style={{ width: '100%', fontSize: 12 }} value={inttraField('shipmentId')} onChange={e => setInttraField('shipmentId', e.target.value)} placeholder="Optional (max 35)" />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' }}>Incoterm</label>
+                <select className="lt-input" style={{ width: '100%', fontSize: 12 }} value={inttraField('incoterm')} onChange={e => {
+                  const inc = e.target.value; setInttraField('incoterm', inc)
+                  if (inc && INCOTERM_TERMS[inc]) {
+                    const pCount = parseInt(inttraField('partyCount')) || 0
+                    for (let p = 0; p < pCount; p++) {
+                      const cCount = parseInt(inttraField(`party_${p}_chargeCount`)) || 0
+                      for (let c = 0; c < cCount; c++) {
+                        const ct = inttraField(`party_${p}_charge_${c}_type`)
+                        const suggested = incotermPaymentTerm(inc, ct)
+                        if (suggested) setInttraField(`party_${p}_charge_${c}_term`, suggested)
+                      }
+                    }
+                  }
+                }}>
+                  <option value="">— None —</option>
+                  {Object.keys(INCOTERM_TERMS).map(k => <option key={k} value={k}>{k}</option>)}
+                </select>
+              </div>
+            </div>
+            {/* Cargo indicators row */}
+            <div style={{ display: 'flex', gap: 16, marginTop: 10, flexWrap: 'wrap' }}>
+              {([
+                { key: 'cargoHazardous', label: 'Hazardous' },
+                { key: 'cargoControlledEnvironment', label: 'Controlled Environment' },
+                { key: 'cargoEnvironmentalPollutant', label: 'Environmental Pollutant' },
+                { key: 'cargoOutOfGauge', label: 'Out of Gauge' },
+              ] as const).map(({ key, label }) => (
+                <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={inttraField(key) === 'true'} onChange={e => setInttraField(key, e.target.checked ? 'true' : 'false')} />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Locations ── */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: 8 }}>Locations</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' }}>Place of Receipt *</label>
+                <input className="lt-input" style={{ width: '100%', fontSize: 12 }} value={inttraField('placeOfReceipt')} onChange={e => setInttraField('placeOfReceipt', e.target.value.toUpperCase())} placeholder="e.g. LKCMB" />
+                {inttraField('receiptIdentifierType') === 'UNLOC' && inttraField('placeOfReceipt') && !UNLOC_RE.test(inttraField('placeOfReceipt')) && (
+                  <div style={{ fontSize: 10, color: '#dc2626', marginTop: 2 }}>Must be 5-char UN/LOCODE (e.g. LKCMB)</div>
+                )}
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' }}>Receipt Identifier Type *</label>
+                <select className="lt-input" style={{ width: '100%', fontSize: 12 }} value={inttraField('receiptIdentifierType')} onChange={e => setInttraField('receiptIdentifierType', e.target.value)}>
+                  <option value="UNLOC">UNLOC</option>
+                  <option value="PartnerAlias">Partner Alias</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' }}>Place of Delivery *</label>
+                <input className="lt-input" style={{ width: '100%', fontSize: 12 }} value={inttraField('placeOfDelivery')} onChange={e => setInttraField('placeOfDelivery', e.target.value.toUpperCase())} placeholder="e.g. NLRTM" />
+                {inttraField('deliveryIdentifierType') === 'UNLOC' && inttraField('placeOfDelivery') && !UNLOC_RE.test(inttraField('placeOfDelivery')) && (
+                  <div style={{ fontSize: 10, color: '#dc2626', marginTop: 2 }}>Must be 5-char UN/LOCODE (e.g. NLRTM)</div>
+                )}
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' }}>Delivery Identifier Type *</label>
+                <select className="lt-input" style={{ width: '100%', fontSize: 12 }} value={inttraField('deliveryIdentifierType')} onChange={e => setInttraField('deliveryIdentifierType', e.target.value)}>
+                  <option value="UNLOC">UNLOC</option>
+                  <option value="PartnerAlias">Partner Alias</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 8 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' }}>Location Date Type</label>
+                <select className="lt-input" style={{ width: '100%', fontSize: 12 }} value={inttraField('locationDateType')} onChange={e => setInttraField('locationDateType', e.target.value)}>
+                  <option value="EarliestDepartureDate">Earliest Departure</option>
+                  <option value="LatestDeliveryDate">Latest Delivery</option>
+                  <option value="EstimatedDepartureDate">Estimated Departure</option>
+                  <option value="EstimatedArrivalDate">Estimated Arrival</option>
+                  <option value="BLReleaseDate">B/L Release</option>
+                  <option value="AMSFilingDueDate">AMS Filing Due</option>
+                  <option value="ClosingDate">Closing Date</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' }}>Date Value</label>
+                <input className="lt-input" type="date" style={{ width: '100%', fontSize: 12 }} value={inttraField('earliestDepartureDate')} onChange={e => setInttraField('earliestDepartureDate', e.target.value)} />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' }}>Date Format</label>
+                <select className="lt-input" style={{ width: '100%', fontSize: 12 }} value={inttraField('locationDateFormat')} onChange={e => setInttraField('locationDateFormat', e.target.value)}>
+                  <option value="CCYYMMDDHHMM">CCYYMMDDHHMM</option>
+                  <option value="CCYYMMDD">CCYYMMDD</option>
+                  <option value="CCYYMMDDHHMMSS">CCYYMMDDHHMMSS</option>
+                  <option value="YYMMDDHHMM">YYMMDDHHMM</option>
+                </select>
+              </div>
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>Either a location date (e.g. EarliestDepartureDate) or vessel + voyage is required</div>
+          </div>
+
+          {/* ── Transport Legs (dynamic list) ── */}
+          {(() => {
+            const lc = parseInt(inttraField('legCount')) || 0
+            const fl = { fontSize: 11, fontWeight: 600 as const, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' as const }
+            const modes = ['MaritimeTransport','RailTransport','RoadTransport','InlandWaterTransport','Rail_WaterTransport','Rail_RoadTransport','Road_WaterTransport']
+            const means = ['OceanVessel','ContainerShip','BulkCarrier','FeederVessel','Ship','Rail','Road','RailOrRoad','Barge','Truck','Other','NotSpecified']
+            const addLeg = () => { setInttraField('legCount', String(lc + 1)); setInttraField(`leg_${lc}_stage`, 'MainCarriage'); setInttraField(`leg_${lc}_scac`, ''); setInttraField(`leg_${lc}_vessel`, ''); setInttraField(`leg_${lc}_voyage`, ''); setInttraField(`leg_${lc}_mode`, 'MaritimeTransport'); setInttraField(`leg_${lc}_means`, 'OceanVessel') }
+            const removeLeg = (idx: number) => { for (let i = idx; i < lc - 1; i++) { for (const k of ['stage','scac','vessel','voyage','mode','means']) setInttraField(`leg_${i}_${k}`, inttraField(`leg_${i+1}_${k}`)) } setInttraField('legCount', String(lc - 1)) }
+            return (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Transport Legs ({lc})</div>
+                  <button type="button" onClick={addLeg} style={{ fontSize: 11, color: '#0891b2', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>+ Add Leg</button>
+                </div>
+                {Array.from({ length: lc }, (_, i) => (
+                  <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: 10, marginBottom: 8, background: 'rgba(0,0,0,0.01)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b' }}>Leg {i + 1} — {inttraField(`leg_${i}_stage`)}</span>
+                      <button type="button" onClick={() => removeLeg(i)} style={{ fontSize: 10, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                      <div><label style={fl}>Stage *</label><select className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`leg_${i}_stage`)} onChange={e => setInttraField(`leg_${i}_stage`, e.target.value)}><option value="MainCarriage">Main Carriage</option><option value="PreCarriage">Pre-Carriage</option><option value="OnCarriage">On-Carriage</option></select></div>
+                      <div><label style={fl}>Carrier SCAC</label><input className="lt-input" style={{ width: '100%', fontSize: 11 }} maxLength={4} value={inttraField(`leg_${i}_scac`)} onChange={e => setInttraField(`leg_${i}_scac`, e.target.value)} /></div>
+                      <div><label style={fl}>Vessel Name</label><input className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`leg_${i}_vessel`)} onChange={e => setInttraField(`leg_${i}_vessel`, e.target.value)} /></div>
+                      <div><label style={fl}>Voyage Number</label><input className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`leg_${i}_voyage`)} onChange={e => setInttraField(`leg_${i}_voyage`, e.target.value)} /></div>
+                      <div><label style={fl}>Mode</label><select className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`leg_${i}_mode`)} onChange={e => setInttraField(`leg_${i}_mode`, e.target.value)}>{modes.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
+                      <div><label style={fl}>Means</label><select className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`leg_${i}_means`)} onChange={e => setInttraField(`leg_${i}_means`, e.target.value)}>{means.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
+          {/* ── Parties (dynamic list) ── */}
+          {(() => {
+            const pc = parseInt(inttraField('partyCount')) || 0
+            const fl = { fontSize: 11, fontWeight: 600 as const, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' as const }
+            const roles = ['Carrier','Booker','Shipper','Forwarder','Consignee','ContractParty','MainNotifyParty','FirstAdditionalNotifyParty','SecondAdditionalNotifyParty','MessageRecipient','BookingOffice','ShipFrom','ShipTo','CustomsBroker']
+            const chTypes = ['OceanFreight','Additional','DestinationHaulage','DestinationTerminalHandling','OriginTerminalHandling','OriginHaulage']
+            const pmTerms = ['Prepaid','Collect','PayableElsewhere']
+            const addParty = () => { setInttraField('partyCount', String(pc + 1)); setInttraField(`party_${pc}_role`, ''); setInttraField(`party_${pc}_name`, ''); setInttraField(`party_${pc}_inttraId`, ''); setInttraField(`party_${pc}_alias`, ''); setInttraField(`party_${pc}_address`, ''); setInttraField(`party_${pc}_city`, ''); setInttraField(`party_${pc}_country`, ''); setInttraField(`party_${pc}_chargeCount`, '0') }
+            const removeParty = (idx: number) => { for (let i = idx; i < pc - 1; i++) { for (const k of ['role','name','inttraId','alias','address','city','country','chargeCount']) setInttraField(`party_${i}_${k}`, inttraField(`party_${i+1}_${k}`)); const cc = parseInt(inttraField(`party_${i+1}_chargeCount`)) || 0; for (let c = 0; c < cc; c++) { setInttraField(`party_${i}_charge_${c}_type`, inttraField(`party_${i+1}_charge_${c}_type`)); setInttraField(`party_${i}_charge_${c}_term`, inttraField(`party_${i+1}_charge_${c}_term`)) } } setInttraField('partyCount', String(pc - 1)) }
+            const addCharge = (pi: number) => { const cc = parseInt(inttraField(`party_${pi}_chargeCount`)) || 0; setInttraField(`party_${pi}_chargeCount`, String(cc + 1)); setInttraField(`party_${pi}_charge_${cc}_type`, 'OceanFreight'); setInttraField(`party_${pi}_charge_${cc}_term`, 'Prepaid') }
+            const removeCharge = (pi: number, ci: number) => { const cc = parseInt(inttraField(`party_${pi}_chargeCount`)) || 0; for (let c = ci; c < cc - 1; c++) { setInttraField(`party_${pi}_charge_${c}_type`, inttraField(`party_${pi}_charge_${c+1}_type`)); setInttraField(`party_${pi}_charge_${c}_term`, inttraField(`party_${pi}_charge_${c+1}_term`)) } setInttraField(`party_${pi}_chargeCount`, String(cc - 1)) }
+            return (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Parties ({pc})</div>
+                  <button type="button" onClick={addParty} style={{ fontSize: 11, color: '#0891b2', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>+ Add Party</button>
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 8 }}>Requires Carrier + Booker. At least one Shipper or Forwarder must have an INTTRA Company ID or Alias.</div>
+                {Array.from({ length: pc }, (_, i) => {
+                  const cc = parseInt(inttraField(`party_${i}_chargeCount`)) || 0
+                  return (
+                    <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: 10, marginBottom: 8, background: 'rgba(0,0,0,0.01)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b' }}>{inttraField(`party_${i}_role`) || `Party ${i + 1}`}</span>
+                        <button type="button" onClick={() => removeParty(i)} style={{ fontSize: 10, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                        <div>
+                          <label style={fl}>Role *</label>
+                          <select className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`party_${i}_role`)} onChange={e => setInttraField(`party_${i}_role`, e.target.value)}>
+                            <option value="">— Select —</option>
+                            {roles.map(r => <option key={r} value={r}>{r}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={fl}>Name *</label>
+                          <input className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`party_${i}_name`)} onChange={e => setInttraField(`party_${i}_name`, e.target.value)} />
+                        </div>
+                        <div>
+                          <label style={fl}>INTTRA Company ID</label>
+                          <input className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`party_${i}_inttraId`)} onChange={e => setInttraField(`party_${i}_inttraId`, e.target.value)} placeholder="ID" />
+                        </div>
+                        <div>
+                          <label style={fl}>Alias</label>
+                          <input className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`party_${i}_alias`)} onChange={e => setInttraField(`party_${i}_alias`, e.target.value)} />
+                        </div>
+                        <div>
+                          <label style={fl}>Address</label>
+                          <input className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`party_${i}_address`)} onChange={e => setInttraField(`party_${i}_address`, e.target.value)} />
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px', gap: 4 }}>
+                          <div><label style={fl}>City</label><input className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`party_${i}_city`)} onChange={e => setInttraField(`party_${i}_city`, e.target.value)} /></div>
+                          <div><label style={fl}>Ctry</label><input className="lt-input" style={{ width: '100%', fontSize: 11 }} maxLength={2} value={inttraField(`party_${i}_country`)} onChange={e => setInttraField(`party_${i}_country`, e.target.value)} /></div>
+                        </div>
+                      </div>
+                      {/* Charges sub-list */}
+                      <div style={{ marginTop: 6, borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: '#94a3b8' }}>Charges ({cc})</span>
+                          <button type="button" onClick={() => addCharge(i)} style={{ fontSize: 10, color: '#0891b2', background: 'none', border: 'none', cursor: 'pointer' }}>+ Add Charge</button>
+                        </div>
+                        {Array.from({ length: cc }, (_, c) => {
+                          const cType = inttraField(`party_${i}_charge_${c}_type`)
+                          const cTerm = inttraField(`party_${i}_charge_${c}_term`)
+                          const payLoc = expectedPaymentUnloc(cType, cTerm, routeFromForm(inttraField))
+                          return (
+                            <div key={c} style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 4 }}>
+                              <select className="lt-input" style={{ flex: 1, fontSize: 10 }} value={cType} onChange={e => setInttraField(`party_${i}_charge_${c}_type`, e.target.value)}>
+                                {chTypes.map(ct => <option key={ct} value={ct}>{ct}</option>)}
+                              </select>
+                              <select className="lt-input" style={{ flex: 1, fontSize: 10 }} value={cTerm} onChange={e => setInttraField(`party_${i}_charge_${c}_term`, e.target.value)}>
+                                {pmTerms.map(pt => <option key={pt} value={pt}>{pt}</option>)}
+                              </select>
+                              {payLoc && <span style={{ fontSize: 9, fontFamily: 'monospace', color: '#0891b2', background: 'rgba(8,145,178,0.08)', padding: '1px 5px', borderRadius: 4, whiteSpace: 'nowrap' }}>@ {payLoc}</span>}
+                              <button type="button" onClick={() => removeCharge(i, c)} style={{ fontSize: 12, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>×</button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
+
+          {/* ── References (dynamic list) ── */}
+          {(() => {
+            const rc = parseInt(inttraField('refCount')) || 0
+            const refTypes = ['ContractNumber','FreightTariffNumber','BookingNumber','BillOfLadingNumber','ShipperReferenceNumber','ConsigneeReferenceNumber','FreightForwarderRefNumber','PurchaseOrderNumber','ExportLicenseNumber','ContractPartyReferenceNumber','OutboundBookingAgentRefNumber','ContractLineItemNumber','InvoiceNumber','ShipmentID','INTTRAReferenceNumber','VehicleIdentificationNumber','CanadianCargoControlNumber','UniqueConsignmentNumber','ConsigneeOrderNumber','ExportersReferenceNumber','GovtAssignedIdentifier','InternalTransactionNumber']
+            const addRef = () => { setInttraField('refCount', String(rc + 1)); setInttraField(`ref_${rc}_type`, 'ContractNumber'); setInttraField(`ref_${rc}_value`, '') }
+            const removeRef = (idx: number) => { for (let i = idx; i < rc - 1; i++) { setInttraField(`ref_${i}_type`, inttraField(`ref_${i+1}_type`)); setInttraField(`ref_${i}_value`, inttraField(`ref_${i+1}_value`)) } setInttraField('refCount', String(rc - 1)) }
+            return (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>References ({rc})</div>
+                  <button type="button" onClick={addRef} style={{ fontSize: 11, color: '#0891b2', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>+ Add Reference</button>
+                </div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 8 }}>At least one ContractNumber or FreightTariffNumber is required.</div>
+                {Array.from({ length: rc }, (_, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 4 }}>
+                    <select className="lt-input" style={{ flex: 1, fontSize: 11 }} value={inttraField(`ref_${i}_type`)} onChange={e => setInttraField(`ref_${i}_type`, e.target.value)}>
+                      {refTypes.map(rt => <option key={rt} value={rt}>{rt}</option>)}
+                    </select>
+                    <input className="lt-input" style={{ flex: 1, fontSize: 11 }} value={inttraField(`ref_${i}_value`)} onChange={e => setInttraField(`ref_${i}_value`, e.target.value)} placeholder="Value *" />
+                    <button type="button" onClick={() => removeRef(i)} style={{ fontSize: 12, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}>×</button>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
+          {/* ── Package Details (dynamic list) ── */}
+          {(() => {
+            const pkc = parseInt(inttraField('pkgCount')) || 0
+            const fl = { fontSize: 11, fontWeight: 600 as const, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' as const }
+            const addPkg = () => { setInttraField('pkgCount', String(pkc + 1)); setInttraField(`pkg_${pkc}_goodsDesc`, ''); setInttraField(`pkg_${pkc}_hsCode`, ''); setInttraField(`pkg_${pkc}_classType`, 'WCO'); setInttraField(`pkg_${pkc}_weight`, ''); setInttraField(`pkg_${pkc}_weightUnit`, 'KGM'); setInttraField(`pkg_${pkc}_volume`, ''); setInttraField(`pkg_${pkc}_volumeUnit`, 'MTQ'); setInttraField(`pkg_${pkc}_pkgCount`, ''); setInttraField(`pkg_${pkc}_pkgCode`, ''); setInttraField(`pkg_${pkc}_pkgDesc`, '') }
+            const removePkg = (idx: number) => { for (let i = idx; i < pkc - 1; i++) { for (const k of ['goodsDesc','hsCode','classType','weight','weightUnit','volume','volumeUnit','pkgCount','pkgCode','pkgDesc']) setInttraField(`pkg_${i}_${k}`, inttraField(`pkg_${i+1}_${k}`)) } setInttraField('pkgCount', String(pkc - 1)) }
+            return (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Package Details ({pkc})</div>
+                  <button type="button" onClick={addPkg} style={{ fontSize: 11, color: '#0891b2', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>+ Add Cargo Line</button>
+                </div>
+                {Array.from({ length: pkc }, (_, i) => (
+                  <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: 10, marginBottom: 8, background: 'rgba(0,0,0,0.01)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b' }}>Line {i + 1}</span>
+                      <button type="button" onClick={() => removePkg(i)} style={{ fontSize: 10, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={fl}>Goods Description *</label>
+                        <input className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`pkg_${i}_goodsDesc`)} onChange={e => setInttraField(`pkg_${i}_goodsDesc`, e.target.value)} />
+                      </div>
+                      <div>
+                        <label style={fl}>HS Code *</label>
+                        <input className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`pkg_${i}_hsCode`)} onChange={e => setInttraField(`pkg_${i}_hsCode`, e.target.value)} placeholder="e.g. 6109.10" />
+                      </div>
+                      <div>
+                        <label style={fl}>Classification Type *</label>
+                        <select className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`pkg_${i}_classType`)} onChange={e => setInttraField(`pkg_${i}_classType`, e.target.value)}>
+                          <option value="WCO">WCO (HS)</option>
+                          <option value="SchedB">Schedule B</option>
+                        </select>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px', gap: 4 }}>
+                        <div><label style={fl}>Gross Weight *</label><input className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`pkg_${i}_weight`)} onChange={e => setInttraField(`pkg_${i}_weight`, e.target.value)} placeholder="e.g. 15000" /></div>
+                        <div><label style={fl}>Unit *</label><select className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`pkg_${i}_weightUnit`)} onChange={e => setInttraField(`pkg_${i}_weightUnit`, e.target.value)}><option value="KGM">KGM</option><option value="LBR">LBR</option></select></div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px', gap: 4 }}>
+                        <div><label style={fl}>Volume</label><input className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`pkg_${i}_volume`)} onChange={e => setInttraField(`pkg_${i}_volume`, e.target.value)} /></div>
+                        <div><label style={fl}>Unit</label><select className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`pkg_${i}_volumeUnit`)} onChange={e => setInttraField(`pkg_${i}_volumeUnit`, e.target.value)}><option value="MTQ">MTQ</option><option value="FTQ">FTQ</option><option value="GAL">GAL</option><option value="LTR">LTR</option></select></div>
+                      </div>
+                      <div><label style={fl}>Package Count</label><input className="lt-input" type="number" min="1" style={{ width: '100%', fontSize: 11 }} value={inttraField(`pkg_${i}_pkgCount`)} onChange={e => setInttraField(`pkg_${i}_pkgCount`, e.target.value)} /></div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr', gap: 4 }}>
+                        <div><label style={fl}>Code</label><input className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`pkg_${i}_pkgCode`)} onChange={e => setInttraField(`pkg_${i}_pkgCode`, e.target.value)} placeholder="PK" /></div>
+                        <div><label style={fl}>Pkg Description</label><input className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`pkg_${i}_pkgDesc`)} onChange={e => setInttraField(`pkg_${i}_pkgDesc`, e.target.value)} placeholder="e.g. CARTON" /></div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
+          {/* ── Equipment (dynamic list) ── */}
+          {(() => {
+            const eqc = parseInt(inttraField('eqCount')) || 0
+            const fl = { fontSize: 11, fontWeight: 600 as const, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' as const }
+            const isoOpts = [['22G1',"20' GP"],['42G1',"40' GP"],['45G1',"40' HC"],['22R1',"20' Reefer"],['42R1',"40' Reefer"],['22U1',"20' OT"],['42U1',"40' OT"],['22P1',"20' FR"],['42P1',"40' FR"]]
+            const addEq = () => { setInttraField('eqCount', String(eqc + 1)); setInttraField(`eq_${eqc}_count`, '1'); setInttraField(`eq_${eqc}_sizeCode`, '22G1'); setInttraField(`eq_${eqc}_haulage`, 'CarrierCarrier'); setInttraField(`eq_${eqc}_supplier`, 'CarrierSupplied'); setInttraField(`eq_${eqc}_svcType`, ''); setInttraField(`eq_${eqc}_reeferTemp`, ''); setInttraField(`eq_${eqc}_reeferUnit`, 'CEL'); setInttraField(`eq_${eqc}_comments`, '') }
+            const removeEq = (idx: number) => { for (let i = idx; i < eqc - 1; i++) { for (const k of ['count','sizeCode','haulage','supplier','svcType','reeferTemp','reeferUnit','comments']) setInttraField(`eq_${i}_${k}`, inttraField(`eq_${i+1}_${k}`)) } setInttraField('eqCount', String(eqc - 1)) }
+            return (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b' }}>Equipment ({eqc})</div>
+                  <button type="button" onClick={addEq} style={{ fontSize: 11, color: '#0891b2', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>+ Add Equipment</button>
+                </div>
+                {Array.from({ length: eqc }, (_, i) => (
+                  <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: 10, marginBottom: 8, background: 'rgba(0,0,0,0.01)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b' }}>Equipment {i + 1} — {inttraField(`eq_${i}_count`)}× {inttraField(`eq_${i}_sizeCode`)}</span>
+                      <button type="button" onClick={() => removeEq(i)} style={{ fontSize: 10, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                      <div><label style={fl}>Count *</label><input className="lt-input" type="number" min="1" style={{ width: '100%', fontSize: 11 }} value={inttraField(`eq_${i}_count`)} onChange={e => setInttraField(`eq_${i}_count`, e.target.value)} /></div>
+                      <div><label style={fl}>ISO Size Code *</label><select className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`eq_${i}_sizeCode`)} onChange={e => setInttraField(`eq_${i}_sizeCode`, e.target.value)}>{isoOpts.map(([v,l]) => <option key={v} value={v}>{v} ({l})</option>)}</select></div>
+                      <div><label style={fl}>Haulage *</label><select className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`eq_${i}_haulage`)} onChange={e => setInttraField(`eq_${i}_haulage`, e.target.value)}><option value="CarrierCarrier">Carrier/Carrier</option><option value="MerchantCarrier">Merchant/Carrier</option><option value="CarrierMerchant">Carrier/Merchant</option><option value="MerchantMerchant">Merchant/Merchant</option></select></div>
+                      <div><label style={fl}>Supplier</label><select className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`eq_${i}_supplier`)} onChange={e => setInttraField(`eq_${i}_supplier`, e.target.value)}><option value="CarrierSupplied">Carrier Supplied</option><option value="ShipperSupplied">Shipper Supplied</option></select></div>
+                      <div><label style={fl}>Service Type</label><select className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`eq_${i}_svcType`)} onChange={e => setInttraField(`eq_${i}_svcType`, e.target.value)}><option value="">— Auto —</option><option value="FCLFCL">FCL/FCL</option><option value="FCLLCL">FCL/LCL</option></select></div>
+                      {/22R1|42R1/.test(inttraField(`eq_${i}_sizeCode`)) && (<>
+                        <div><label style={fl}>Reefer Temp</label><input className="lt-input" style={{ width: '100%', fontSize: 11 }} maxLength={5} value={inttraField(`eq_${i}_reeferTemp`)} onChange={e => setInttraField(`eq_${i}_reeferTemp`, e.target.value)} placeholder="-18" /></div>
+                        <div><label style={fl}>Temp Unit</label><select className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`eq_${i}_reeferUnit`)} onChange={e => setInttraField(`eq_${i}_reeferUnit`, e.target.value)}><option value="CEL">CEL</option><option value="FAH">FAH</option></select></div>
+                      </>)}
+                      <div style={{ gridColumn: '1 / -1' }}><label style={fl}>Comments</label><input className="lt-input" style={{ width: '100%', fontSize: 11 }} value={inttraField(`eq_${i}_comments`)} onChange={e => setInttraField(`eq_${i}_comments`, e.target.value)} /></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
+          {/* ── Flags ── */}
+          <div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-secondary)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={inttraField('perContainerReleaseFlag') === 'true'} onChange={e => setInttraField('perContainerReleaseFlag', e.target.checked ? 'true' : 'false')} />
+              Per-container release flag
+            </label>
+          </div>
+
+          {/* ── Other ── */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 3, display: 'block' }}>General Comments</label>
+            <textarea className="lt-input" rows={2} style={{ width: '100%', fontSize: 12, resize: 'vertical' }} value={inttraField('generalComments')} onChange={e => setInttraField('generalComments', e.target.value)} placeholder="Optional remarks..." />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text-secondary)', cursor: 'pointer', marginTop: 8 }}>
+              <input type="checkbox" checked={inttraField('notifyMe') === 'true'} onChange={e => setInttraField('notifyMe', e.target.checked ? 'true' : 'false')} />
+              Notify me of booking updates
+            </label>
+          </div>
+
+          {/* Submit button */}
+          {(() => {
+            // Validate dynamic lists
+            const pc = parseInt(inttraField('partyCount')) || 0
+            const hasCarrier = Array.from({ length: pc }, (_, i) => i).some(i => inttraField(`party_${i}_role`) === 'Carrier' && inttraField(`party_${i}_name`))
+            const hasBooker = Array.from({ length: pc }, (_, i) => i).some(i => inttraField(`party_${i}_role`) === 'Booker' && inttraField(`party_${i}_name`))
+            const hasInttraId = Array.from({ length: pc }, (_, i) => i).some(i => (inttraField(`party_${i}_role`) === 'Shipper' || inttraField(`party_${i}_role`) === 'Forwarder') && inttraField(`party_${i}_inttraId`))
+            const rc = parseInt(inttraField('refCount')) || 0
+            const hasRef = Array.from({ length: rc }, (_, i) => i).some(i => inttraField(`ref_${i}_type`) && inttraField(`ref_${i}_value`))
+            const pkc = parseInt(inttraField('pkgCount')) || 0
+            const hasPkg = pkc > 0 && inttraField('pkg_0_goodsDesc') && inttraField('pkg_0_hsCode') && inttraField('pkg_0_weight')
+            const eqc = parseInt(inttraField('eqCount')) || 0
+            const hasEq = eqc > 0 && inttraField('eq_0_count') && inttraField('eq_0_sizeCode') && inttraField('eq_0_haulage')
+            const lc = parseInt(inttraField('legCount')) || 0
+            const hasLeg = lc > 0 && inttraField('leg_0_scac')
+            // Collect missing field names for user feedback
+            const missing: string[] = []
+            if (!inttraField('contactName')) missing.push('Contact Name')
+            if (!(inttraField('contactEmail') || inttraField('contactPhone'))) missing.push('Contact Email or Phone')
+            if (!inttraField('moveType')) missing.push('Move Type')
+            if (!inttraField('placeOfReceipt')) missing.push('Place of Receipt')
+            if (!inttraField('placeOfDelivery')) missing.push('Place of Delivery')
+            if (!hasCarrier) missing.push('Carrier party')
+            if (!hasBooker) missing.push('Booker party')
+            if (!hasInttraId) missing.push('INTTRA Company ID on Shipper or Forwarder')
+            if (!hasRef) missing.push('At least one Reference')
+            if (!hasPkg) missing.push('Package Details (description, HS code, weight)')
+            if (!hasEq) missing.push('Equipment (count, size, haulage)')
+            if (!hasLeg) missing.push('Transport Leg (carrier SCAC)')
+            const disabled = inttraLoading || missing.length > 0
+            const advisories = computeAdvisories(inttraField)
+            return (
+              <div style={{ marginTop: 4 }}>
+                {advisories.length > 0 && (
+                  <div style={{ fontSize: 11, color: '#7c3aed', background: 'rgba(124,58,237,0.04)', border: '1px solid rgba(124,58,237,0.12)', borderRadius: 6, padding: '6px 10px', marginBottom: 8 }}>
+                    <strong style={{ display: 'block', marginBottom: 3 }}>Advisories</strong>
+                    {advisories.map((a, idx) => <div key={idx} style={{ display: 'flex', gap: 4, alignItems: 'baseline' }}><span style={{ color: '#a78bfa' }}>•</span> {a}</div>)}
+                  </div>
+                )}
+                {missing.length > 0 && (
+                  <div style={{ fontSize: 11, color: '#ca8a04', background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.15)', borderRadius: 6, padding: '6px 10px', marginBottom: 8 }}>
+                    <strong>Missing required fields:</strong> {missing.join(' · ')}
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button className="db-btn primary"
+                    disabled={disabled}
+                    style={{ background: '#0891b2', borderColor: '#0891b2', display: 'flex', alignItems: 'center', gap: 6, opacity: disabled ? 0.5 : 1 }}
+                    onClick={onSubmitInttraBooking}>
+                    {inttraLoading ? <><Loader2 size={14} className="animate-spin" /> Submitting...</> : <><Globe size={14} /> Submit INTTRA Booking</>}
+                  </button>
+                </div>
+              </div>
+            )
+          })()}
         </div>
       )}
-      {/* Submit */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
-        <button className="db-btn primary"
-          disabled={!linerBooked || (linerBooked === 'no' && !formNote.trim())}
-          style={{ background: linerBooked === 'no' ? '#dc2626' : '#16a34a', borderColor: linerBooked === 'no' ? '#dc2626' : '#16a34a',
-            opacity: (!linerBooked || (linerBooked === 'no' && !formNote.trim())) ? 0.5 : 1 }}
-          onClick={handleModalSubmit}>
-          {linerBooked === 'no' ? 'Revert to Pending Liner' : 'Confirm Liner Booking'}
-        </button>
-      </div>
     </div>
   )
 })() : selectedItem.actionKind === 'submit-si' && actionModal ? (() => {
