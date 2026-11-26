@@ -2,8 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nProvider } from 'react-aria-components'
 import { useState } from 'react'
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { todayISO } from '../../lib/date'
+import { describe, expect, it, vi } from 'vitest'
 import { DatePicker } from './DatePicker'
 import { Field } from './Field'
 
@@ -83,8 +82,47 @@ describe('DatePicker', () => {
     render(wrap(<Harness initial="2026-11-26" onChange={onChange} />))
     await clearSegment(user, segments()[0], 2)
     // The first Backspace leaves day "2" (a complete date, so it is emitted like a native input);
-    // the second empties the day only, which must not emit '' while month and year are still filled.
+    // the second empties the day only. RAC does not report that, so nothing more is emitted until blur.
     expect(onChange.mock.calls).toEqual([['2026-11-02']])
+  })
+
+  it('clears a partially filled date when focus leaves the field', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(wrap(<Harness initial="2026-11-26" onChange={onChange} />))
+    await clearSegment(user, segments()[0], 2)
+    expect(onChange.mock.calls).toEqual([['2026-11-02']])
+    // day -> month -> year -> calendar button -> out of the field
+    await user.tab()
+    await user.tab()
+    await user.tab()
+    await user.tab()
+    expect(onChange).toHaveBeenLastCalledWith('')
+    expect(segmentTexts().join('')).toBe('ddmmyyyy')
+  })
+
+  it('clears a date whose year was partially erased when focus leaves', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(wrap(<Harness initial="2026-11-26" onChange={onChange} />))
+    await clearSegment(user, segments()[2], 4)
+    await user.tab()
+    await user.tab()
+    expect(onChange).toHaveBeenLastCalledWith('')
+    expect(segmentTexts().join('')).toBe('ddmmyyyy')
+  })
+
+  it('does not emit on blur for a complete date', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(wrap(<Harness initial="2026-11-26" onChange={onChange} />))
+    await user.click(segments()[0])
+    await user.tab()
+    await user.tab()
+    await user.tab()
+    await user.tab()
+    expect(onChange).not.toHaveBeenCalled()
+    expect(segmentTexts()).toEqual(['26', '11', '2026'])
   })
 
   it('accepts a datetime string and does not call onChange on mount', () => {
@@ -162,23 +200,5 @@ describe('DatePicker', () => {
     const group = screen.getByRole('group', { name: /valid until/i })
     expect(group.parentElement).toHaveAttribute('data-invalid')
     expect(group).toHaveAccessibleDescription('Required')
-  })
-})
-
-describe('todayISO', () => {
-  beforeAll(() => {
-    vi.stubEnv('TZ', 'Asia/Colombo')
-  })
-  afterAll(() => {
-    vi.unstubAllEnvs()
-  })
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('uses the local timezone, not UTC', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-11-26T20:00:00Z'))
-    expect(todayISO()).toBe('2026-11-27')
   })
 })

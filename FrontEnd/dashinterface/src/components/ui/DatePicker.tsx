@@ -1,6 +1,6 @@
 import { parseDate, type DateValue } from '@internationalized/date'
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useRef, type AriaAttributes, type CSSProperties } from 'react'
+import type { AriaAttributes, CSSProperties } from 'react'
 import {
   Button,
   Calendar,
@@ -20,12 +20,12 @@ import {
 } from 'react-aria-components'
 import { cn } from '../../lib/cn'
 import { control, controlModifier } from './controlStyles'
-import { clearedLastSegment } from './segments'
 
 export interface DatePickerProps {
   /** `'YYYY-MM-DD'` (a longer ISO datetime is cut to its date part). `''`, `null`, `undefined` or invalid text shows empty. */
   value: string | null | undefined
-  /** Called with `'YYYY-MM-DD'` when a full date is entered or picked, and with `''` when every segment is cleared. */
+  /** Called with `'YYYY-MM-DD'` whenever the segments hold a full date (so typing a year emits intermediate dates, like a native input),
+   * and with `''` when every segment is cleared or when focus leaves a partly filled field that held a date. */
   onChange: (value: string) => void
   /** `'YYYY-MM-DD'`; invalid text is ignored. */
   minValue?: string
@@ -58,8 +58,19 @@ function parseISODate(value: string | null | undefined): ReturnType<typeof parse
   }
 }
 
+/**
+ * True when focus left `group` while some, but not all, of its segments are filled. RAC keeps the
+ * last full date in the controlled value, so the field would show less than the parent holds.
+ */
+function isPartiallyFilled(group: HTMLElement, nextFocus: EventTarget | null): boolean {
+  if (nextFocus instanceof Node && group.contains(nextFocus)) return false
+  const all = group.querySelectorAll('[role="spinbutton"]').length
+  const filled = group.querySelectorAll('[role="spinbutton"]:not([data-placeholder])').length
+  return filled > 0 && filled < all
+}
+
 const navButton =
-  'flex size-7 items-center justify-center rounded-control border-none bg-transparent p-0 text-fg-muted hover:bg-primary-subtle disabled:text-fg-muted'
+  'flex size-7 items-center justify-center rounded-control border-none bg-transparent p-0 text-fg-muted hover:bg-primary-subtle disabled:opacity-40 disabled:hover:bg-transparent'
 
 export function DatePicker({
   value,
@@ -81,14 +92,11 @@ export function DatePicker({
   className,
   style,
 }: DatePickerProps) {
-  const groupRef = useRef<HTMLDivElement>(null)
+  const parsed = parseISODate(value)
   return (
     <AriaDatePicker<DateValue>
-      value={parseISODate(value)}
-      onChange={(date) => {
-        if (date) onChange(date.toString())
-        else if (clearedLastSegment(groupRef.current)) onChange('')
-      }}
+      value={parsed}
+      onChange={(date) => onChange(date ? date.toString() : '')}
       minValue={parseISODate(minValue) ?? undefined}
       maxValue={parseISODate(maxValue) ?? undefined}
       granularity="day"
@@ -107,7 +115,9 @@ export function DatePicker({
     >
       {label && <Label className="text-label font-semibold text-fg-label">{label}</Label>}
       <Group
-        ref={groupRef}
+        onBlur={(e) => {
+          if (parsed && isPartiallyFilled(e.currentTarget, e.relatedTarget)) onChange('')
+        }}
         className={cn(
           'ui-control',
           controlModifier(controlSize),
@@ -153,7 +163,7 @@ export function DatePicker({
                     className={({ isToday }) =>
                       cn(
                         'mx-auto flex size-8 items-center justify-center rounded-day text-control text-fg hover:bg-primary-subtle',
-                        'outside-month:text-fg-muted disabled:text-fg-muted unavailable:text-fg-muted',
+                        'outside-month:text-fg-muted disabled:line-through disabled:opacity-40 disabled:hover:bg-transparent unavailable:text-fg-muted',
                         isToday && 'ring-1 ring-primary ring-inset',
                         'selected:bg-primary selected:text-white selected:hover:bg-primary',
                       )

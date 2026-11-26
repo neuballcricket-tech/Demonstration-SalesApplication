@@ -59,6 +59,28 @@ describe('TimeField', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 
+  it('clears a partially filled time when focus leaves the field', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(wrap(<Harness initial="09:30" onChange={onChange} />))
+    await user.click(segments()[1])
+    await user.keyboard('{Backspace}{Backspace}')
+    await user.tab()
+    expect(onChange).toHaveBeenLastCalledWith('')
+    expect(segmentTexts().join('')).toBe('––––')
+  })
+
+  it('does not emit on blur for a complete time', async () => {
+    const onChange = vi.fn()
+    const user = userEvent.setup()
+    render(wrap(<Harness initial="09:30" onChange={onChange} />))
+    await user.click(segments()[0])
+    await user.tab()
+    await user.tab()
+    expect(onChange).not.toHaveBeenCalled()
+    expect(segmentTexts()).toEqual(['09', '30'])
+  })
+
   it.each([['abc'], ['']])('tolerates an invalid value (%s) without onChange', (value) => {
     const onChange = vi.fn()
     render(wrap(<TimeField aria-label="Time" value={value} onChange={onChange} />))

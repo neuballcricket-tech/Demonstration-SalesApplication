@@ -3,12 +3,12 @@ import { useRef, type AriaAttributes, type CSSProperties } from 'react'
 import { DateInput, DateSegment, Label, TimeField as AriaTimeField } from 'react-aria-components'
 import { cn } from '../../lib/cn'
 import { control, controlModifier } from './controlStyles'
-import { clearedLastSegment } from './segments'
 
 export interface TimeFieldProps {
   /** `'HH:mm'`. `''` or invalid text shows empty. */
   value: string
-  /** Called with `'HH:mm'` when a full time is entered, and with `''` when every segment is cleared. */
+  /** Called with `'HH:mm'` whenever the segments hold a full time, and with `''` when every segment is cleared
+   * or when focus leaves a partly filled field that held a time. */
   onChange: (value: string) => void
   label?: string
   'aria-label'?: string
@@ -37,6 +37,17 @@ function parseHHmm(value: string) {
   }
 }
 
+/**
+ * True when focus left `group` while some, but not all, of its segments are filled. RAC keeps the
+ * last full time in the controlled value, so the field would show less than the parent holds.
+ */
+function isPartiallyFilled(group: HTMLElement, nextFocus: EventTarget | null): boolean {
+  if (nextFocus instanceof Node && group.contains(nextFocus)) return false
+  const all = group.querySelectorAll('[role="spinbutton"]').length
+  const filled = group.querySelectorAll('[role="spinbutton"]:not([data-placeholder])').length
+  return filled > 0 && filled < all
+}
+
 const pad = (n: number) => String(n).padStart(2, '0')
 
 export function TimeField({
@@ -57,13 +68,14 @@ export function TimeField({
   className,
   style,
 }: TimeFieldProps) {
+  const parsed = parseHHmm(value)
   const inputRef = useRef<HTMLDivElement>(null)
   return (
     <AriaTimeField
-      value={parseHHmm(value)}
-      onChange={(time) => {
-        if (time) onChange(`${pad(time.hour)}:${pad(time.minute)}`)
-        else if (clearedLastSegment(inputRef.current)) onChange('')
+      value={parsed}
+      onChange={(time) => onChange(time ? `${pad(time.hour)}:${pad(time.minute)}` : '')}
+      onBlur={() => {
+        if (parsed && inputRef.current && isPartiallyFilled(inputRef.current, null)) onChange('')
       }}
       granularity="minute"
       hourCycle={24}
