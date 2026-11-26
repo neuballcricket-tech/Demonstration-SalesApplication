@@ -683,6 +683,13 @@ export default function RateCheck({
   const [manualEntries, setManualEntries] = useState<ManualRateEntry[]>([])
   // Track backend-created rate IDs from manual entries so we can link them as rate request options on submit
   const [createdManualRateIds, setCreatedManualRateIds] = useState<{ rateType: string; rateId: number; scheduleId?: number }[]>([])
+  // Submit/escalate run one at a time. The ref blocks a second click in the same tick;
+  // the state drives the disabled/busy button.
+  const [submitting, setSubmitting] = useState(false)
+  const submittingRef = useRef(false)
+  // Kept across retries so a retry never creates a second rate request or links an option twice
+  const createdRequestIdRef = useRef<number | null>(null)
+  const linkedOptionKeysRef = useRef<Set<string>>(new Set())
 
   // Path 3: schedule-linked manual rate entry — holds the schedule row the user wants to attach a rate to
   const [linkedSchedule, setLinkedSchedule] = useState<SelectablePivotRow | null>(null)
@@ -1105,12 +1112,48 @@ export default function RateCheck({
       emp_id_requested: 6, // beta: backend hardcodes emp_id 6
       is_given: isGiven,
       remark,
-      selected_schedules: schedules,
+      selected_schedules: schedules ?? [],
     })
   }
 
+  const errMsg = (err: unknown) => (err instanceof Error ? err.message : String(err)).slice(0, 160)
+
+  const runExclusive = async (fn: () => Promise<void>) => {
+    if (submittingRef.current) return
+    submittingRef.current = true
+    setSubmitting(true)
+    try {
+      await fn()
+    } finally {
+      submittingRef.current = false
+      setSubmitting(false)
+    }
+  }
+
+  // Create the CS/Sales rate request once; a retry after a partial failure reuses it
+  const ensureCsRateRequest = async (remark: string, isGiven: boolean): Promise<number | undefined> => {
+    if (createdRequestIdRef.current != null) return createdRequestIdRef.current
+    const res = await createCsRateRequest(remark, isGiven)
+    const id = res?.request_id
+    if (id != null) createdRequestIdRef.current = id
+    return id
+  }
+
+  type OptionLink = { key: string; payload: Parameters<typeof apiAddRateRequestOption>[1] }
+  // Link rate options, skipping any already linked by an earlier attempt. Throws if any fail.
+  const linkOptions = async (requestId: number, links: OptionLink[]) => {
+    const pending = links.filter(l => !linkedOptionKeysRef.current.has(l.key))
+    const results = await Promise.allSettled(pending.map(l => apiAddRateRequestOption(requestId, l.payload)))
+    results.forEach((r, i) => { if (r.status === 'fulfilled') linkedOptionKeysRef.current.add(pending[i].key) })
+    const failed = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+    if (failed.length > 0) {
+      console.error('[RateCheck] rate option link failed:', failed.map(f => f.reason))
+      throw new Error(`${failed.length} of ${pending.length} rate option(s) failed to link: ${errMsg(failed[0].reason)}`)
+    }
+  }
+
   // Submit handler
-  const handleSubmit = async () => {
+  const handleSubmit = () => runExclusive(async () => {
     // Non-procurement branches: create rate request at submit time (includes schedules)
     if (!isProcurement && skipProcurement) {
       createCsRateRequest(
@@ -1138,7 +1181,11 @@ export default function RateCheck({
           `No suitable rates found. Escalating to Procurement for rate sourcing. ${inquiry.inq_id}: ${inquiry.origin} → ${dest ?? ''}. ${formNote || ''}`.trim(),
           false,
         )
-      } catch (err) { console.error('[RateCheck] rate request create failed:', err) }
+      } catch (err) {
+        console.error('[RateCheck] rate request create failed:', err)
+        onFlash(`Could not escalate to Procurement: ${errMsg(err)}`)
+        return
+      }
       onAdvanceWorkflow(inquiry.id, 'procurement-request')
       onLogActivity({
         actor_role: activeRole,
@@ -1187,87 +1234,85 @@ export default function RateCheck({
       vessel: 'vessel_by_vessel_rate', fak: 'fak_rates', special: 'special_rate',
     }
 
-    // Collect all option-link promises so we can await them before navigating.
-    // Previously these were fire-and-forget, causing Workspace to fetch
-    // completedRateRequests before options were persisted.
-    const optionPromises: Promise<unknown>[] = []
-
+    // Every step below must succeed before the workflow advances or the page navigates away.
     if (isProcurement) {
-      // Procurement: PATCH the existing incoming rate request
+      // Procurement: PATCH the existing incoming rate request, then link its options
       if (rateRequestId) {
-        await apiPatchRateRequestProc(rateRequestId, { is_given: true, remark: briefRemark })
-          .catch(err => console.error('[RateCheck] rate request patch failed:', err))
+        try {
+          await apiPatchRateRequestProc(rateRequestId, { is_given: true, remark: briefRemark })
+        } catch (err) {
+          console.error('[RateCheck] rate request patch failed:', err)
+          onFlash(`Could not send the rate brief: ${errMsg(err)}`)
+          return
+        }
+        const links: OptionLink[] = []
+        for (const mr of createdManualRateIds) {
+          links.push({
+            key: `manual:${mr.rateType}:${mr.rateId}`,
+            payload: { request_id: rateRequestId, rate_type: mr.rateType, rate_id: mr.rateId, schedule_id: mr.scheduleId },
+          })
+        }
+        // Aggregate schedule rate selections (key = "schedule_id:rate_type:rate_id")
+        for (const aggKey of selectedAggregateRateIds) {
+          const parts = aggKey.split(':')
+          if (parts.length < 3) continue
+          const scheduleId = Number(parts[0])
+          const rateType = parts.slice(1, -1).join(':')
+          const rateId = Number(parts[parts.length - 1])
+          if (!isNaN(rateId) && !isNaN(scheduleId)) {
+            links.push({ key: `agg:${aggKey}`, payload: { request_id: rateRequestId, rate_type: rateType, rate_id: rateId, schedule_id: scheduleId } })
+          }
+        }
+        try {
+          await linkOptions(rateRequestId, links)
+        } catch (err) {
+          onFlash(`Rate brief saved, but ${errMsg(err)}. Press the button again to retry the rest.`)
+          return
+        }
       }
     } else {
-      // CS/Sales: create rate request now, then link enriched rate options
+      // CS/Sales: create the rate request (once), then link the selected rate options
+      let reqId: number | undefined
       try {
-        const res = await createCsRateRequest(briefRemark, true)
-        const reqId = res?.request_id
-        if (reqId) {
-          // Link enriched schedule rate selections (key = "schedule_id:rate_type:rate_id")
-          for (const aggKey of selectedAggregateRateIds) {
-            const parts = aggKey.split(':')
-            if (parts.length < 3) continue
-            const scheduleId = Number(parts[0])
-            const rateType = parts.slice(1, -1).join(':')
-            const rateId = Number(parts[parts.length - 1])
-            if (!isNaN(rateId) && !isNaN(scheduleId)) {
-              optionPromises.push(
-                apiAddRateRequestOption(reqId, { request_id: reqId, rate_type: rateType, rate_id: rateId, schedule_id: scheduleId })
-                  .catch(err => console.error('[RateCheck] add enriched rate request option failed:', err))
-              )
-            }
-          }
-          // Also link DB-selected rates if any
-          if (hasDbSelections) {
-            const selectedRates = visibleRates.filter(r => selectedIds.has(r.id))
-            for (const rate of selectedRates) {
-              const colonIdx = rate.id.indexOf(':')
-              if (colonIdx === -1) continue
-              const prefix = rate.id.slice(0, colonIdx)
-              const rateType = RATE_TYPE_MAP[prefix] ?? prefix
-              const rateId = Number(rate.id.slice(colonIdx + 1))
-              if (!isNaN(rateId)) {
-                optionPromises.push(
-                  apiAddRateRequestOption(reqId, { request_id: reqId, rate_type: rateType, rate_id: rateId })
-                    .catch(err => console.error('[RateCheck] add rate request option failed:', err))
-                )
-              }
-            }
-          }
-        }
+        reqId = await ensureCsRateRequest(briefRemark, true)
       } catch (err) {
         console.error('[RateCheck] rate request create failed:', err)
+        onFlash(`Could not create the rate request: ${errMsg(err)}`)
+        return
       }
-    }
-
-    // Procurement: link options using existing rateRequestId
-    if (isProcurement && rateRequestId) {
-      for (const mr of createdManualRateIds) {
-        optionPromises.push(
-          apiAddRateRequestOption(rateRequestId, { request_id: rateRequestId, rate_type: mr.rateType, rate_id: mr.rateId, schedule_id: mr.scheduleId })
-            .catch(err => console.error('[RateCheck] add manual rate request option failed:', err))
-        )
-      }
-      // Link aggregate schedule rate selections (key = "schedule_id:rate_type:rate_id")
-      for (const aggKey of selectedAggregateRateIds) {
-        const parts = aggKey.split(':')
-        if (parts.length < 3) continue
-        const scheduleId = Number(parts[0])
-        const rateType = parts.slice(1, -1).join(':')
-        const rateId = Number(parts[parts.length - 1])
-        if (!isNaN(rateId) && !isNaN(scheduleId)) {
-          optionPromises.push(
-            apiAddRateRequestOption(rateRequestId, { request_id: rateRequestId, rate_type: rateType, rate_id: rateId, schedule_id: scheduleId })
-              .catch(err => console.error('[RateCheck] add aggregate rate request option failed:', err))
-          )
+      if (reqId) {
+        const links: OptionLink[] = []
+        // Enriched schedule rate selections (key = "schedule_id:rate_type:rate_id")
+        for (const aggKey of selectedAggregateRateIds) {
+          const parts = aggKey.split(':')
+          if (parts.length < 3) continue
+          const scheduleId = Number(parts[0])
+          const rateType = parts.slice(1, -1).join(':')
+          const rateId = Number(parts[parts.length - 1])
+          if (!isNaN(rateId) && !isNaN(scheduleId)) {
+            links.push({ key: `agg:${aggKey}`, payload: { request_id: reqId, rate_type: rateType, rate_id: rateId, schedule_id: scheduleId } })
+          }
+        }
+        // DB-selected rates, if any
+        if (hasDbSelections) {
+          for (const rate of visibleRates.filter(r => selectedIds.has(r.id))) {
+            const colonIdx = rate.id.indexOf(':')
+            if (colonIdx === -1) continue
+            const prefix = rate.id.slice(0, colonIdx)
+            const rateType = RATE_TYPE_MAP[prefix] ?? prefix
+            const rateId = Number(rate.id.slice(colonIdx + 1))
+            if (!isNaN(rateId)) {
+              links.push({ key: `db:${rate.id}`, payload: { request_id: reqId, rate_type: rateType, rate_id: rateId } })
+            }
+          }
+        }
+        try {
+          await linkOptions(reqId, links)
+        } catch (err) {
+          onFlash(`Rate request created, but ${errMsg(err)}. Press the button again to retry the rest.`)
+          return
         }
       }
-    }
-
-    // Wait for all options to be persisted before advancing workflow / navigating
-    if (optionPromises.length > 0) {
-      await Promise.all(optionPromises)
     }
 
     // Advance local state (backend may already have auto-advanced via options above — idempotent)
@@ -1294,10 +1339,10 @@ export default function RateCheck({
       : `${inquiry.id} → ${totalCount} rate(s) — proceeding to quotation`
     )
     ;(onGoToQuotations ?? onGoBack)()
-  }
+  })
 
   // Direct escalation to procurement (cs-sales, always available)
-  const handleEscalate = async () => {
+  const handleEscalate = () => runExclusive(async () => {
     const schedPayloads = getEnrichedSchedulePayloads()
     const schedCount = schedPayloads?.length ?? 0
     const schedNote = schedCount > 0
@@ -1311,6 +1356,8 @@ export default function RateCheck({
       console.log('[RateCheck] escalation rate request created:', res)
     } catch (err) {
       console.error('[RateCheck] rate request create failed:', err)
+      onFlash(`Could not escalate to Procurement: ${errMsg(err)}`)
+      return
     }
     onAdvanceWorkflow(inquiry.id, 'procurement-request')
     onLogActivity({
@@ -1325,7 +1372,7 @@ export default function RateCheck({
     })
     onFlash(`${inquiry.id} → Escalated to Procurement${schedCount > 0 ? ` (${schedCount} schedules)` : ''}`)
     onGoBack()
-  }
+  })
 
   // Resolve which rates list to display
   const displayRates = isProcurement ? dbRates : visibleRates
@@ -1912,8 +1959,9 @@ export default function RateCheck({
                       background: 'rgba(15,143,168,0.06)', borderColor: '#0f8fa8', color: '#0f8fa8',
                     }}
                     onClick={handleEscalate}
+                    disabled={submitting}
                   >
-                    <ChevronRight size={12} />
+                    {submitting ? <Loader2 size={12} className="spin" /> : <ChevronRight size={12} />}
                     {hasScheduleSelections
                       ? `Request Rates (${selectedScheduleIds.size} schedule${selectedScheduleIds.size !== 1 ? 's' : ''})`
                       : 'Escalate to Procurement'}
@@ -2618,8 +2666,9 @@ export default function RateCheck({
                   background: reviewAction.color, borderColor: reviewAction.color,
                 }}
                 onClick={handleSubmit}
+                disabled={submitting}
               >
-                {reviewAction.icon} {reviewAction.label}
+                {submitting ? <Loader2 size={12} className="spin" /> : reviewAction.icon} {reviewAction.label}
               </button>
             </div>
           </div>

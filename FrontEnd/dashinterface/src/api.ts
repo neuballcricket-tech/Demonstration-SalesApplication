@@ -1054,7 +1054,7 @@ export function apiCreateRateRequest(data: {
   emp_id_requested: number
   is_given?: boolean
   remark: string
-  selected_schedules?: SchedulePayload[]
+  selected_schedules: SchedulePayload[]  // required by the backend (send [] when none)
 }): Promise<RateRequestRecord> {
   return post<RateRequestRecord>('/rate-requests', data)
 }
