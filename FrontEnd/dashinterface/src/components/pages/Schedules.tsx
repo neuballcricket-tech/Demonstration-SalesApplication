@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { Search, Loader2, Globe, Ship, Filter, X, Plus, ArrowRight } from 'lucide-react'
-import { apiGetEnrichedScheduleRates, apiGetLiners, apiSearchSchedulesBulk, apiSaveSchedules } from '../../api'
+import { apiGetEnrichedScheduleRates, apiGetLiners, apiSearchSchedulesBulk, apiSaveSchedules, apiCreateAdhocRate, apiPatchAdhocRate, apiDeleteAdhocRate } from '../../api'
 import type { AggregateScheduleRatesResponse, AggregateRate, LinerRecord, OceanSchedule } from '../../types'
 import { linerDisplay } from '../../types'
 import PortCombobox from '../shared/PortCombobox'
@@ -407,19 +407,28 @@ function ScheduleSearchTable({ data, linerList, onFlash }: { data: OceanSchedule
     return da.localeCompare(db)
   }), [data])
 
-  // Track checked "special rate" rows by index
-  const [checked, setChecked] = useState<Set<number>>(new Set())
   // Track selected rows for saving to DB
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [saving, setSaving] = useState(false)
-  // Modal state for the special rate input placeholder
+  // Modal state for adhoc rate input
   const [modalIdx, setModalIdx] = useState<number | null>(null)
+  // Map sorted-index → schedule_id (populated after saving to DB)
+  const [savedScheduleIds, setSavedScheduleIds] = useState<Map<number, number>>(new Map())
+  // Adhoc rate form state
+  const [adhocRate, setAdhocRate] = useState('')
+  const [adhocValidFrom, setAdhocValidFrom] = useState('')
+  const [adhocValidTo, setAdhocValidTo] = useState('')
+  const [adhocTeus, setAdhocTeus] = useState('')
+  const [adhocRemark, setAdhocRemark] = useState('')
+  const [adhocSaving, setAdhocSaving] = useState(false)
+  // Track which rows have an adhoc rate saved (index → adhoc_id)
+  const [savedAdhocIds, setSavedAdhocIds] = useState<Map<number, number>>(new Map())
+  // Track saved adhoc data per row for edit pre-fill
+  const [savedAdhocData, setSavedAdhocData] = useState<Map<number, { rate: number; valid_from: string; valid_to: string; teus?: number; remark?: string }>>(new Map())
+  const [adhocDeleting, setAdhocDeleting] = useState(false)
 
-  // Reset checks when data changes
-  useEffect(() => { setChecked(new Set()); setSelected(new Set()); setModalIdx(null) }, [data])
-
-  const toggleCheck = (idx: number) =>
-    setChecked(prev => { const n = new Set(prev); if (n.has(idx)) n.delete(idx); else n.add(idx); return n })
+  // Reset state when data changes
+  useEffect(() => { setSelected(new Set()); setModalIdx(null); setSavedScheduleIds(new Map()); setSavedAdhocIds(new Map()); setSavedAdhocData(new Map()) }, [data])
 
   const toggleSelected = (idx: number) =>
     setSelected(prev => { const n = new Set(prev); if (n.has(idx)) n.delete(idx); else n.add(idx); return n })
@@ -440,20 +449,115 @@ function ScheduleSearchTable({ data, linerList, onFlash }: { data: OceanSchedule
     if (selected.size === 0) return
     setSaving(true)
     try {
-      // Resolve lin_id from SCAC before saving
-      const schedulesToSave = sorted
-        .filter((_, i) => selected.has(i))
-        .map(s => ({
-          ...s,
-          linId: s.linId ?? (s.scac ? scacToLinId.get(s.scac.toUpperCase()) ?? null : null),
-        }))
+      const indices = [...selected].sort((a, b) => a - b)
+      const schedulesToSave = indices.map(i => ({
+        ...sorted[i],
+        linId: sorted[i].linId ?? (sorted[i].scac ? scacToLinId.get(sorted[i].scac!.toUpperCase()) ?? null : null),
+      }))
       const ids = await apiSaveSchedules(schedulesToSave)
+      // Track which sorted-indices got which schedule_id
+      setSavedScheduleIds(prev => {
+        const next = new Map(prev)
+        indices.forEach((sortedIdx, i) => { if (ids[i] != null) next.set(sortedIdx, ids[i]) })
+        return next
+      })
       onFlash(`Saved ${ids.length} schedule${ids.length !== 1 ? 's' : ''} to database`)
       setSelected(new Set())
     } catch {
       onFlash('Failed to save schedules')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // Open the adhoc rate modal — first ensure the schedule is saved to DB
+  const openAdhocModal = async (idx: number) => {
+    if (!savedScheduleIds.has(idx)) {
+      // Save this single schedule first
+      const s = sorted[idx]
+      const withLinId = {
+        ...s,
+        linId: s.linId ?? (s.scac ? scacToLinId.get(s.scac.toUpperCase()) ?? null : null),
+      }
+      try {
+        const ids = await apiSaveSchedules([withLinId])
+        if (ids[0] != null) {
+          setSavedScheduleIds(prev => new Map(prev).set(idx, ids[0]))
+        }
+      } catch {
+        onFlash('Failed to save schedule — cannot input rate')
+        return
+      }
+    }
+    // Pre-fill form if editing an existing rate, otherwise reset
+    const existing = savedAdhocData.get(idx)
+    if (existing) {
+      setAdhocRate(String(existing.rate))
+      setAdhocValidFrom(existing.valid_from)
+      setAdhocValidTo(existing.valid_to)
+      setAdhocTeus(existing.teus != null ? String(existing.teus) : '')
+      setAdhocRemark(existing.remark ?? '')
+    } else {
+      setAdhocRate('')
+      setAdhocValidFrom('')
+      setAdhocValidTo('')
+      setAdhocTeus('')
+      setAdhocRemark('')
+    }
+    setModalIdx(idx)
+  }
+
+  const handleSaveAdhocRate = async () => {
+    if (modalIdx === null) return
+    const scheduleId = savedScheduleIds.get(modalIdx)
+    if (!scheduleId) { onFlash('Schedule not saved yet'); return }
+    const rateVal = parseFloat(adhocRate)
+    if (isNaN(rateVal) || !adhocValidFrom || !adhocValidTo) return
+    if (adhocValidTo < adhocValidFrom) { onFlash('Valid To must be on or after Valid From'); return }
+    setAdhocSaving(true)
+    try {
+      const existingAdhocId = savedAdhocIds.get(modalIdx)
+      const rateData = {
+        rate: rateVal,
+        valid_from: adhocValidFrom,
+        valid_to: adhocValidTo,
+        ...(adhocTeus ? { teus: parseFloat(adhocTeus) } : {}),
+        ...(adhocRemark.trim() ? { remark: adhocRemark.trim() } : {}),
+      }
+      let adhocId: number
+      if (existingAdhocId) {
+        // PATCH existing
+        await apiPatchAdhocRate(existingAdhocId, rateData)
+        adhocId = existingAdhocId
+      } else {
+        // POST new
+        const res = await apiCreateAdhocRate({ schedule_id: scheduleId, ...rateData })
+        adhocId = res.adhoc_id
+      }
+      setSavedAdhocIds(prev => new Map(prev).set(modalIdx, adhocId))
+      setSavedAdhocData(prev => new Map(prev).set(modalIdx, rateData))
+      onFlash(existingAdhocId ? 'Adhoc rate updated' : 'Adhoc rate saved')
+      setModalIdx(null)
+    } catch {
+      onFlash('Failed to save adhoc rate')
+    } finally {
+      setAdhocSaving(false)
+    }
+  }
+
+  const handleDeleteAdhocRate = async (idx: number) => {
+    const adhocId = savedAdhocIds.get(idx)
+    if (!adhocId) return
+    setAdhocDeleting(true)
+    try {
+      await apiDeleteAdhocRate(adhocId)
+      setSavedAdhocIds(prev => { const n = new Map(prev); n.delete(idx); return n })
+      setSavedAdhocData(prev => { const n = new Map(prev); n.delete(idx); return n })
+      onFlash('Adhoc rate deleted')
+    } catch {
+      onFlash('Failed to delete adhoc rate')
+    } finally {
+      setAdhocDeleting(false)
     }
   }
 
@@ -560,28 +664,43 @@ function ScheduleSearchTable({ data, linerList, onFlash }: { data: OceanSchedule
                     ) : '—'}
                   </td>
                   <td style={{ ...tdStyle, fontSize: 9, whiteSpace: 'nowrap' }}>{fmtDate(s.bkCutoff)}</td>
-                  {/* Special Rate checkbox */}
-                  <td style={{ ...tdStyle, textAlign: 'center' }}>
-                    <input
-                      type="checkbox"
-                      checked={checked.has(i)}
-                      onChange={() => toggleCheck(i)}
-                      style={{ cursor: 'pointer', accentColor: '#0f8fa8' }}
-                    />
+                  {/* Special Rate status */}
+                  <td style={{ ...tdStyle, textAlign: 'center', fontSize: 9 }}>
+                    {savedAdhocIds.has(i) ? (
+                      <span style={{ color: '#16a34a', fontWeight: 600 }}>
+                        ${savedAdhocData.get(i)?.rate?.toLocaleString() ?? '✓'}
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--text-muted)' }}>—</span>
+                    )}
                   </td>
                   {/* Action button */}
-                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                  <td style={{ ...tdStyle, textAlign: 'center', whiteSpace: 'nowrap' }}>
                     <button
                       type="button"
-                      onClick={() => setModalIdx(i)}
+                      onClick={() => openAdhocModal(i)}
                       style={{
                         fontSize: 9, fontWeight: 600, padding: '3px 10px', borderRadius: 4,
                         border: '1px solid #0f8fa8', background: 'rgba(15,143,168,0.06)',
                         color: '#0f8fa8', cursor: 'pointer', whiteSpace: 'nowrap',
                       }}
                     >
-                      Input Rate
+                      {savedAdhocIds.has(i) ? 'Edit Rate' : 'Input Rate'}
                     </button>
+                    {savedAdhocIds.has(i) && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteAdhocRate(i)}
+                        disabled={adhocDeleting}
+                        style={{
+                          fontSize: 9, fontWeight: 600, padding: '3px 8px', borderRadius: 4, marginLeft: 4,
+                          border: '1px solid #dc2626', background: 'rgba(220,38,38,0.06)',
+                          color: '#dc2626', cursor: 'pointer', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -590,7 +709,7 @@ function ScheduleSearchTable({ data, linerList, onFlash }: { data: OceanSchedule
         </div>
       </div>
 
-      {/* Special rate input modal (placeholder) */}
+      {/* Adhoc rate input modal */}
       {modalIdx !== null && sorted[modalIdx] && (
         <div
           style={{
@@ -608,7 +727,9 @@ function ScheduleSearchTable({ data, linerList, onFlash }: { data: OceanSchedule
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Special Rate Input</h3>
+              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>
+                {savedAdhocIds.has(modalIdx) ? 'Edit Adhoc Rate' : 'Input Adhoc Rate'}
+              </h3>
               <button
                 type="button"
                 onClick={() => setModalIdx(null)}
@@ -629,20 +750,118 @@ function ScheduleSearchTable({ data, linerList, onFlash }: { data: OceanSchedule
               {sorted[modalIdx].destinationCityName || sorted[modalIdx].destinationUnloc || '—'}
               {sorted[modalIdx].originDepartureDate ? ` \u00b7 ETD ${fmtDate(sorted[modalIdx].originDepartureDate)}` : ''}
             </div>
-            <div style={{
-              padding: 24, background: 'rgba(100,116,139,0.04)', border: '1px dashed var(--border)',
-              borderRadius: 8, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13,
-            }}>
-              Special rate input
+            {/* Rate */}
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 3 }}>
+                Rate (USD) <span style={{ color: '#dc2626' }}>*</span>
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={adhocRate}
+                onChange={e => setAdhocRate(e.target.value)}
+                placeholder="e.g. 1200.00"
+                style={{
+                  width: '100%', padding: '6px 10px', fontSize: 12, borderRadius: 6,
+                  border: '1px solid var(--border)', background: 'var(--bg-card, #fff)',
+                  color: 'var(--text)', boxSizing: 'border-box',
+                }}
+              />
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 18 }}>
+            {/* Valid From / Valid To */}
+            <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 3 }}>
+                  Valid From <span style={{ color: '#dc2626' }}>*</span>
+                </label>
+                <input
+                  type="date"
+                  value={adhocValidFrom}
+                  onChange={e => setAdhocValidFrom(e.target.value)}
+                  style={{
+                    width: '100%', padding: '6px 10px', fontSize: 12, borderRadius: 6,
+                    border: '1px solid var(--border)', background: 'var(--bg-card, #fff)',
+                    color: 'var(--text)', boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 3 }}>
+                  Valid To <span style={{ color: '#dc2626' }}>*</span>
+                </label>
+                <input
+                  type="date"
+                  value={adhocValidTo}
+                  onChange={e => setAdhocValidTo(e.target.value)}
+                  style={{
+                    width: '100%', padding: '6px 10px', fontSize: 12, borderRadius: 6,
+                    border: '1px solid var(--border)', background: 'var(--bg-card, #fff)',
+                    color: 'var(--text)', boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            </div>
+            {/* TEUs */}
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 3 }}>
+                TEUs <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>
+              </label>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                value={adhocTeus}
+                onChange={e => setAdhocTeus(e.target.value)}
+                placeholder="e.g. 10"
+                style={{
+                  width: '100%', padding: '6px 10px', fontSize: 12, borderRadius: 6,
+                  border: '1px solid var(--border)', background: 'var(--bg-card, #fff)',
+                  color: 'var(--text)', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            {/* Remark */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 3 }}>
+                Remark <span style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>
+              </label>
+              <textarea
+                value={adhocRemark}
+                onChange={e => setAdhocRemark(e.target.value)}
+                rows={2}
+                placeholder="Any notes..."
+                style={{
+                  width: '100%', padding: '6px 10px', fontSize: 12, borderRadius: 6,
+                  border: '1px solid var(--border)', background: 'var(--bg-card, #fff)',
+                  color: 'var(--text)', boxSizing: 'border-box', resize: 'vertical',
+                }}
+              />
+            </div>
+            {/* Buttons */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button
                 type="button"
                 onClick={() => setModalIdx(null)}
-                className="db-btn"
-                style={{ fontSize: 11, padding: '5px 16px' }}
+                style={{
+                  fontSize: 11, padding: '5px 16px', borderRadius: 6,
+                  border: '1px solid var(--border)', background: 'var(--bg-card, #fff)',
+                  color: 'var(--text-muted)', cursor: 'pointer',
+                }}
               >
-                Close
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAdhocRate}
+                disabled={adhocSaving || !adhocRate || !adhocValidFrom || !adhocValidTo}
+                style={{
+                  fontSize: 11, fontWeight: 600, padding: '5px 20px', borderRadius: 6,
+                  border: '1px solid #0f8fa8', background: '#0f8fa8',
+                  color: '#fff', cursor: adhocSaving ? 'wait' : 'pointer',
+                  opacity: (!adhocRate || !adhocValidFrom || !adhocValidTo) ? 0.5 : 1,
+                }}
+              >
+                {adhocSaving ? 'Saving...' : 'Save Rate'}
               </button>
             </div>
           </div>
