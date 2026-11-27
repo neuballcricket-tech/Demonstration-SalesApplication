@@ -1,12 +1,17 @@
-import { useMemo, useState } from 'react'
-import { FileText, Plus, ShieldCheck, X, Copy, ClipboardCheck, Trash2, CheckCircle2, Lock } from 'lucide-react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { FileText, Plus, ShieldCheck, Copy, ClipboardCheck, Trash2, CheckCircle2, Lock } from 'lucide-react'
 import {
   EMPLOYEES, findCustomer,
   type Quote, type QuoteLine, type QuoteStatus, type QuoteType, type RateType,
   type Customer, type Inquiry,
 } from '../../types'
 import { useRole } from '../../RoleContext'
-import { PAGE_WRAPPER, PAGE_TITLE_ROW, PAGE_TITLE_ICON, PAGE_TITLE_H2, CARD, SECTION_LABEL, FIELD_LABEL, INPUT_STYLE } from './pageStyles'
+import {
+  Badge, Button, ComboBox, EmptyState, Field, Input, Modal, NumberInput, Select, Textarea, Tooltip,
+  type BadgeProps, type ComboBoxItem, type Option,
+} from '../ui'
+import { labelClass } from '../ui/controlStyles'
+import { cn } from '../../lib/cn'
 
 interface QuotationsProps {
   quotes: Quote[]
@@ -23,17 +28,68 @@ interface QuotationsProps {
 const RATE_TYPES: RateType[] = ['Spot', 'Contractual', 'NAC', 'Volume-based', 'Convoy']
 const QUOTE_TYPES: QuoteType[] = ['FCA', 'Domestic Included', 'Drayage', 'DDP']
 
-const STATUS_BADGE: Record<QuoteStatus, string> = {
-  'Draft':              'db-badge muted',
-  'Awaiting Approval':  'db-badge warning',
-  'Approved':           'db-badge accent',
-  'Sent':               'db-badge purple',
-  'Confirmed':          'db-badge success',
-  'Lost':               'db-badge danger',
+type Tone = BadgeProps['tone']
+
+const STATUS_TONE: Record<QuoteStatus, Tone> = {
+  'Draft':              'neutral',
+  'Awaiting Approval':  'warning',
+  'Approved':           'info',
+  'Sent':               'orange',
+  'Confirmed':          'success',
+  'Lost':               'danger',
 }
+
+const STATUS_FILTER_OPTIONS: Option[] = [
+  { value: 'all', label: 'All' },
+  ...(['Draft', 'Awaiting Approval', 'Approved', 'Sent', 'Confirmed', 'Lost'] as QuoteStatus[]).map(s => ({ value: s, label: s })),
+]
+const QUOTE_TYPE_OPTIONS: Option[] = QUOTE_TYPES.map(t => ({ value: t, label: t }))
+const RATE_TYPE_OPTIONS: Option[] = RATE_TYPES.map(r => ({ value: r, label: r }))
+const EMPLOYEE_OPTIONS: Option[] = EMPLOYEES.map(e => ({ value: String(e.id), label: e.name }))
 
 // Big Schedule stub (Phase 7) - pretend list of shipping lines per route lookup.
 const BIG_SCHEDULE_LINES = ['Maersk', 'CMA CGM', 'MSC', 'Hapag-Lloyd', 'ONE', 'Evergreen', 'COSCO', 'OOCL']
+const BIG_SCHEDULE_ITEMS: ComboBoxItem[] = BIG_SCHEDULE_LINES.map(l => ({ value: l }))
+
+const CARD = 'rounded-card border border-line-soft bg-surface p-4'
+const SECTION_TITLE = 'm-0 mb-2.5 text-label font-bold uppercase tracking-label text-fg-label'
+const TH = 'border-0 border-b border-line px-1.5 py-1.5 text-left text-label font-semibold uppercase tracking-label text-fg-label'
+const TD = 'px-1.5 py-1.5 align-middle text-label'
+const BUILDER_TH = 'px-1 py-1.5 text-left text-label font-semibold uppercase tracking-label text-fg-label'
+const BUILDER_TD = 'px-1 py-1 align-middle'
+
+/** Unique, non-empty customer names for the ComboBox (item values are list keys). */
+const uniqueItems = (items: ComboBoxItem[]): ComboBoxItem[] => {
+  const seen = new Set<string>()
+  return items.filter(item => {
+    if (!item.value || seen.has(item.value)) return false
+    seen.add(item.value)
+    return true
+  })
+}
+
+/** Role-gated action: a locked action shows a lock icon and keeps its native title (a disabled button cannot show a Tooltip). */
+function GatedButton({ allowed, icon, title, variant = 'primary', onClick, children }: {
+  allowed: boolean
+  icon?: ReactNode
+  title?: string
+  variant?: 'primary' | 'secondary'
+  onClick: () => void
+  children: ReactNode
+}) {
+  return (
+    <Button
+      size="sm"
+      variant={variant}
+      disabled={!allowed}
+      title={title}
+      icon={allowed ? icon : (icon !== undefined ? <Lock size={12} aria-hidden="true" /> : undefined)}
+      onClick={onClick}
+    >
+      {children}
+    </Button>
+  )
+}
 
 export default function Quotations({
   quotes, customers, inquiries, onAddQuote, onSetQuoteStatus, onFlash, preFillCustomer, onPreFillConsumed,
@@ -87,78 +143,62 @@ export default function Quotations({
   }
 
   return (
-    <div style={PAGE_WRAPPER}>
-      <div style={PAGE_TITLE_ROW}>
-        <FileText size={18} style={PAGE_TITLE_ICON} />
-        <h2 style={PAGE_TITLE_H2}>Quotations</h2>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+    <div className="mx-auto max-w-[1200px] p-6">
+      <div className="mb-4 flex items-center gap-2">
+        <FileText size={18} aria-hidden="true" className="text-primary" />
+        <h2 className="m-0 text-title font-bold text-fg">Quotations</h2>
+        <span className="ml-2 text-label text-fg-muted">
           {quotes.length} quotes · {counts['Awaiting Approval'] ?? 0} pending approval · {counts['Confirmed'] ?? 0} confirmed
         </span>
-        <div style={{ marginLeft: 'auto' }}>
-          <button
-            className="db-btn primary"
-            onClick={() => canCreate && setShowBuilder(true)}
-            disabled={!canCreate}
-            title={canCreate ? 'Create a new quotation' : `Restricted - requires Sales role`}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, opacity: canCreate ? 1 : 0.4, cursor: canCreate ? 'pointer' : 'not-allowed' }}
-          >
-            {canCreate ? <Plus size={12} /> : <Lock size={10} />} New Quote
-          </button>
-        </div>
+        <Button
+          variant="primary"
+          className="ml-auto"
+          onClick={() => canCreate && setShowBuilder(true)}
+          disabled={!canCreate}
+          title={canCreate ? 'Create a new quotation' : `Restricted - requires Sales role`}
+          icon={canCreate ? <Plus size={14} aria-hidden="true" /> : <Lock size={12} aria-hidden="true" />}
+        >
+          New Quote
+        </Button>
       </div>
 
       {/* Ready to Quote - inquiries at quotation-prep stage */}
       {readyToQuote.length > 0 && (
-        <div style={{ ...CARD, marginBottom: 18 }}>
-          <div style={{ marginBottom: 14 }}>
-            <div style={SECTION_LABEL}>Ready to Quote</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{readyToQuote.length} {readyToQuote.length === 1 ? 'inquiry' : 'inquiries'} awaiting quotation</div>
+        <div className={cn(CARD, 'mb-4')}>
+          <div className="mb-3.5">
+            <h3 className={SECTION_TITLE}>Ready to Quote</h3>
+            <div className="text-label text-fg-muted">{readyToQuote.length} {readyToQuote.length === 1 ? 'inquiry' : 'inquiries'} awaiting quotation</div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+          <div className="flex flex-col gap-2">
             {readyToQuote.map(inq => {
               const cust = findCustomer(inq.customer_name, customers)
               const cont = inq.containers?.[0]
               return (
-                <div
-                  key={inq.id}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-                    padding: '12px 14px',
-                    background: 'rgba(44,44,130,0.03)',
-                    border: '1px solid rgba(44,44,130,0.15)',
-                    borderRadius: 8,
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' }}>
-                      <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-muted)' }}>{inq.id}</span>
-                      <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{inq.customer_name}</span>
-                      {cust && <span className="db-badge accent">{cust.tier}</span>}
+                <div key={inq.id} className="flex flex-wrap items-center gap-3 rounded-card border border-line-soft bg-canvas px-3.5 py-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-label text-fg-muted">{inq.id}</span>
+                      <span className="text-control font-bold text-fg">{inq.customer_name}</span>
+                      {cust && <Badge tone="info">{cust.tier}</Badge>}
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                    <div className="text-label text-fg-label">
                       {inq.origin} → {inq.destination}
                       {cont && <> · {cont.quantity}× {cont.containerType}</>}
                       {inq.cargo_ready_date && <> · CRD: {inq.cargo_ready_date}</>}
                     </div>
                   </div>
-                  <button
-                    className="db-btn primary"
-                    disabled={!canCreate}
+                  <GatedButton
+                    allowed={canCreate}
+                    icon={<FileText size={14} aria-hidden="true" />}
+                    title={canCreate ? 'Generate quotation for this inquiry' : 'Restricted - requires Sales role'}
                     onClick={() => {
                       if (!canCreate) return
                       setBuilderInquiry(inq)
                       setShowBuilder(true)
                     }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 5, fontSize: 12,
-                      whiteSpace: 'nowrap',
-                      opacity: canCreate ? 1 : 0.4,
-                      cursor: canCreate ? 'pointer' : 'not-allowed',
-                    }}
-                    title={canCreate ? 'Generate quotation for this inquiry' : 'Restricted - requires Sales role'}
                   >
-                    <FileText size={11} /> Generate Quote
-                  </button>
+                    Generate Quote
+                  </GatedButton>
                 </div>
               )
             })}
@@ -167,107 +207,81 @@ export default function Quotations({
       )}
 
       {/* Filters */}
-      <div style={{ ...CARD, marginBottom: 18 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div>
-            <label style={FIELD_LABEL}>By Customer</label>
-            <input
-              value={customerFilter}
-              onChange={e => setCustomerFilter(e.target.value)}
-              placeholder="Search customer name..."
-              style={INPUT_STYLE}
-            />
-          </div>
-          <div>
-            <label style={FIELD_LABEL}>By Status</label>
-            <select
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value as QuoteStatus | 'all')}
-              style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
-            >
-              <option value="all">All</option>
-              {(['Draft', 'Awaiting Approval', 'Approved', 'Sent', 'Confirmed', 'Lost'] as QuoteStatus[]).map(s =>
-                <option key={s} value={s}>{s}</option>,
-              )}
-            </select>
-          </div>
+      <div className={cn(CARD, 'mb-4')}>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="By Customer">
+            {ids => <Input {...ids} value={customerFilter} onChange={e => setCustomerFilter(e.target.value)} placeholder="Search customer name..." />}
+          </Field>
+          <Field label="By Status">
+            {ids => <Select {...ids} value={statusFilter} onChange={v => setStatusFilter(v as QuoteStatus | 'all')} options={STATUS_FILTER_OPTIONS} />}
+          </Field>
         </div>
       </div>
 
       {/* Quote list */}
-      <div style={CARD}>
-        <div style={{ marginBottom: 14 }}>
-          <div style={SECTION_LABEL}>Quotes</div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Showing {filtered.length} of {quotes.length}</div>
+      <div className={CARD}>
+        <div className="mb-3.5">
+          <h3 className={SECTION_TITLE}>Quotes</h3>
+          <div className="text-label text-fg-muted">Showing {filtered.length} of {quotes.length}</div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="flex flex-col gap-2.5">
           {filtered.map(q => {
             const cust = findCustomer(q.customer_name, customers)
             const sell = quoteSell(q)
             const cost = totalLineRevenue(q)
             return (
-              <div
-                key={q.id}
-                style={{
-                  padding: '14px 16px',
-                  background: '#ffffff',
-                  border: '1px solid var(--border)',
-                  borderRadius: 10,
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 10 }}>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-                      <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--text-muted)' }}>{q.id}</span>
-                      <span style={{ color: 'var(--text)', fontWeight: 700, fontSize: 14 }}>{q.customer_name}</span>
-                      {cust && <span className="db-badge muted">{cust.tier}</span>}
-                      <span className={STATUS_BADGE[q.status]}>{q.status}</span>
-                      <span className="db-badge accent">{q.quote_type}</span>
+              <div key={q.id} className="rounded-card border border-line-soft bg-surface px-4 py-3.5">
+                <div className="mb-2.5 flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-label text-fg-muted">{q.id}</span>
+                      <span className="text-body font-bold text-fg">{q.customer_name}</span>
+                      {cust && <Badge tone="neutral">{cust.tier}</Badge>}
+                      <Badge tone={STATUS_TONE[q.status]}>{q.status}</Badge>
+                      <Badge tone="info">{q.quote_type}</Badge>
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                    <div className="text-label text-fg-label">
                       {q.origin} → {q.destination} · {q.lines.length} option{q.lines.length === 1 ? '' : 's'} · margin {q.margin_pct}%
-                      {q.inquiry_id && <> · linked to <span style={{ fontFamily: 'monospace' }}>{q.inquiry_id}</span></>}
+                      {q.inquiry_id && <> · linked to <span className="font-mono">{q.inquiry_id}</span></>}
                     </div>
                     {q.approval_reason && (
-                      <div style={{ fontSize: 11, color: '#d97706', marginTop: 4, fontWeight: 600 }}>
+                      <div className="mt-1 text-label font-semibold text-warning">
                         ⚠ Awaiting approval - {q.approval_reason}
                       </div>
                     )}
                   </div>
-                  <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                    <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>${sell.toLocaleString()}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>cost ${cost.toLocaleString()} + {q.margin_pct}%</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{empName(q.created_by)} · {q.created_at}</div>
+                  <div className="whitespace-nowrap text-right">
+                    <div className="text-title font-extrabold text-fg">${sell.toLocaleString()}</div>
+                    <div className="text-label text-fg-muted">cost ${cost.toLocaleString()} + {q.margin_pct}%</div>
+                    <div className="mt-0.5 text-label text-fg-muted">{empName(q.created_by)} · {q.created_at}</div>
                   </div>
                 </div>
 
                 {/* Rate lines table */}
-                <div style={{ overflowX: 'auto', borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                <div className="overflow-x-auto border-0 border-t border-line-soft pt-2">
+                  <table className="w-full border-collapse">
                     <thead>
-                      <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.05em' }}>
-                        <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--border)' }}>Line</th>
-                        <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--border)' }}>Rate Type</th>
-                        <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--border)' }}>Base</th>
-                        <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--border)' }}>Transit</th>
-                        <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--border)' }}>Free Time</th>
-                        <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--border)' }}>Transship</th>
-                        <th style={{ padding: '6px 6px', borderBottom: '1px solid var(--border)' }}>Dest. Chg</th>
+                      <tr>
+                        <th className={TH}>Line</th>
+                        <th className={TH}>Rate Type</th>
+                        <th className={TH}>Base</th>
+                        <th className={TH}>Transit</th>
+                        <th className={TH}>Free Time</th>
+                        <th className={TH}>Transship</th>
+                        <th className={TH}>Dest. Chg</th>
                       </tr>
                     </thead>
                     <tbody>
                       {q.lines.map(l => (
-                        <tr key={l.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                          <td style={{ padding: '6px 6px', color: 'var(--text)', fontWeight: 600 }}>{l.shipping_line}</td>
-                          <td style={{ padding: '6px 6px' }}>
-                            <span className="db-badge muted">{l.rate_type}</span>
-                          </td>
-                          <td style={{ padding: '6px 6px', color: 'var(--text-secondary)' }}>${l.base_rate_usd}</td>
-                          <td style={{ padding: '6px 6px', color: 'var(--text-muted)' }}>{l.transit_days}d</td>
-                          <td style={{ padding: '6px 6px', color: 'var(--text-muted)' }}>{l.free_time_days}d</td>
-                          <td style={{ padding: '6px 6px', color: 'var(--text-muted)' }}>{l.transshipment_points}</td>
-                          <td style={{ padding: '6px 6px', color: 'var(--text-secondary)' }}>${l.destination_charges_usd}</td>
+                        <tr key={l.id} className="border-0 border-b border-line-soft">
+                          <td className={cn(TD, 'font-semibold text-fg')}>{l.shipping_line}</td>
+                          <td className={TD}><Badge tone="neutral">{l.rate_type}</Badge></td>
+                          <td className={cn(TD, 'text-fg-label')}>${l.base_rate_usd}</td>
+                          <td className={cn(TD, 'text-fg-muted')}>{l.transit_days}d</td>
+                          <td className={cn(TD, 'text-fg-muted')}>{l.free_time_days}d</td>
+                          <td className={cn(TD, 'text-fg-muted')}>{l.transshipment_points}</td>
+                          <td className={cn(TD, 'text-fg-label')}>${l.destination_charges_usd}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -275,70 +289,61 @@ export default function Quotations({
                 </div>
 
                 {/* Action row - status transitions (role-gated) */}
-                <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+                <div className="mt-2.5 flex flex-wrap gap-1.5 empty:hidden">
                   {q.status === 'Awaiting Approval' && (
                     <>
-                      <button
-                        className="db-btn primary"
-                        onClick={() => canApprove && onSetQuoteStatus(q.id, 'Approved')}
-                        disabled={!canApprove}
+                      <GatedButton
+                        allowed={canApprove}
+                        icon={<ShieldCheck size={14} aria-hidden="true" />}
                         title={canApprove ? 'Approve this quote' : 'Restricted - requires Finance role'}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: canApprove ? 1 : 0.4, cursor: canApprove ? 'pointer' : 'not-allowed' }}
+                        onClick={() => canApprove && onSetQuoteStatus(q.id, 'Approved')}
                       >
-                        {canApprove ? <ShieldCheck size={11} /> : <Lock size={9} />} Approve
-                      </button>
-                      <button
-                        className="db-btn secondary"
-                        onClick={() => canReject && onSetQuoteStatus(q.id, 'Lost')}
-                        disabled={!canReject}
+                        Approve
+                      </GatedButton>
+                      <GatedButton
+                        allowed={canReject}
+                        variant="secondary"
                         title={canReject ? 'Reject this quote' : 'Restricted - requires Finance role'}
-                        style={{ opacity: canReject ? 1 : 0.4, cursor: canReject ? 'pointer' : 'not-allowed' }}
+                        onClick={() => canReject && onSetQuoteStatus(q.id, 'Lost')}
                       >
                         Reject
-                      </button>
+                      </GatedButton>
                     </>
                   )}
                   {(q.status === 'Draft' || q.status === 'Approved') && (
-                    <button
-                      className="db-btn primary"
-                      onClick={() => canSendQuote && handleSendClick(q)}
-                      disabled={!canSendQuote}
+                    <GatedButton
+                      allowed={canSendQuote}
+                      icon={<Copy size={14} aria-hidden="true" />}
                       title={canSendQuote ? 'Copy quotation text and mark as sent' : 'Restricted - requires CS or Sales role'}
-                      style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: canSendQuote ? 1 : 0.4, cursor: canSendQuote ? 'pointer' : 'not-allowed' }}
+                      onClick={() => canSendQuote && handleSendClick(q)}
                     >
-                      {canSendQuote ? <Copy size={11} /> : <Lock size={9} />} Copy & Send
-                    </button>
+                      Copy & Send
+                    </GatedButton>
                   )}
                   {q.status === 'Sent' && (
                     <>
-                      <button
-                        className="db-btn primary"
-                        onClick={() => canConfirm && onSetQuoteStatus(q.id, 'Confirmed')}
-                        disabled={!canConfirm}
+                      <GatedButton
+                        allowed={canConfirm}
+                        icon={<CheckCircle2 size={14} aria-hidden="true" />}
                         title={canConfirm ? 'Mark confirmed' : 'Restricted - requires Sales role'}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: canConfirm ? 1 : 0.4, cursor: canConfirm ? 'pointer' : 'not-allowed' }}
+                        onClick={() => canConfirm && onSetQuoteStatus(q.id, 'Confirmed')}
                       >
-                        {canConfirm ? <CheckCircle2 size={11} /> : <Lock size={9} />} Mark Confirmed
-                      </button>
-                      <button
-                        className="db-btn secondary"
+                        Mark Confirmed
+                      </GatedButton>
+                      <GatedButton
+                        allowed={canReject}
+                        variant="secondary"
                         onClick={() => canReject && onSetQuoteStatus(q.id, 'Lost')}
-                        disabled={!canReject}
-                        style={{ opacity: canReject ? 1 : 0.4, cursor: canReject ? 'pointer' : 'not-allowed' }}
                       >
                         Mark Lost
-                      </button>
+                      </GatedButton>
                     </>
                   )}
                 </div>
               </div>
             )
           })}
-          {filtered.length === 0 && (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
-              No quotes match these filters.
-            </div>
-          )}
+          {filtered.length === 0 && <EmptyState title="No quotes match these filters." />}
         </div>
       </div>
 
@@ -435,70 +440,46 @@ function CopyQuotationModal({
   }
 
   return (
-    <div className="lt-modal-backdrop" onClick={onCancel}>
-      <div
-        className="lt-modal"
-        style={{ width: 660, maxWidth: '95%' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Copy size={16} /> Copy Quotation
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-              Copy the quotation below, then share it with {quote.customer_name} via your preferred channel
-            </div>
-          </div>
-          <button className="lt-icon-btn" onClick={onCancel}><X size={14} /></button>
-        </div>
-
-        {/* Quote summary pill */}
-        <div style={{
-          padding: '8px 12px', marginBottom: 10,
-          background: 'rgba(44,44,130,0.03)', border: '1px solid rgba(44,44,130,0.12)',
-          borderRadius: 8, fontSize: 12, color: 'var(--text-secondary)',
-        }}>
-          <span style={{ fontFamily: 'monospace', fontSize: 11 }}>{quote.id}</span>
-          {' · '}{quote.origin} → {quote.destination}
-          {' · '}{quote.quote_type}
-          {' · '}{quote.lines.length} option{quote.lines.length === 1 ? '' : 's'}
-          {' · '}<strong style={{ color: 'var(--text)' }}>USD {sell.toLocaleString()}</strong>
-        </div>
-
-        {/* Generated quotation text */}
-        <textarea
-          readOnly
-          value={quotationText}
-          style={{
-            width: '100%', minHeight: 280, resize: 'vertical',
-            fontFamily: 'monospace', fontSize: 11, lineHeight: 1.6,
-            padding: '10px 12px', border: '1px solid var(--border)',
-            borderRadius: 8, background: 'rgba(0,0,0,0.02)', color: 'var(--text)',
-            boxSizing: 'border-box', marginBottom: 12,
-          }}
-        />
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button className="db-btn secondary" onClick={onCancel}>Cancel</button>
-          <button
-            className="db-btn secondary"
+    <Modal
+      isOpen
+      onClose={onCancel}
+      title="Copy Quotation"
+      footer={
+        <>
+          <Button onClick={onCancel}>Cancel</Button>
+          <Button
             onClick={handleCopy}
-            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            icon={copied ? <ClipboardCheck size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
           >
-            {copied ? <ClipboardCheck size={14} /> : <Copy size={14} />}
             {copied ? 'Copied!' : 'Copy to Clipboard'}
-          </button>
-          <button
-            className="db-btn primary"
-            onClick={() => onSent(quote.id)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            <CheckCircle2 size={14} /> Mark as Sent
-          </button>
-        </div>
+          </Button>
+          <Button variant="primary" icon={<CheckCircle2 size={14} aria-hidden="true" />} onClick={() => onSent(quote.id)}>
+            Mark as Sent
+          </Button>
+        </>
+      }
+    >
+      <p className="m-0 text-label text-fg-muted">
+        Copy the quotation below, then share it with {quote.customer_name} via your preferred channel
+      </p>
+
+      {/* Quote summary pill */}
+      <div className="rounded-card border border-line-soft bg-canvas px-3 py-2 text-label text-fg-label">
+        <span className="font-mono">{quote.id}</span>
+        {' · '}{quote.origin} → {quote.destination}
+        {' · '}{quote.quote_type}
+        {' · '}{quote.lines.length} option{quote.lines.length === 1 ? '' : 's'}
+        {' · '}<strong className="text-fg">USD {sell.toLocaleString()}</strong>
       </div>
-    </div>
+
+      {/* Generated quotation text: monospace keeps its aligned columns */}
+      <Textarea
+        readOnly
+        aria-label="Quotation text"
+        value={quotationText}
+        className="min-h-[280px] resize-y bg-canvas font-mono text-label leading-relaxed"
+      />
+    </Modal>
   )
 }
 
@@ -540,6 +521,8 @@ function QuoteBuilderModal({
     },
   ])
 
+  const customerItems = useMemo(() => uniqueItems(customers.map(c => ({ value: c.name }))), [customers])
+
   const addLine = () => {
     setLines(prev => [...prev, {
       id: `tmp-${prev.length + 1}-${Date.now()}`,
@@ -569,158 +552,16 @@ function QuoteBuilderModal({
   const canSave = customerName.trim() && origin.trim() && destination.trim() && lines.length > 0 && lines.every(l => l.shipping_line && l.base_rate_usd > 0)
 
   return (
-    <div className="lt-modal-backdrop" onClick={onCancel}>
-      <div
-        className="lt-modal"
-        style={{ width: 880, maxWidth: '95%' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-          <div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <FileText size={16} /> New Quote
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-              Build a multi-option quote · auto-routes for approval if margin &lt; customer floor
-            </div>
-          </div>
-          <button className="lt-icon-btn" onClick={onCancel}><X size={14} /></button>
-        </div>
-
-        {/* Customer + route */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
-          <div>
-            <label style={FIELD_LABEL}>Customer</label>
-            <input
-              list="qb-customers"
-              value={customerName}
-              onChange={e => setCustomerName(e.target.value)}
-              placeholder="Customer name"
-              style={INPUT_STYLE}
-            />
-            <datalist id="qb-customers">
-              {customers.map(c => <option key={c.id} value={c.name} />)}
-            </datalist>
-            {cust && (
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-                {cust.tier} · {cust.payment_terms} · floor {cust.min_margin_pct}%
-                {cust.blacklisted && <span style={{ color: '#dc2626', marginLeft: 6 }}>· blacklisted</span>}
-                {cust.credit_hold && <span style={{ color: '#d97706', marginLeft: 6 }}>· credit hold</span>}
-              </div>
-            )}
-          </div>
-          <div>
-            <label style={FIELD_LABEL}>Origin</label>
-            <input value={origin} onChange={e => setOrigin(e.target.value)} style={INPUT_STYLE} />
-          </div>
-          <div>
-            <label style={FIELD_LABEL}>Destination</label>
-            <input value={destination} onChange={e => setDestination(e.target.value)} style={INPUT_STYLE} />
-          </div>
-          <div>
-            <label style={FIELD_LABEL}>Quote Type</label>
-            <select value={quoteType} onChange={e => setQuoteType(e.target.value as QuoteType)} style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}>
-              {QUOTE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-        </div>
-
-        {/* Big Schedule stub hint (Phase 7.1) */}
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, padding: '6px 10px', background: 'rgba(44,44,130,0.03)', border: '1px solid rgba(44,44,130,0.12)', borderRadius: 6 }}>
-          📡 Big Schedule lines available for this route: {BIG_SCHEDULE_LINES.join(', ')} (stub data - real integration in Phase 2)
-        </div>
-
-        {/* Rate lines */}
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <label style={{ ...FIELD_LABEL, marginBottom: 0 }}>Rate Options ({lines.length})</label>
-            <button className="db-btn secondary" onClick={addLine} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
-              <Plus size={11} /> Add line
-            </button>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-              <thead>
-                <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.05em' }}>
-                  <th style={{ padding: '6px 4px' }}>Line</th>
-                  <th style={{ padding: '6px 4px' }}>Type</th>
-                  <th style={{ padding: '6px 4px' }}>Base $</th>
-                  <th style={{ padding: '6px 4px' }}>Transit</th>
-                  <th style={{ padding: '6px 4px' }}>Free</th>
-                  <th style={{ padding: '6px 4px' }}>Via</th>
-                  <th style={{ padding: '6px 4px' }}>Dest $</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {lines.map(l => (
-                  <tr key={l.id}>
-                    <td style={{ padding: '4px 4px' }}>
-                      <input value={l.shipping_line} onChange={e => updateLine(l.id, { shipping_line: e.target.value })} style={{ ...INPUT_STYLE, width: 110, padding: '6px 8px' }} list="qb-lines" />
-                    </td>
-                    <td style={{ padding: '4px 4px' }}>
-                      <select value={l.rate_type} onChange={e => updateLine(l.id, { rate_type: e.target.value as RateType })} style={{ ...INPUT_STYLE, padding: '6px 8px' }}>
-                        {RATE_TYPES.map(r => <option key={r} value={r}>{r}</option>)}
-                      </select>
-                    </td>
-                    <td style={{ padding: '4px 4px' }}>
-                      <input type="number" value={l.base_rate_usd} onChange={e => updateLine(l.id, { base_rate_usd: Number(e.target.value) })} style={{ ...INPUT_STYLE, width: 80, padding: '6px 8px' }} />
-                    </td>
-                    <td style={{ padding: '4px 4px' }}>
-                      <input type="number" value={l.transit_days} onChange={e => updateLine(l.id, { transit_days: Number(e.target.value) })} style={{ ...INPUT_STYLE, width: 60, padding: '6px 8px' }} />
-                    </td>
-                    <td style={{ padding: '4px 4px' }}>
-                      <input type="number" value={l.free_time_days} onChange={e => updateLine(l.id, { free_time_days: Number(e.target.value) })} style={{ ...INPUT_STYLE, width: 60, padding: '6px 8px' }} />
-                    </td>
-                    <td style={{ padding: '4px 4px' }}>
-                      <input value={l.transshipment_points} onChange={e => updateLine(l.id, { transshipment_points: e.target.value })} style={{ ...INPUT_STYLE, width: 110, padding: '6px 8px' }} />
-                    </td>
-                    <td style={{ padding: '4px 4px' }}>
-                      <input type="number" value={l.destination_charges_usd} onChange={e => updateLine(l.id, { destination_charges_usd: Number(e.target.value) })} style={{ ...INPUT_STYLE, width: 80, padding: '6px 8px' }} />
-                    </td>
-                    <td style={{ padding: '4px 4px' }}>
-                      <button className="lt-icon-btn" onClick={() => removeLine(l.id)} disabled={lines.length === 1}><Trash2 size={11} /></button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <datalist id="qb-lines">
-              {BIG_SCHEDULE_LINES.map(l => <option key={l} value={l} />)}
-            </datalist>
-          </div>
-        </div>
-
-        {/* Margin + employee + summary */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: 10, alignItems: 'flex-end', marginBottom: 14 }}>
-          <div>
-            <label style={FIELD_LABEL}>Margin %</label>
-            <input type="number" value={margin} onChange={e => setMargin(Number(e.target.value))} style={INPUT_STYLE} />
-          </div>
-          <div>
-            <label style={FIELD_LABEL}>Created by</label>
-            <select value={createdBy} onChange={e => setCreatedBy(Number(e.target.value))} style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}>
-              {EMPLOYEES.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-            </select>
-          </div>
-          <div style={{ background: 'rgba(44,44,130,0.03)', border: '1px solid rgba(44,44,130,0.12)', borderRadius: 8, padding: '10px 14px' }}>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Quote total</div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)' }}>${sell.toLocaleString()}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>cost ${cost.toLocaleString()} + {margin}%</div>
-          </div>
-        </div>
-
-        {/* Approval banner if margin under floor */}
-        {willNeedApproval && (
-          <div style={{ padding: '10px 14px', background: 'rgba(217,119,6,0.05)', border: '1px solid rgba(217,119,6,0.2)', borderRadius: 8, marginBottom: 12, fontSize: 12, color: '#b45309', fontWeight: 600 }}>
-            ⚠ This quote will be flagged Awaiting Approval - margin {margin}% is below {cust!.name}'s floor of {minMargin}%.
-          </div>
-        )}
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button className="db-btn secondary" onClick={onCancel}>Cancel</button>
-          <button
-            className="db-btn primary"
+    <Modal
+      isOpen
+      onClose={onCancel}
+      title="New Quote"
+      size="lg"
+      footer={
+        <>
+          <Button onClick={onCancel}>Cancel</Button>
+          <Button
+            variant="primary"
             onClick={() => {
               if (!canSave) return
               onSave({
@@ -735,12 +576,139 @@ function QuoteBuilderModal({
               })
             }}
             disabled={!canSave}
-            style={{ opacity: canSave ? 1 : 0.5, cursor: canSave ? 'pointer' : 'not-allowed' }}
           >
             {willNeedApproval ? 'Submit for Approval' : 'Save Quote'}
-          </button>
+          </Button>
+        </>
+      }
+    >
+      <p className="m-0 text-label text-fg-muted">
+        Build a multi-option quote · auto-routes for approval if margin &lt; customer floor
+      </p>
+
+      {/* Customer + route */}
+      <div className="grid grid-cols-[1.4fr_1fr_1fr_1fr] gap-x-4 gap-y-3 items-start">
+        <div className="flex flex-col gap-1">
+          <Field label="Customer">
+            {ids => <ComboBox {...ids} value={customerName} onChange={setCustomerName} items={customerItems} placeholder="Customer name" />}
+          </Field>
+          {cust && (
+            <div className="text-label text-fg-muted">
+              {cust.tier} · {cust.payment_terms} · floor {cust.min_margin_pct}%
+              {cust.blacklisted && <span className="ml-1.5 text-danger">· blacklisted</span>}
+              {cust.credit_hold && <span className="ml-1.5 text-warning">· credit hold</span>}
+            </div>
+          )}
+        </div>
+        <Field label="Origin">
+          {ids => <Input {...ids} value={origin} onChange={e => setOrigin(e.target.value)} />}
+        </Field>
+        <Field label="Destination">
+          {ids => <Input {...ids} value={destination} onChange={e => setDestination(e.target.value)} />}
+        </Field>
+        <Field label="Quote Type">
+          {ids => <Select {...ids} value={quoteType} onChange={v => setQuoteType(v as QuoteType)} options={QUOTE_TYPE_OPTIONS} />}
+        </Field>
+      </div>
+
+      {/* Big Schedule stub hint (Phase 7.1) */}
+      <div className="rounded-control border border-line-soft bg-canvas px-2.5 py-1.5 text-label text-fg-muted">
+        📡 Big Schedule lines available for this route: {BIG_SCHEDULE_LINES.join(', ')} (stub data - real integration in Phase 2)
+      </div>
+
+      {/* Rate lines */}
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between">
+          <span id="qb-rate-options" className={labelClass}>Rate Options ({lines.length})</span>
+          <Button size="sm" icon={<Plus size={14} aria-hidden="true" />} onClick={addLine}>Add line</Button>
+        </div>
+        <div className="-mx-1 overflow-x-auto">
+          <table aria-labelledby="qb-rate-options" className="w-full border-collapse">
+            <thead>
+              <tr>
+                <th className={BUILDER_TH}>Line</th>
+                <th className={BUILDER_TH}>Type</th>
+                <th className={BUILDER_TH}>Base $</th>
+                <th className={BUILDER_TH}>Transit</th>
+                <th className={BUILDER_TH}>Free</th>
+                <th className={BUILDER_TH}>Via</th>
+                <th className={BUILDER_TH}>Dest $</th>
+                <th className={BUILDER_TH}><span className="sr-only">Remove</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((l, i) => (
+                <tr key={l.id}>
+                  <td className={BUILDER_TD}>
+                    <ComboBox
+                      aria-label={`Line ${i + 1} shipping line`}
+                      className="w-[140px]"
+                      value={l.shipping_line}
+                      onChange={v => updateLine(l.id, { shipping_line: v })}
+                      items={BIG_SCHEDULE_ITEMS}
+                    />
+                  </td>
+                  <td className={BUILDER_TD}>
+                    <Select
+                      aria-label={`Line ${i + 1} rate type`}
+                      className="w-[136px]"
+                      value={l.rate_type}
+                      onChange={v => updateLine(l.id, { rate_type: v as RateType })}
+                      options={RATE_TYPE_OPTIONS}
+                    />
+                  </td>
+                  <td className={BUILDER_TD}>
+                    <NumberInput aria-label={`Line ${i + 1} base rate USD`} className="w-[88px]" value={l.base_rate_usd} onChange={e => updateLine(l.id, { base_rate_usd: Number(e.target.value) })} />
+                  </td>
+                  <td className={BUILDER_TD}>
+                    <NumberInput aria-label={`Line ${i + 1} transit days`} className="w-16" value={l.transit_days} onChange={e => updateLine(l.id, { transit_days: Number(e.target.value) })} />
+                  </td>
+                  <td className={BUILDER_TD}>
+                    <NumberInput aria-label={`Line ${i + 1} free time days`} className="w-16" value={l.free_time_days} onChange={e => updateLine(l.id, { free_time_days: Number(e.target.value) })} />
+                  </td>
+                  <td className={BUILDER_TD}>
+                    <Input aria-label={`Line ${i + 1} transshipment via`} className="w-[110px]" value={l.transshipment_points} onChange={e => updateLine(l.id, { transshipment_points: e.target.value })} />
+                  </td>
+                  <td className={BUILDER_TD}>
+                    <NumberInput aria-label={`Line ${i + 1} destination charges USD`} className="w-[88px]" value={l.destination_charges_usd} onChange={e => updateLine(l.id, { destination_charges_usd: Number(e.target.value) })} />
+                  </td>
+                  <td className={BUILDER_TD}>
+                    {lines.length === 1 ? (
+                      <Button className="w-8 px-0" icon={<Trash2 size={14} aria-hidden="true" />} aria-label={`Remove line ${i + 1}`} title={`Remove line ${i + 1}`} disabled />
+                    ) : (
+                      <Tooltip content={`Remove line ${i + 1}`}>
+                        <Button className="w-8 px-0 text-danger" icon={<Trash2 size={14} aria-hidden="true" />} aria-label={`Remove line ${i + 1}`} onClick={() => removeLine(l.id)} />
+                      </Tooltip>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
-    </div>
+
+      {/* Margin + employee + summary */}
+      <div className="grid grid-cols-[1fr_1fr_1.2fr] items-end gap-x-4">
+        <Field label="Margin %">
+          {ids => <NumberInput {...ids} value={margin} onChange={e => setMargin(Number(e.target.value))} />}
+        </Field>
+        <Field label="Created by">
+          {ids => <Select {...ids} value={String(createdBy)} onChange={v => setCreatedBy(Number(v))} options={EMPLOYEE_OPTIONS} />}
+        </Field>
+        <div className="rounded-card border border-line-soft bg-canvas px-3.5 py-2.5">
+          <div className="text-label uppercase tracking-label text-fg-muted">Quote total</div>
+          <div className="text-title font-extrabold text-fg">${sell.toLocaleString()}</div>
+          <div className="text-label text-fg-muted">cost ${cost.toLocaleString()} + {margin}%</div>
+        </div>
+      </div>
+
+      {/* Approval banner if margin under floor */}
+      {willNeedApproval && (
+        <div className="rounded-card border border-warning-line bg-warning-bg px-3.5 py-2.5 text-control font-semibold text-warning-fg">
+          ⚠ This quote will be flagged Awaiting Approval - margin {margin}% is below {cust!.name}'s floor of {minMargin}%.
+        </div>
+      )}
+    </Modal>
   )
 }
