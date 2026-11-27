@@ -6,6 +6,9 @@ import { linerDisplay } from '../../types'
 import PortCombobox from '../shared/PortCombobox'
 import TagInput from '../shared/TagInput'
 import { COLOR } from '../ui/tokens'
+import { Badge, Button, Checkbox, DatePicker, EmptyState, Field, LoadingState, Modal, NumberInput, Tooltip, todayISO } from '../ui'
+import { labelClass } from '../ui/controlStyles'
+import { cn } from '../../lib/cn'
 
 // ---------------------------------------------------------------------------
 // Pivot aggregate response: one row per schedule, rate types as columns
@@ -121,6 +124,13 @@ const RATE_COLORS: Record<string, string> = {
   NAC: '#0891b2', Contracted: '#dc2626',
 }
 
+// Header and body cell classes for the dense 11px data grids
+const GRID_TH = 'whitespace-nowrap border-l border-white/20 px-1 py-1.5 text-center text-label font-bold tracking-label text-white'
+const GRID_TD = 'border-b border-l border-line-soft px-1 py-1.5 align-middle text-label text-fg'
+const SEARCH_TH = 'whitespace-nowrap border-l border-white/20 px-1.5 py-1.5 text-left text-label font-bold tracking-label text-white'
+const SEARCH_TD = 'border-b border-l border-line-soft px-1.5 py-1.5 align-middle text-label text-fg'
+const CARD = 'mb-5 flex flex-col gap-3.5 rounded-card border border-line-soft bg-surface p-4'
+
 function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
   rows: ScheduleRow[]
   rateTypes: string[]
@@ -178,7 +188,7 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
   const clearAll = () => { setFCarrier(new Set()); setFCutoff(new Set()); setFOrigin(new Set()); setFDest(new Set()); setOpenFilter(null) }
 
   if (rows.length === 0) {
-    return <div style={{ padding: 16, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>{emptyMessage || 'No schedule rates available.'}</div>
+    return <EmptyState title={emptyMessage || 'No schedule rates available.'} />
   }
 
   const SCHED_COL_COUNT = 8
@@ -192,19 +202,10 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
     { key: 'destination', label: 'Destination', values: distinct.destinations, active: fDest, set: setFDest },
   ]
 
-  const thBase: React.CSSProperties = {
-    padding: '5px 4px', fontSize: 11, fontWeight: 700, color: '#fff', letterSpacing: 0.3,
-    textAlign: 'center', whiteSpace: 'nowrap', borderLeft: '1px solid rgba(255,255,255,0.2)',
-  }
-  const tdBase: React.CSSProperties = {
-    padding: '5px 4px', fontSize: 11, color: 'var(--text)', verticalAlign: 'middle',
-    borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)',
-  }
-
   function cellTooltip(cell: RateCell): string {
     const lines: string[] = []
     lines.push(`${cell.currency} ${cell.rate.toLocaleString()}`)
-    if (cell.validFrom && cell.validTo) lines.push(`Valid: ${fmtDate(cell.validFrom)} \u2013 ${fmtDate(cell.validTo)}`)
+    if (cell.validFrom && cell.validTo) lines.push(`Valid: ${fmtDate(cell.validFrom)} – ${fmtDate(cell.validTo)}`)
     if (cell.transit) lines.push(`Transit: ${cell.transit} days`)
     if (cell.freeTime) lines.push(`Free time: ${cell.freeTime} days`)
     if (cell.maxWeight) lines.push(`Max weight: ${cell.maxWeight.toLocaleString()} kg`)
@@ -213,64 +214,58 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
   }
 
   return (
-    <>
+    <div className="flex flex-col gap-2">
       {/* Count + clear */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, padding: '0 2px' }}>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+      <div className="flex min-h-7 items-center justify-between px-0.5">
+        <div className="text-label text-fg-muted">
           {filtered.length === rows.length
             ? `${rows.length} schedule${rows.length !== 1 ? 's' : ''}`
             : `${filtered.length} of ${rows.length} (filtered)`}
         </div>
         {activeCount > 0 && (
-          <button onClick={clearAll} style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
-            <X size={10} /> Clear filters
-          </button>
+          <Button variant="ghost" size="sm" icon={<X size={14} aria-hidden="true" />} onClick={clearAll} className="text-danger">
+            Clear filters
+          </Button>
         )}
       </div>
 
       {/* Filter chips */}
-      <div ref={filterBarRef} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+      <div ref={filterBarRef} className="flex flex-wrap gap-2">
         {FILTERS.map(f => {
           const isOpen = openFilter === f.key
           const hasActive = f.active.size > 0
           const entries = [...f.values.entries()].sort((a, b) => b[1] - a[1])
           if (entries.length <= 1) return null
           return (
-            <div key={f.key} style={{ position: 'relative' }}>
-              <button onClick={() => setOpenFilter(isOpen ? null : f.key)}
-                style={{
-                  fontSize: 11, padding: '3px 10px', borderRadius: 14, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  border: hasActive ? `1px solid ${COLOR.primary}` : '1px solid var(--border)',
-                  background: hasActive ? 'rgba(44,44,130,0.08)' : 'transparent',
-                  color: hasActive ? COLOR.primary : 'var(--text-secondary)',
-                  fontWeight: hasActive ? 600 : 400,
-                }}>
-                <Filter size={10} />
+            <div key={f.key} className="relative">
+              <Button
+                size="sm"
+                icon={<Filter size={14} aria-hidden="true" />}
+                aria-expanded={isOpen}
+                onClick={() => setOpenFilter(isOpen ? null : f.key)}
+                className={cn(hasActive ? 'border-primary bg-primary-subtle text-primary' : 'font-normal text-fg-label')}
+              >
                 {f.label}
-                {hasActive && <span style={{ fontSize: 11, background: COLOR.primary, color: '#fff', borderRadius: 8, padding: '0 5px', fontWeight: 700 }}>{f.active.size}</span>}
-              </button>
+                {hasActive && <span className="rounded-control bg-primary px-1.5 text-label font-bold text-white">{f.active.size}</span>}
+              </Button>
               {isOpen && (
-                <div style={{
-                  position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 50,
-                  background: 'var(--card, #fff)', border: '1px solid var(--border)', borderRadius: 8,
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.12)', minWidth: 180, maxHeight: 240, overflowY: 'auto', padding: '4px 0',
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 10px', borderBottom: '1px solid var(--border)' }}>
-                    <button onClick={() => f.set(new Set(entries.map(e => e[0])))} style={{ fontSize: 11, color: COLOR.primary, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Select all</button>
-                    <button onClick={() => f.set(new Set())} style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>Clear</button>
+                <div className="absolute left-0 top-full z-20 mt-1 max-h-60 min-w-[180px] overflow-y-auto rounded-card border border-line-popover bg-surface py-1 shadow-popover">
+                  <div className="flex justify-between border-b border-line-soft px-1 pb-1">
+                    <Button variant="ghost" size="sm" onClick={() => f.set(new Set(entries.map(e => e[0])))}>Select all</Button>
+                    <Button variant="ghost" size="sm" onClick={() => f.set(new Set())} className="font-normal text-fg-muted">Clear</Button>
                   </div>
                   {entries.map(([val, count]) => (
-                    <label key={val} style={{
-                      display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', cursor: 'pointer',
-                      fontSize: 11, color: 'var(--text)', background: f.active.has(val) ? 'rgba(44,44,130,0.04)' : 'transparent',
-                    }}>
-                      <input type="checkbox" checked={f.active.has(val)} onChange={() => {
+                    <Checkbox
+                      key={val}
+                      checked={f.active.has(val)}
+                      onChange={() => {
                         f.set(prev => { const n = new Set(prev); if (n.has(val)) n.delete(val); else n.add(val); return n })
-                      }} />
-                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{count}</span>
-                    </label>
+                      }}
+                      className={cn('flex w-full px-2.5 py-1.5 hover:bg-surface-hover', f.active.has(val) && 'bg-primary-subtle')}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{val}</span>
+                      <span className="shrink-0 text-label text-fg-muted">{count}</span>
+                    </Checkbox>
                   ))}
                 </div>
               )}
@@ -280,46 +275,30 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
       </div>
 
       {/* Pivot table */}
-      <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto', maxHeight: 600 }}>
-          <table style={{ borderCollapse: 'collapse', minWidth: SCHED_COL_COUNT * 80 + rateCols * 76 }}>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-              <tr style={{ background: 'var(--accent, #2c2c82)' }}>
-                <th colSpan={SCHED_COL_COUNT} style={{
-                  padding: '5px 8px', fontSize: 11, fontWeight: 700, color: '#fff',
-                  letterSpacing: 0.5, textAlign: 'center',
-                  borderBottom: '1px solid rgba(255,255,255,0.2)',
-                }}>
+      <div className="overflow-hidden rounded-card border border-line">
+        <div className="relative max-h-[600px] overflow-x-auto">
+          <table className="border-collapse" style={{ minWidth: SCHED_COL_COUNT * 80 + rateCols * 76 }}>
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-primary">
+                <th colSpan={SCHED_COL_COUNT} className={cn(GRID_TH, 'border-b border-l-0 px-2')}>
                   SCHEDULE
                 </th>
                 {rateTypes.map(rt => (
-                  <th key={rt} colSpan={containerTypes.length} style={{
-                    padding: '5px 4px', fontSize: 11, fontWeight: 700,
-                    color: '#fff', letterSpacing: 0.5, textAlign: 'center',
-                    borderLeft: '2px solid rgba(255,255,255,0.5)',
-                    borderBottom: '1px solid rgba(255,255,255,0.2)',
-                    background: RATE_COLORS[rt] ?? '#64748b',
-                  }}>
+                  <th key={rt} colSpan={containerTypes.length}
+                    className={cn(GRID_TH, 'border-b border-l-2 border-b-white/20 border-l-white/50')}
+                    style={{ background: RATE_COLORS[rt] ?? COLOR.muted }}>
                     {rt.toUpperCase()}
                   </th>
                 ))}
               </tr>
-              <tr style={{ background: 'var(--accent, #2c2c82)' }}>
+              <tr className="bg-primary">
                 {['CARRIER', 'VESSEL / VOYAGE', 'ORIGIN', 'DEST', 'ETD', 'ETA', 'TT', 'CUTOFF'].map((h, i) => (
-                  <th key={h} style={{
-                    ...thBase,
-                    textAlign: ['ETD', 'ETA', 'TT', 'CUTOFF'].includes(h) ? 'center' : 'left',
-                    borderLeft: i === 0 ? 'none' : thBase.borderLeft,
-                  }}>{h}</th>
+                  <th key={h} className={cn(GRID_TH, !['ETD', 'ETA', 'TT', 'CUTOFF'].includes(h) && 'text-left', i === 0 && 'border-l-0')}>{h}</th>
                 ))}
                 {rateTypes.map(rt =>
                   containerTypes.map((ct, ctIdx) => (
-                    <th key={`${rt}-${ct}`} style={{
-                      ...thBase,
-                      fontSize: 11,
-                      borderLeft: ctIdx === 0 ? '2px solid rgba(255,255,255,0.5)' : thBase.borderLeft,
-                      background: RATE_COLORS[rt] ?? '#64748b',
-                    }}>
+                    <th key={`${rt}-${ct}`} className={cn(GRID_TH, ctIdx === 0 && 'border-l-2 border-l-white/50')}
+                      style={{ background: RATE_COLORS[rt] ?? COLOR.muted }}>
                       {ct}
                     </th>
                   ))
@@ -328,71 +307,59 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={totalCols} style={{ padding: 20, textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>No schedules match the active filters.</td></tr>
+                <tr><td colSpan={totalCols} className="p-0"><EmptyState title="No schedules match the active filters." /></td></tr>
               )}
-              {filtered.map((row, rowIdx) => {
-                const bg = rowIdx % 2 ? 'rgba(100,116,139,0.04)' : 'transparent'
-                return (
-                  <tr key={row.scheduleId} style={{ background: bg }}>
-                    <td style={{ ...tdBase, borderLeft: 'none', fontWeight: 600 }}>{row.linerName || '-'}</td>
-                    <td style={tdBase}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                        <Ship size={9} style={{ opacity: 0.5, flexShrink: 0 }} />
-                        <span style={{ fontSize: 11 }}>{row.vesselName || '-'}{row.voyageNumber ? ` / ${row.voyageNumber}` : ''}</span>
-                      </div>
-                    </td>
-                    <td style={tdBase}>{row.originCity || row.origin || '-'}</td>
-                    <td style={tdBase}>{row.destinationCity || row.destination || '-'}</td>
-                    <td style={{ ...tdBase, textAlign: 'center' }}>{fmtDate(row.etd)}</td>
-                    <td style={{ ...tdBase, textAlign: 'center' }}>{fmtDate(row.eta)}</td>
-                    <td style={{ ...tdBase, fontWeight: 600, textAlign: 'center' }}>
-                      {row.totalDuration != null ? `${row.totalDuration}d` : '-'}
-                    </td>
-                    <td style={{ ...tdBase, fontSize: 11 }}>{fmtDate(row.bkCutoff)}</td>
-                    {rateTypes.map(rt =>
-                      containerTypes.map((ct, ctIdx) => {
-                        const cell = row.rates[rt]?.[ct]
-                        return (
-                          <td
-                            key={`${rt}-${ct}`}
-                            title={cell ? cellTooltip(cell) : undefined}
-                            style={{
-                              ...tdBase,
-                              textAlign: 'center',
-                              borderLeft: ctIdx === 0 ? '2px solid var(--border)' : tdBase.borderLeft,
-                              padding: '4px 3px',
-                            }}
-                          >
-                            {cell ? (
-                              <>
-                                <div style={{ fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>
-                                  {cell.currency} {cell.rate.toLocaleString()}
+              {filtered.map((row, rowIdx) => (
+                <tr key={row.scheduleId} className={rowIdx % 2 ? 'bg-canvas' : undefined}>
+                  <td className={cn(GRID_TD, 'border-l-0 font-semibold')}>{row.linerName || '-'}</td>
+                  <td className={GRID_TD}>
+                    <div className="flex items-center gap-1">
+                      <Ship size={14} aria-hidden="true" className="shrink-0 text-fg-muted" />
+                      <span>{row.vesselName || '-'}{row.voyageNumber ? ` / ${row.voyageNumber}` : ''}</span>
+                    </div>
+                  </td>
+                  <td className={GRID_TD}>{row.originCity || row.origin || '-'}</td>
+                  <td className={GRID_TD}>{row.destinationCity || row.destination || '-'}</td>
+                  <td className={cn(GRID_TD, 'text-center')}>{fmtDate(row.etd)}</td>
+                  <td className={cn(GRID_TD, 'text-center')}>{fmtDate(row.eta)}</td>
+                  <td className={cn(GRID_TD, 'text-center font-semibold')}>
+                    {row.totalDuration != null ? `${row.totalDuration}d` : '-'}
+                  </td>
+                  <td className={GRID_TD}>{fmtDate(row.bkCutoff)}</td>
+                  {rateTypes.map(rt =>
+                    containerTypes.map((ct, ctIdx) => {
+                      const cell = row.rates[rt]?.[ct]
+                      return (
+                        <td
+                          key={`${rt}-${ct}`}
+                          title={cell ? cellTooltip(cell) : undefined}
+                          className={cn(GRID_TD, 'text-center', ctIdx === 0 && 'border-l-2 border-l-line')}
+                        >
+                          {cell ? (
+                            <>
+                              <div className="whitespace-nowrap font-bold">
+                                {cell.currency} {cell.rate.toLocaleString()}
+                              </div>
+                              {cell.note && (
+                                <div className="mx-auto mt-px max-w-[72px] truncate leading-tight text-fg-muted">
+                                  {cell.note}
                                 </div>
-                                {cell.note && (
-                                  <div style={{
-                                    fontSize: 11, color: '#94a3b8', lineHeight: 1.2, marginTop: 1,
-                                    maxWidth: 72, overflow: 'hidden', textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap', margin: '1px auto 0',
-                                  }}>
-                                    {cell.note}
-                                  </div>
-                                )}
-                              </>
-                            ) : (
-                              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>-</span>
-                            )}
-                          </td>
-                        )
-                      })
-                    )}
-                  </tr>
-                )
-              })}
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-fg-muted">-</span>
+                          )}
+                        </td>
+                      )
+                    })
+                  )}
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
@@ -419,100 +386,76 @@ function ScheduleSearchTable({ data }: { data: OceanSchedule[] }) {
   const toggleCheck = (idx: number) =>
     setChecked(prev => { const n = new Set(prev); if (n.has(idx)) n.delete(idx); else n.add(idx); return n })
 
-  const thStyle: React.CSSProperties = {
-    padding: '6px 6px', fontSize: 11, fontWeight: 700, color: '#fff',
-    letterSpacing: 0.3, textAlign: 'left', whiteSpace: 'nowrap',
-    borderLeft: '1px solid rgba(255,255,255,0.2)',
-  }
-  const tdStyle: React.CSSProperties = {
-    padding: '5px 6px', fontSize: 11, color: 'var(--text)',
-    verticalAlign: 'middle', borderBottom: '1px solid var(--border)',
-    borderLeft: '1px solid var(--border)',
-  }
-
   const COLS = ['CARRIER', 'SERVICE', 'VESSEL / VOYAGE', 'ORIGIN', 'DESTINATION', 'ETD', 'ETA', 'TRANSIT', 'TYPE', 'BK CUTOFF', 'SPECIAL RATE', 'ACTION']
 
+  const scheduleName = (s: OceanSchedule) =>
+    `${s.carrierName || s.scac || '-'} ${s.vesselName || '-'}${s.voyageNumber ? ` / ${s.voyageNumber}` : ''}`
+
+  const modalRow = modalIdx !== null ? sorted[modalIdx] : undefined
+
   return (
-    <>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6, padding: '0 2px' }}>
+    <div className="flex flex-col gap-1.5">
+      <div className="px-0.5 text-label text-fg-muted">
         {sorted.length} schedule{sorted.length !== 1 ? 's' : ''} found
       </div>
-      <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto', maxHeight: 540 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
-              <tr style={{ background: 'var(--accent, #2c2c82)' }}>
+      <div className="overflow-hidden rounded-card border border-line">
+        <div className="relative max-h-[540px] overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-primary">
                 {COLS.map((h, i) => (
-                  <th key={h} style={{
-                    ...thStyle,
-                    borderLeft: i === 0 ? 'none' : thStyle.borderLeft,
-                    textAlign: h === 'SPECIAL RATE' || h === 'ACTION' ? 'center' : 'left',
-                  }}>{h}</th>
+                  <th key={h} className={cn(SEARCH_TH, i === 0 && 'border-l-0', (h === 'SPECIAL RATE' || h === 'ACTION') && 'text-center')}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {sorted.length === 0 && (
-                <tr><td colSpan={COLS.length} style={{ padding: 20, textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>No schedules found.</td></tr>
+                <tr><td colSpan={COLS.length} className="p-0"><EmptyState title="No schedules found." /></td></tr>
               )}
               {sorted.map((s, i) => (
-                <tr key={`${s.scac}-${s.vesselName}-${s.voyageNumber}-${i}`} style={{ background: i % 2 ? 'rgba(100,116,139,0.04)' : 'transparent' }}>
-                  <td style={{ ...tdStyle, borderLeft: 'none', fontWeight: 600 }}>
+                <tr key={`${s.scac}-${s.vesselName}-${s.voyageNumber}-${i}`} className={i % 2 ? 'bg-canvas' : undefined}>
+                  <td className={cn(SEARCH_TD, 'border-l-0 font-semibold')}>
                     <div>{s.carrierName || s.scac || '-'}</div>
-                    {s.scac && s.carrierName && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.scac}</div>}
+                    {s.scac && s.carrierName && <div className="font-normal text-fg-muted">{s.scac}</div>}
                   </td>
-                  <td style={{ ...tdStyle, fontSize: 11 }}>{s.serviceName || '-'}</td>
-                  <td style={tdStyle}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                      <Ship size={9} style={{ opacity: 0.5, flexShrink: 0 }} />
+                  <td className={SEARCH_TD}>{s.serviceName || '-'}</td>
+                  <td className={SEARCH_TD}>
+                    <div className="flex items-center gap-1">
+                      <Ship size={14} aria-hidden="true" className="shrink-0 text-fg-muted" />
                       <span>{s.vesselName || '-'}{s.voyageNumber ? ` / ${s.voyageNumber}` : ''}</span>
                     </div>
                   </td>
-                  <td style={tdStyle}>
+                  <td className={SEARCH_TD}>
                     {s.originCityName || s.originUnloc || '-'}
-                    {s.originUnloc && s.originCityName && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.originUnloc}</div>}
+                    {s.originUnloc && s.originCityName && <div className="text-fg-muted">{s.originUnloc}</div>}
                   </td>
-                  <td style={tdStyle}>
+                  <td className={SEARCH_TD}>
                     {s.destinationCityName || s.destinationUnloc || '-'}
-                    {s.destinationUnloc && s.destinationCityName && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.destinationUnloc}</div>}
+                    {s.destinationUnloc && s.destinationCityName && <div className="text-fg-muted">{s.destinationUnloc}</div>}
                   </td>
-                  <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{fmtDate(s.originDepartureDate)}</td>
-                  <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{fmtDate(s.destinationArrivalDate)}</td>
-                  <td style={{ ...tdStyle, fontWeight: 600, textAlign: 'center' }}>
+                  <td className={cn(SEARCH_TD, 'whitespace-nowrap')}>{fmtDate(s.originDepartureDate)}</td>
+                  <td className={cn(SEARCH_TD, 'whitespace-nowrap')}>{fmtDate(s.destinationArrivalDate)}</td>
+                  <td className={cn(SEARCH_TD, 'text-center font-semibold')}>
                     {s.totalDuration != null ? `${s.totalDuration}d` : '-'}
                   </td>
-                  <td style={tdStyle}>
+                  <td className={SEARCH_TD}>
                     {s.scheduleType ? (
-                      <span style={{
-                        fontSize: 11, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
-                        background: s.scheduleType === 'direct' ? 'rgba(22,163,74,0.1)' : 'rgba(217,119,6,0.1)',
-                        color: s.scheduleType === 'direct' ? '#16a34a' : '#d97706',
-                      }}>{s.scheduleType === 'direct' ? 'Direct' : 'T/S'}</span>
+                      <Badge tone={s.scheduleType === 'direct' ? 'success' : 'warning'}>{s.scheduleType === 'direct' ? 'Direct' : 'T/S'}</Badge>
                     ) : '-'}
                   </td>
-                  <td style={{ ...tdStyle, fontSize: 11, whiteSpace: 'nowrap' }}>{fmtDate(s.bkCutoff)}</td>
+                  <td className={cn(SEARCH_TD, 'whitespace-nowrap')}>{fmtDate(s.bkCutoff)}</td>
                   {/* Special Rate checkbox */}
-                  <td style={{ ...tdStyle, textAlign: 'center' }}>
-                    <input
-                      type="checkbox"
+                  <td className={cn(SEARCH_TD, 'text-center')}>
+                    <Checkbox
                       checked={checked.has(i)}
                       onChange={() => toggleCheck(i)}
-                      style={{ cursor: 'pointer', accentColor: COLOR.primary }}
+                      aria-label={`Special rate for ${scheduleName(s)}`}
+                      className="flex justify-center"
                     />
                   </td>
                   {/* Action button */}
-                  <td style={{ ...tdStyle, textAlign: 'center' }}>
-                    <button
-                      type="button"
-                      onClick={() => setModalIdx(i)}
-                      style={{
-                        fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 4,
-                        border: `1px solid ${COLOR.primary}`, background: 'rgba(44,44,130,0.06)',
-                        color: COLOR.primary, cursor: 'pointer', whiteSpace: 'nowrap',
-                      }}
-                    >
-                      Input Rate
-                    </button>
+                  <td className={cn(SEARCH_TD, 'text-center')}>
+                    <Button size="sm" onClick={() => setModalIdx(i)}>Input Rate</Button>
                   </td>
                 </tr>
               ))}
@@ -522,64 +465,75 @@ function ScheduleSearchTable({ data }: { data: OceanSchedule[] }) {
       </div>
 
       {/* Special rate input modal (placeholder) */}
-      {modalIdx !== null && sorted[modalIdx] && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 9999,
-            background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-          onClick={() => setModalIdx(null)}
+      {modalRow && (
+        <Modal
+          isOpen
+          onClose={() => setModalIdx(null)}
+          title="Special Rate Input"
+          size="sm"
+          footer={<Button onClick={() => setModalIdx(null)}>Close</Button>}
         >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: 'var(--bg-card, #fff)', border: '1px solid var(--border)',
-              borderRadius: 12, padding: 28, minWidth: 380, maxWidth: 500,
-              boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Special Rate Input</h3>
-              <button
-                type="button"
-                onClick={() => setModalIdx(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2 }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14 }}>
-              {sorted[modalIdx].carrierName || sorted[modalIdx].scac || '-'}
-              {' - '}
-              {sorted[modalIdx].vesselName || '-'}
-              {sorted[modalIdx].voyageNumber ? ` / ${sorted[modalIdx].voyageNumber}` : ''}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14 }}>
-              {sorted[modalIdx].originCityName || sorted[modalIdx].originUnloc || '-'}
-              {' \u2192 '}
-              {sorted[modalIdx].destinationCityName || sorted[modalIdx].destinationUnloc || '-'}
-              {sorted[modalIdx].originDepartureDate ? ` \u00b7 ETD ${fmtDate(sorted[modalIdx].originDepartureDate)}` : ''}
-            </div>
-            <div style={{
-              padding: 24, background: 'rgba(100,116,139,0.04)', border: '1px dashed var(--border)',
-              borderRadius: 8, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13,
-            }}>
-              Special rate input
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 18 }}>
-              <button
-                type="button"
-                onClick={() => setModalIdx(null)}
-                className="db-btn"
-                style={{ fontSize: 11, padding: '5px 16px' }}
-              >
-                Close
-              </button>
-            </div>
+          <p className="m-0 text-label text-fg-muted">
+            {modalRow.carrierName || modalRow.scac || '-'}
+            {' - '}
+            {modalRow.vesselName || '-'}
+            {modalRow.voyageNumber ? ` / ${modalRow.voyageNumber}` : ''}
+          </p>
+          <p className="m-0 text-label text-fg-muted">
+            {modalRow.originCityName || modalRow.originUnloc || '-'}
+            {' → '}
+            {modalRow.destinationCityName || modalRow.destinationUnloc || '-'}
+            {modalRow.originDepartureDate ? ` · ETD ${fmtDate(modalRow.originDepartureDate)}` : ''}
+          </p>
+          <div className="rounded-card border border-dashed border-line bg-canvas p-6 text-center text-control text-fg-muted">
+            Special rate input
           </div>
-        </div>
+        </Modal>
       )}
-    </>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Port pair rows (shared by both tabs)
+// ---------------------------------------------------------------------------
+
+function PortPairRows({ pairs, onUpdate, onRemove, onAdd }: {
+  pairs: { origin: string; destination: string }[]
+  onUpdate: (idx: number, field: 'origin' | 'destination', value: string) => void
+  onRemove: (idx: number) => void
+  onAdd: () => void
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <h3 className={cn('m-0', labelClass)}>Port Pairs</h3>
+      {pairs.map((pair, idx) => (
+        <div key={idx} className="flex items-start gap-2">
+          <div className="flex-1">
+            <PortCombobox value={pair.origin} onChange={v => onUpdate(idx, 'origin', v)} placeholder="Origin port" />
+          </div>
+          <ArrowRight size={16} aria-hidden="true" className="mt-2 shrink-0 text-fg-muted" />
+          <div className="flex-1">
+            <PortCombobox value={pair.destination} onChange={v => onUpdate(idx, 'destination', v)} placeholder="Destination port" />
+          </div>
+          {pairs.length > 1 && (
+            <Tooltip content={`Remove port pair ${idx + 1}`}>
+              <Button
+                className="w-8 shrink-0 px-0 text-danger"
+                icon={<X size={14} aria-hidden="true" />}
+                aria-label={`Remove port pair ${idx + 1}`}
+                onClick={() => onRemove(idx)}
+              />
+            </Tooltip>
+          )}
+        </div>
+      ))}
+      <div>
+        <Button variant="ghost" size="sm" className="-ml-2.5" icon={<Plus size={14} aria-hidden="true" />} onClick={onAdd}>
+          Add port pair
+        </Button>
+      </div>
+    </div>
   )
 }
 
@@ -658,10 +612,10 @@ export default function Schedules({ onFlash }: SchedulesProps) {
   const scacSuggestions = useMemo(() => scacLiners.map(l => l.scac!), [scacLiners])
   const formatScacLabel = (scac: string) => {
     const l = scacLiners.find(x => x.scac === scac)
-    return l ? `${l.name} \u2013 ${scac}` : scac
+    return l ? `${l.name} – ${scac}` : scac
   }
 
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  const today = useMemo(() => todayISO(), [])
   const [searchDate, setSearchDate] = useState(today)
   const [weeksOut, setWeeksOut] = useState(4)
   const [directOnly, setDirectOnly] = useState(false)
@@ -698,28 +652,25 @@ export default function Schedules({ onFlash }: SchedulesProps) {
   // Render
   // ====================================================================
 
-  const tabStyle = (active: boolean): React.CSSProperties => ({
-    padding: '8px 20px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-    border: 'none', background: 'none',
-    color: active ? COLOR.primary : 'var(--text-muted)',
-    borderBottom: active ? `2px solid ${COLOR.primary}` : '2px solid transparent',
-    marginBottom: -2, transition: 'color 0.15s, border-color 0.15s',
-  })
+  const tabClass = (active: boolean) => cn(
+    '-mb-0.5 border-0 border-b-2 bg-transparent px-5 py-2 text-control font-semibold transition-colors',
+    active ? 'border-primary text-primary' : 'border-transparent text-fg-muted',
+  )
 
   return (
-    <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
+    <div className="mx-auto max-w-[1400px] p-6">
       {/* Page title */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-        <Globe size={18} style={{ color: COLOR.primary }} />
-        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Ocean Schedules</h2>
+      <div className="mb-4 flex items-center gap-2">
+        <Globe size={18} aria-hidden="true" className="text-primary" />
+        <h2 className="m-0 text-title font-bold text-fg">Ocean Schedules</h2>
       </div>
 
       {/* Tab bar */}
-      <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--border)', marginBottom: 16 }}>
-        <button onClick={() => setActiveTab('rates')} style={tabStyle(activeTab === 'rates')}>
+      <div className="mb-4 flex border-0 border-b-2 border-line-soft">
+        <button type="button" aria-pressed={activeTab === 'rates'} onClick={() => setActiveTab('rates')} className={tabClass(activeTab === 'rates')}>
           Schedule Rates
         </button>
-        <button onClick={() => setActiveTab('search')} style={tabStyle(activeTab === 'search')}>
+        <button type="button" aria-pressed={activeTab === 'search'} onClick={() => setActiveTab('search')} className={tabClass(activeTab === 'search')}>
           Search Schedules
         </button>
       </div>
@@ -727,233 +678,123 @@ export default function Schedules({ onFlash }: SchedulesProps) {
       {/* ================================================================
           TAB 1 - Schedule Rates
           ================================================================ */}
-      <div style={{ display: activeTab === 'rates' ? 'block' : 'none' }}>
+      <div className={activeTab === 'rates' ? 'block' : 'hidden'}>
         {/* Search form */}
-        <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 18, marginBottom: 20, background: 'var(--bg-card, #fff)' }}>
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8, letterSpacing: 0.3, textTransform: 'uppercase' }}>
-              Port Pairs
-            </div>
-            {portPairs.map((pair, idx) => (
-              <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
-                <div style={{ flex: 1 }}>
-                  <PortCombobox value={pair.origin} onChange={v => updatePair(idx, 'origin', v)} placeholder="Origin port" />
-                </div>
-                <ArrowRight size={16} style={{ marginTop: 10, color: 'var(--text-muted)', flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
-                  <PortCombobox value={pair.destination} onChange={v => updatePair(idx, 'destination', v)} placeholder="Destination port" />
-                </div>
-                {portPairs.length > 1 && (
-                  <button type="button" onClick={() => removePair(idx)}
-                    style={{
-                      marginTop: 6, width: 26, height: 26, borderRadius: 6, border: '1px solid var(--border)',
-                      background: 'transparent', color: '#dc2626', cursor: 'pointer', display: 'flex',
-                      alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}>
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
-            ))}
-            <button type="button" onClick={addPair}
-              style={{
-                fontSize: 11, color: COLOR.primary, background: 'none', border: 'none', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0', fontWeight: 600,
-              }}>
-              <Plus size={12} /> Add port pair
-            </button>
-          </div>
+        <div className={CARD}>
+          <PortPairRows pairs={portPairs} onUpdate={updatePair} onRemove={removePair} onAdd={addPair} />
 
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8, letterSpacing: 0.3, textTransform: 'uppercase' }}>
-              Filter by Liner <span style={{ fontWeight: 400, textTransform: 'none' }}>(optional)</span>
-            </div>
-            <TagInput
-              values={selectedLiners}
-              onChange={setSelectedLiners}
-              suggestions={[...new Set(linerList.map(l => l.name))]}
-              placeholder="Type to add liners..."
-              formatLabel={formatLinerLabel}
-            />
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Leave empty to show all liners.</div>
-          </div>
+          <Field label="Filter by Liner (optional)" hint="Leave empty to show all liners.">
+            {ids => (
+              <TagInput
+                id={ids.id}
+                aria-labelledby={ids['aria-labelledby']}
+                values={selectedLiners}
+                onChange={setSelectedLiners}
+                suggestions={[...new Set(linerList.map(l => l.name))]}
+                placeholder="Type to add liners..."
+                formatLabel={formatLinerLabel}
+              />
+            )}
+          </Field>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="db-btn primary" onClick={handleSearch} disabled={!canSearch}
-              style={{
-                fontSize: 11, padding: '6px 20px', display: 'flex', alignItems: 'center', gap: 6,
-              }}>
-              {loading ? <Loader2 size={14} className="spin" /> : <Search size={14} />}
+          <div className="flex justify-end">
+            <Button variant="primary" icon={<Search size={14} aria-hidden="true" />} isPending={loading} onClick={handleSearch} disabled={!canSearch}>
               Search Rates
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Results */}
-        {loading && filteredRows.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>
-            <Loader2 size={20} className="spin" style={{ marginBottom: 6 }} />
-            <div style={{ fontSize: 12 }}>Searching schedule rates...</div>
-          </div>
-        )}
+        {loading && filteredRows.length === 0 && <LoadingState label="Searching schedule rates..." />}
         {!loading && searched && filteredRows.length === 0 && (
-          <div style={{
-            padding: 20, background: 'rgba(100,116,139,0.04)', border: '1px solid rgba(100,116,139,0.15)',
-            borderRadius: 8, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center',
-          }}>
-            No schedule rates found for the selected port pairs{selectedLiners.length > 0 ? ' and liner filter' : ''}.
+          <div className="rounded-card border border-line-soft bg-canvas">
+            <EmptyState title={`No schedule rates found for the selected port pairs${selectedLiners.length > 0 ? ' and liner filter' : ''}.`} />
           </div>
         )}
         {filteredRows.length > 0 && (
           <>
             {loading && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 11, color: 'var(--text-muted)' }}>
-                <Loader2 size={12} className="spin" /> Updating results...
+              <div className="mb-2 flex items-center gap-1.5 text-label text-fg-muted">
+                <Loader2 size={14} aria-hidden="true" className="animate-spin" /> Updating results...
               </div>
             )}
             <PivotRateTable rows={filteredRows} rateTypes={pivot.rateTypes} containerTypes={pivot.containerTypes} />
           </>
         )}
         {!searched && !loading && (
-          <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
-            <Globe size={28} style={{ marginBottom: 8, opacity: 0.3 }} />
-            <div style={{ fontSize: 12 }}>Enter one or more port pairs and click Search to find schedule rates.</div>
-          </div>
+          <EmptyState icon={<Globe size={28} />} title="Enter one or more port pairs and click Search to find schedule rates." />
         )}
       </div>
 
       {/* ================================================================
           TAB 2 - Search Schedules (INTTRA)
           ================================================================ */}
-      <div style={{ display: activeTab === 'search' ? 'block' : 'none' }}>
+      <div className={activeTab === 'search' ? 'block' : 'hidden'}>
         {/* Search form */}
-        <div style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 18, marginBottom: 20, background: 'var(--bg-card, #fff)' }}>
-          {/* Port pairs */}
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8, letterSpacing: 0.3, textTransform: 'uppercase' }}>
-              Port Pairs
-            </div>
-            {searchPairs.map((pair, idx) => (
-              <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
-                <div style={{ flex: 1 }}>
-                  <PortCombobox value={pair.origin} onChange={v => updateSearchPair(idx, 'origin', v)} placeholder="Origin port" />
-                </div>
-                <ArrowRight size={16} style={{ marginTop: 10, color: 'var(--text-muted)', flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
-                  <PortCombobox value={pair.destination} onChange={v => updateSearchPair(idx, 'destination', v)} placeholder="Destination port" />
-                </div>
-                {searchPairs.length > 1 && (
-                  <button type="button" onClick={() => removeSearchPair(idx)}
-                    style={{
-                      marginTop: 6, width: 26, height: 26, borderRadius: 6, border: '1px solid var(--border)',
-                      background: 'transparent', color: '#dc2626', cursor: 'pointer', display: 'flex',
-                      alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}>
-                    <X size={13} />
-                  </button>
-                )}
-              </div>
-            ))}
-            <button type="button" onClick={addSearchPair}
-              style={{
-                fontSize: 11, color: COLOR.primary, background: 'none', border: 'none', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0', fontWeight: 600,
-              }}>
-              <Plus size={12} /> Add port pair
-            </button>
-          </div>
+        <div className={CARD}>
+          <PortPairRows pairs={searchPairs} onUpdate={updateSearchPair} onRemove={removeSearchPair} onAdd={addSearchPair} />
 
           {/* Carrier / SCAC selection */}
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8, letterSpacing: 0.3, textTransform: 'uppercase' }}>
-              Carriers <span style={{ color: '#dc2626', textTransform: 'none' }}>*</span>
-            </div>
-            <TagInput
-              values={selectedScacs}
-              onChange={setSelectedScacs}
-              suggestions={scacSuggestions}
-              placeholder="Type carrier name or SCAC code..."
-              formatLabel={formatScacLabel}
-            />
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-              Select one or more carriers to search their schedules.
-            </div>
-          </div>
+          <Field label="Carriers" required hint="Select one or more carriers to search their schedules.">
+            {ids => (
+              <TagInput
+                id={ids.id}
+                aria-labelledby={ids['aria-labelledby']}
+                values={selectedScacs}
+                onChange={setSelectedScacs}
+                suggestions={scacSuggestions}
+                placeholder="Type carrier name or SCAC code..."
+                formatLabel={formatScacLabel}
+              />
+            )}
+          </Field>
 
           {/* Date + options row */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-end', marginBottom: 14 }}>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6, letterSpacing: 0.3, textTransform: 'uppercase' }}>
-                Departure Date <span style={{ color: '#dc2626', textTransform: 'none' }}>*</span>
-              </div>
-              <input
-                type="date"
-                value={searchDate}
-                onChange={e => setSearchDate(e.target.value)}
-                style={{ width: 160, padding: '7px 10px', fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-card, #fff)', color: 'var(--text)', outline: 'none' }}
-              />
+          <div className="flex flex-wrap items-end gap-4">
+            <Field label="Departure Date" required>
+              {ids => <DatePicker {...ids} className="w-[160px]" value={searchDate} onChange={setSearchDate} />}
+            </Field>
+            <Field label="Weeks Out">
+              {ids => <NumberInput {...ids} className="w-20" value={weeksOut} onChange={e => setWeeksOut(Number(e.target.value))} min={1} max={12} />}
+            </Field>
+            <div className="flex h-8 items-center">
+              <Checkbox checked={directOnly} onChange={setDirectOnly}>Direct only</Checkbox>
             </div>
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6, letterSpacing: 0.3, textTransform: 'uppercase' }}>
-                Weeks Out
-              </div>
-              <input
-                type="number"
-                value={weeksOut}
-                onChange={e => setWeeksOut(Number(e.target.value))}
-                min={1}
-                max={12}
-                style={{ width: 80, padding: '7px 10px', fontSize: 12, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg-card, #fff)', color: 'var(--text)', outline: 'none' }}
-              />
-            </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', paddingBottom: 4 }}>
-              <input type="checkbox" checked={directOnly} onChange={e => setDirectOnly(e.target.checked)} />
-              <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600 }}>Direct only</span>
-            </label>
           </div>
 
           {/* Search button */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button className="db-btn primary" onClick={handleSearchSchedules} disabled={!canSearchSchedules}
-              style={{
-                fontSize: 11, padding: '6px 20px', display: 'flex', alignItems: 'center', gap: 6,
-              }}>
-              {searchLoading ? <Loader2 size={14} className="spin" /> : <Search size={14} />}
+          <div className="flex justify-end">
+            <Button
+              variant="primary"
+              icon={<Search size={14} aria-hidden="true" />}
+              isPending={searchLoading}
+              onClick={handleSearchSchedules}
+              disabled={!canSearchSchedules}
+            >
               Search Schedules
-            </button>
+            </Button>
           </div>
         </div>
 
         {/* Results */}
-        {searchLoading && searchResults.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>
-            <Loader2 size={20} className="spin" style={{ marginBottom: 6 }} />
-            <div style={{ fontSize: 12 }}>Searching schedules...</div>
-          </div>
-        )}
+        {searchLoading && searchResults.length === 0 && <LoadingState label="Searching schedules..." />}
         {!searchLoading && searchSearched && searchResults.length === 0 && (
-          <div style={{
-            padding: 20, background: 'rgba(100,116,139,0.04)', border: '1px solid rgba(100,116,139,0.15)',
-            borderRadius: 8, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center',
-          }}>
-            No schedules found for the selected port pairs and carriers.
+          <div className="rounded-card border border-line-soft bg-canvas">
+            <EmptyState title="No schedules found for the selected port pairs and carriers." />
           </div>
         )}
         {searchResults.length > 0 && (
           <>
             {searchLoading && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, fontSize: 11, color: 'var(--text-muted)' }}>
-                <Loader2 size={12} className="spin" /> Updating results...
+              <div className="mb-2 flex items-center gap-1.5 text-label text-fg-muted">
+                <Loader2 size={14} aria-hidden="true" className="animate-spin" /> Updating results...
               </div>
             )}
             <ScheduleSearchTable data={searchResults} />
           </>
         )}
         {!searchSearched && !searchLoading && (
-          <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
-            <Ship size={28} style={{ marginBottom: 8, opacity: 0.3 }} />
-            <div style={{ fontSize: 12 }}>Select port pairs, carriers, and a departure date, then click Search.</div>
-          </div>
+          <EmptyState icon={<Ship size={28} />} title="Select port pairs, carriers, and a departure date, then click Search." />
         )}
       </div>
     </div>
