@@ -1459,12 +1459,10 @@ export default function InlineStepForms({
   const rbkg = actionModal.sourceData.booking as Booking
   const ro = rbkg.release_order_fields
   const roRow = (label: string, value: string | undefined) =>
-    value ? (
-      <div key={label} style={{ display: 'grid', gridTemplateColumns: '150px 1fr', borderBottom: '1px solid rgba(124,58,237,0.12)' }}>
-        <div style={{ padding: '6px 12px', background: 'rgba(124,58,237,0.06)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.4, color: '#7c3aed', display: 'flex', alignItems: 'center', borderRight: '1px solid rgba(124,58,237,0.12)' }}>{label}</div>
-        <div style={{ padding: '6px 12px', fontSize: 12, color: 'var(--text)' }}>{value}</div>
-      </div>
-    ) : null
+    value ? <SummaryRow key={label} label={label} strong={false} className="grid-cols-[160px_1fr]">{value}</SummaryRow> : null
+  const roGroup = (title: string) => (
+    <div className="border-b border-line-soft px-3 py-1.5 text-label font-bold uppercase tracking-label text-fg-muted">{title}</div>
+  )
   const switchMethod = (m: 'email' | 'whatsapp') => {
     setSendMethod(m)
     setReleaseDraft(mkReleaseOrderDraft(rbkg, m))
@@ -1474,52 +1472,46 @@ export default function InlineStepForms({
   const canSend = sendMethod === 'email'
     ? customerContactEmail.includes('@') && releaseDraft.trim() && emailConfirmed
     : waConfirmed && releaseDraft.trim()
+  const draftTitle = sendMethod === 'email' ? 'Email Draft' : 'WhatsApp Message'
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="flex flex-col gap-4">
 
       {/* ═══════ PHASE 1: REVIEW RELEASE ORDER ═══════ */}
       {releasePhase === 'review' && (
         <>
-          {/* Header */}
-          <div style={{ padding: '10px 14px', background: '#7c3aed', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <FileText size={14} style={{ color: '#fff' }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>RELEASE ORDER — REVIEW</span>
-            </div>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>Step 1 of 2</span>
-          </div>
+          <StepHeader icon={<FileText size={14} aria-hidden="true" />} title="RELEASE ORDER — REVIEW" subtitle="Step 1 of 2" />
 
           {/* Booking summary */}
-          <div style={{ padding: '10px 14px', background: 'rgba(124,58,237,0.04)', border: '1px solid rgba(124,58,237,0.15)', borderRadius: 8, fontSize: 12 }}>
+          <div className="rounded-card border border-line-soft bg-primary-subtle px-3.5 py-2.5 text-control text-fg">
             <strong>{rbkg.customer_name}</strong> — {rbkg.origin} → {rbkg.destination}
-            <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
+            <div className="mt-0.5 text-fg-muted">
               {rbkg.quantity}x {rbkg.container_type} · {rbkg.shipping_line || 'No liner'} · {rbkg.vessel_name || 'No vessel'} / {rbkg.voyage_number || '—'}
             </div>
           </div>
 
           {/* Release Order details */}
           {ro ? (
-            <div style={{ border: '1px solid rgba(124,58,237,0.25)', borderRadius: 8, overflow: 'hidden' }}>
+            <div className="overflow-hidden rounded-card border border-line-soft bg-surface">
               {/* RO header */}
-              <div style={{ padding: '8px 12px', background: 'rgba(124,58,237,0.08)', borderBottom: '1px solid rgba(124,58,237,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>Release Order Details</span>
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#7c3aed', fontFamily: 'monospace' }}>{ro.reference_nbr}</span>
+              <div className="flex items-center justify-between border-b border-line-soft bg-primary-subtle px-3 py-2 text-label">
+                <span className="font-bold uppercase tracking-label text-primary">Release Order Details</span>
+                <span className="font-mono font-semibold text-primary">{ro.reference_nbr}</span>
               </div>
 
               {/* Liner Reference section */}
-              <div style={{ padding: '6px 12px', background: 'rgba(124,58,237,0.03)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: '#94a3b8', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>Liner Reference</div>
+              {roGroup('Liner Reference')}
               {roRow('Reference No.',  ro.reference_nbr)}
               {roRow('Pick Up Date',   ro.pickup_empty_date)}
               {roRow('Valid Until',    ro.validity_expiration_date)}
 
               {/* Depot section */}
-              <div style={{ padding: '6px 12px', background: 'rgba(124,58,237,0.03)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: '#94a3b8', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>Pick Up Depot</div>
+              {roGroup('Pick Up Depot')}
               {roRow('Depot Name',     ro.pickup_depot)}
               {roRow('Depot Address',  ro.pickup_depot_address)}
 
               {/* Routing section */}
-              <div style={{ padding: '6px 12px', background: 'rgba(124,58,237,0.03)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: '#94a3b8', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>Routing & Schedule</div>
+              {roGroup('Routing & Schedule')}
               {roRow('Booking Client', rbkg.customer_name)}
               {roRow('Port of Loading', rbkg.origin)}
               {ro.next_port_of_discharge ? roRow('Next Port', ro.next_port_of_discharge) : null}
@@ -1531,7 +1523,7 @@ export default function InlineStepForms({
               {roRow('ETA',            ro.eta)}
 
               {/* Cargo section */}
-              <div style={{ padding: '6px 12px', background: 'rgba(124,58,237,0.03)', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: '#94a3b8', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>Cargo & Container</div>
+              {roGroup('Cargo & Container')}
               {roRow('Container',      `${rbkg.quantity}x ${rbkg.container_type}`)}
               {roRow('Cargo',          ro.cargo_description)}
               {roRow('Weight',         ro.cargo_weight ? `${ro.cargo_weight} kg` : undefined)}
@@ -1539,27 +1531,18 @@ export default function InlineStepForms({
               {ro.transport_carrier ? roRow('Transport Carrier', ro.transport_carrier) : null}
             </div>
           ) : (
-            <div style={{ padding: '20px 14px', background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, textAlign: 'center' as const }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626', marginBottom: 4 }}>No Release Order Attached</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Procurement has not yet attached a release order to this booking.</div>
+            <div className="rounded-card border border-danger-line bg-danger-bg px-3.5 py-5 text-center">
+              <div className="mb-1 text-control font-semibold text-danger">No Release Order Attached</div>
+              <div className="text-label text-fg-muted">Procurement has not yet attached a release order to this booking.</div>
             </div>
           )}
 
           {/* Action buttons */}
-          <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
-            <button type="button"
-              disabled={!ro}
-              style={{
-                flex: 1, padding: '10px 16px', border: '1px solid #7c3aed', borderRadius: 8,
-                background: '#7c3aed', color: '#fff', fontWeight: 600, fontSize: 13,
-                cursor: !ro ? 'not-allowed' : 'pointer',
-                opacity: !ro ? 0.4 : 1,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              }}
-              onClick={() => setReleasePhase('send')}
-            >
-              <Send size={12} /> Proceed to Release
-            </button>
+          <div className="flex gap-2.5 pt-1">
+            <Button variant="primary" className="flex-1" disabled={!ro} icon={<Send size={14} aria-hidden="true" />}
+              onClick={() => setReleasePhase('send')}>
+              Proceed to Release
+            </Button>
           </div>
         </>
       )}
@@ -1567,159 +1550,94 @@ export default function InlineStepForms({
       {/* ═══════ PHASE 2: SEND TO CUSTOMER ═══════ */}
       {releasePhase === 'send' && (
         <>
-          {/* Header */}
-          <div style={{ padding: '10px 14px', background: '#7c3aed', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Send size={14} style={{ color: '#fff' }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>RELEASE TO CUSTOMER</span>
-            </div>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>Step 2 of 2</span>
-          </div>
+          <StepHeader icon={<Send size={14} aria-hidden="true" />} title="RELEASE TO CUSTOMER" subtitle="Step 2 of 2" />
 
           {/* Back to review link */}
           <button type="button" onClick={() => setReleasePhase('review')}
-            style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#7c3aed', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontWeight: 600 }}>
+            className="self-start border-none bg-transparent p-0 text-label font-semibold text-primary hover:underline">
             ← Back to Release Order Review
           </button>
 
           {/* Compact RO reference */}
           {ro && (
-            <div style={{ padding: '8px 12px', background: 'rgba(124,58,237,0.06)', border: '1px solid rgba(124,58,237,0.15)', borderRadius: 8, fontSize: 11, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span><strong style={{ color: '#7c3aed' }}>R/O:</strong> {ro.reference_nbr} · {rbkg.customer_name}</span>
-              <span style={{ color: 'var(--text-muted)' }}>{rbkg.origin} → {rbkg.destination}</span>
+            <div className="flex items-center justify-between rounded-card border border-line-soft bg-primary-subtle px-3 py-2 text-label text-fg">
+              <span><strong className="text-primary">R/O:</strong> {ro.reference_nbr} · {rbkg.customer_name}</span>
+              <span className="text-fg-muted">{rbkg.origin} → {rbkg.destination}</span>
             </div>
           )}
 
           {/* Send method */}
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.4, color: 'var(--text-muted)', marginBottom: 8 }}>Send via</div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                className={`db-btn ${sendMethod === 'email' ? 'primary' : ''}`}
-                style={sendMethod !== 'email' ? { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' } : {}}
-                onClick={() => switchMethod('email')}
-              >
-                <Mail size={13} style={{ marginRight: 4 }} /> Email
-              </button>
-              <button
-                className={`db-btn ${sendMethod === 'whatsapp' ? 'primary' : ''}`}
-                style={sendMethod === 'whatsapp' ? { background: '#25d366', borderColor: '#25d366' } : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-                onClick={() => switchMethod('whatsapp')}
-              >
-                <MessageCircle size={13} style={{ marginRight: 4 }} /> WhatsApp
-              </button>
-            </div>
-          </div>
+          <SendMethodToggle id="ws-rb-method-label" label="Send via" value={sendMethod} onSelect={switchMethod} />
 
           {/* Contact input */}
           {sendMethod === 'email' && (
-            <div>
-              <label className="lt-label">Customer Email <span style={{ color: '#dc2626' }}>*</span></label>
-              <input className="lt-input" style={{ width: '100%' }} type="email"
+            <Field label="Customer Email" required>
+              {ids => <Input {...ids} type="email"
                 value={customerContactEmail} onChange={e => setCustomerContactEmail(e.target.value)}
-                placeholder="customer@example.com" />
-            </div>
+                placeholder="customer@example.com" />}
+            </Field>
           )}
           {sendMethod === 'whatsapp' && (
-            <div>
-              <label className="lt-label">Customer WhatsApp Number</label>
-              <input className="lt-input" style={{ width: '100%' }}
+            <Field label="Customer WhatsApp Number">
+              {ids => <Input {...ids}
                 value={customerContactPhone} onChange={e => setCustomerContactPhone(e.target.value)}
-                placeholder="+94 7X XXX XXXX" />
-            </div>
+                placeholder="+94 7X XXX XXXX" />}
+            </Field>
           )}
 
           {/* Open in Outlook + confirmation (email) */}
           {sendMethod === 'email' && customerContactEmail.includes('@') && (
             <>
-              <button className="db-btn" type="button"
-                onClick={() => openMailto(customerContactEmail, `Release Order — ${rbkg.id} — ${rbkg.customer_name}`, releaseDraft)}
-                style={{ background: '#0078d4', borderColor: '#0078d4', color: '#fff', width: '100%' }}>
-                <Mail size={13} style={{ marginRight: 6 }} /> Open in Outlook
-              </button>
-              <div style={{ padding: '10px 14px', background: 'rgba(0,120,212,0.06)', border: '1px solid rgba(0,120,212,0.2)', borderRadius: 8 }}>
-                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)' }}>
-                  <input type="checkbox" checked={emailConfirmed} onChange={e => setEmailConfirmed(e.target.checked)} style={{ marginTop: 2 }} />
-                  <span>
-                    I confirm that I have sent this release order to the customer via email.
-                    <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                      Click "Open in Outlook" above, send the email, then check this box.
-                    </span>
-                  </span>
-                </label>
-              </div>
+              <Button variant="primary" className="w-full justify-start" icon={<Mail size={14} aria-hidden="true" />}
+                onClick={() => openMailto(customerContactEmail, `Release Order — ${rbkg.id} — ${rbkg.customer_name}`, releaseDraft)}>
+                Open in Outlook
+              </Button>
+              <ConfirmCheck tone="info" checked={emailConfirmed} onChange={setEmailConfirmed}
+                hint='Click "Open in Outlook" above, send the email, then check this box.'>
+                I confirm that I have sent this release order to the customer via email.
+              </ConfirmCheck>
             </>
           )}
 
           {/* Draft message — collapsible */}
-          <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-            <button type="button" onClick={() => setDraftCollapsed(c => !c)}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-card)', border: 'none', cursor: 'pointer' }}>
-              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.4, color: sendMethod === 'whatsapp' ? '#25d366' : 'var(--text-muted)' }}>
-                {sendMethod === 'email' ? 'Email Draft' : 'WhatsApp Message'}
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                {!draftCollapsed && (
-                  <button type="button"
-                    style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '2px 6px', borderRadius: 4 }}
-                    onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(releaseDraft) }}
-                    title="Copy to clipboard">
-                    <Copy size={12} /> Copy
-                  </button>
-                )}
-                <ChevronDown size={13} style={{ color: 'var(--text-muted)', transform: draftCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }} />
-              </span>
-            </button>
-            {!draftCollapsed && (
-              <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
-                <textarea
-                  className="lt-input"
-                  rows={sendMethod === 'email' ? 14 : 12}
-                  style={{ width: '100%', resize: 'vertical' as const, fontFamily: sendMethod === 'email' ? 'ui-monospace, monospace' : 'inherit', fontSize: 11.5, lineHeight: 1.6 }}
-                  value={releaseDraft}
-                  onChange={e => setReleaseDraft(e.target.value)}
-                />
-              </div>
-            )}
-          </div>
+          <DraftPanel title={draftTitle} collapsed={draftCollapsed} onToggle={() => setDraftCollapsed(c => !c)}
+            action={
+              <Tooltip content="Copy to clipboard">
+                <Button variant="ghost" size="sm" icon={<Copy size={12} aria-hidden="true" />}
+                  onClick={() => navigator.clipboard.writeText(releaseDraft)}>
+                  Copy
+                </Button>
+              </Tooltip>
+            }>
+            <Textarea aria-label={draftTitle}
+              rows={sendMethod === 'email' ? 14 : 12}
+              className={cn('resize-y text-label leading-relaxed', sendMethod === 'email' && 'font-mono')}
+              value={releaseDraft}
+              onChange={e => setReleaseDraft(e.target.value)} />
+          </DraftPanel>
 
           {/* WhatsApp manual confirm */}
           {sendMethod === 'whatsapp' && (
-            <div style={{ padding: '10px 14px', background: 'rgba(37,211,102,0.06)', border: '1px solid rgba(37,211,102,0.2)', borderRadius: 8 }}>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)' }}>
-                <input type="checkbox" checked={waConfirmed} onChange={e => setWaConfirmed(e.target.checked)} style={{ marginTop: 2 }} />
-                <span>
-                  I confirm I have sent the release order to the customer via WhatsApp.
-                  <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Copy the message above and paste it into WhatsApp, then check this box.</span>
-                </span>
-              </label>
-            </div>
+            <ConfirmCheck tone="success" checked={waConfirmed} onChange={setWaConfirmed}
+              hint="Copy the message above and paste it into WhatsApp, then check this box.">
+              I confirm I have sent the release order to the customer via WhatsApp.
+            </ConfirmCheck>
           )}
 
           {/* Optional notes */}
-          <div>
-            <label className="lt-label">Internal Note (optional)</label>
-            <input className="lt-input" style={{ width: '100%' }} value={formNote}
+          <Field label="Internal Note (optional)">
+            {ids => <Input {...ids} value={formNote}
               onChange={e => setFormNote(e.target.value)}
-              placeholder="Collection instructions, remarks, etc." />
-          </div>
+              placeholder="Collection instructions, remarks, etc." />}
+          </Field>
 
           {/* Submit */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button
-              className="db-btn primary"
-              disabled={!canSend}
-              style={
-                !canSend ? { opacity: 0.4, cursor: 'not-allowed' } :
-                sendMethod === 'whatsapp' ? { background: '#25d366', borderColor: '#25d366' } : {}
-              }
-              onClick={handleModalSubmit}
-            >
-              {sendMethod === 'email'
-                ? <><Mail size={12} style={{ marginRight: 6 }} /> Send Release Order via Email</>
-                : <><MessageCircle size={12} style={{ marginRight: 6 }} /> Confirm WhatsApp Sent</>
-              }
-            </button>
+          <div className="flex justify-end">
+            <Button variant="primary" disabled={!canSend}
+              icon={sendMethod === 'email' ? <Mail size={14} aria-hidden="true" /> : <MessageCircle size={14} aria-hidden="true" />}
+              onClick={handleModalSubmit}>
+              {sendMethod === 'email' ? 'Send Release Order via Email' : 'Confirm WhatsApp Sent'}
+            </Button>
           </div>
         </>
       )}
@@ -1727,193 +1645,164 @@ export default function InlineStepForms({
   )
 })() : selectedItem.actionKind === 'attach-release-order' ? (() => {
   const roBkg = selectedItem.sourceData.booking as Booking
+  const roGroup = (title: string, grid: string, children: ReactNode) => (
+    <div className="flex flex-col gap-1.5">
+      <h4 className="m-0 text-label font-bold uppercase tracking-label text-primary">{title}</h4>
+      <div className={cn('grid gap-x-4 gap-y-3', grid)}>{children}</div>
+    </div>
+  )
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      {/* Header */}
-      <div style={{ padding: '8px 14px', background: '#7c3aed', borderRadius: '8px 8px 0 0', marginBottom: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>RELEASE ORDER</span>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>Attach & send to CS</span>
+    <div className="flex flex-col gap-4">
+      <div>
+        <StepHeader className="mb-px rounded-b-none" title="RELEASE ORDER" subtitle="Attach & send to CS" />
+        {/* Booking summary — read-only */}
+        <div className="overflow-hidden rounded-b-card border border-line-soft bg-surface">
+          {[
+            { label: 'Customer',   value: roBkg.customer_name },
+            { label: 'Carrier',    value: roBkg.shipping_line || '—' },
+            { label: 'Container',  value: `${roBkg.quantity}x ${roBkg.container_type}` },
+            { label: 'Vessel',     value: roBkg.vessel_name || '—' },
+            { label: 'Voyage',     value: roBkg.voyage_number || '—' },
+            { label: 'Route',      value: `${roBkg.origin} → ${roBkg.destination}` },
+          ].map(({ label, value }) => (
+            <SummaryRow key={label} label={label} strong={false} className="last:border-b-0">{value}</SummaryRow>
+          ))}
+        </div>
       </div>
-      {/* Booking summary — read-only */}
-      <div style={{ border: '1px solid var(--border)', borderRadius: '0 0 8px 8px', overflow: 'hidden', marginBottom: 16 }}>
-        {[
-          { label: 'Customer',   value: roBkg.customer_name },
-          { label: 'Carrier',    value: roBkg.shipping_line || '—' },
-          { label: 'Container',  value: `${roBkg.quantity}x ${roBkg.container_type}` },
-          { label: 'Vessel',     value: roBkg.vessel_name || '—' },
-          { label: 'Voyage',     value: roBkg.voyage_number || '—' },
-          { label: 'Route',      value: `${roBkg.origin} → ${roBkg.destination}` },
-        ].map(({ label, value }) => (
-          <div key={label} style={{ display: 'grid', gridTemplateColumns: '100px 1fr', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ padding: '7px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>{label}</div>
-            <div style={{ padding: '7px 12px', fontSize: 12, color: 'var(--text)' }}>{value}</div>
-          </div>
-        ))}
-      </div>
+
       {/* Release Order Fields — structured form matching liner release order format */}
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.4, color: '#7c3aed', marginBottom: 10 }}>Release Order Details</div>
+      <section className="flex flex-col gap-4">
+        <SectionHead>Release Order Details</SectionHead>
 
-        {/* Liner Reference */}
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 6 }}>Liner Reference</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
-          <div>
-            <label className="lt-label">Reference Nbr</label>
-            <input className="lt-input" style={{ width: '100%' }} value={roFields.reference_nbr}
+        {roGroup('Liner Reference', 'grid-cols-3', <>
+          <Field label="Reference Nbr">
+            {ids => <Input {...ids} value={roFields.reference_nbr}
               onChange={e => setRoFields(f => ({ ...f, reference_nbr: e.target.value }))}
-              placeholder="e.g. EBKG16474591" />
-          </div>
-          <div>
-            <label className="lt-label">Pick Up Empty Date</label>
-            <input type="date" className="lt-input" style={{ width: '100%' }} value={roFields.pickup_empty_date}
-              onChange={e => setRoFields(f => ({ ...f, pickup_empty_date: e.target.value }))} />
-          </div>
-          <div>
-            <label className="lt-label">Validity Expiration</label>
-            <input type="date" className="lt-input" style={{ width: '100%' }} value={roFields.validity_expiration_date}
-              onChange={e => setRoFields(f => ({ ...f, validity_expiration_date: e.target.value }))} />
-          </div>
-        </div>
+              placeholder="e.g. EBKG16474591" />}
+          </Field>
+          <Field label="Pick Up Empty Date">
+            {ids => <DatePicker {...ids} value={roFields.pickup_empty_date}
+              onChange={v => setRoFields(f => ({ ...f, pickup_empty_date: v }))} />}
+          </Field>
+          <Field label="Validity Expiration">
+            {ids => <DatePicker {...ids} value={roFields.validity_expiration_date}
+              onChange={v => setRoFields(f => ({ ...f, validity_expiration_date: v }))} />}
+          </Field>
+        </>)}
 
-        {/* Pick Up Depot */}
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 6 }}>Pick Up Depot</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 8, marginBottom: 12 }}>
-          <div>
-            <label className="lt-label">Depot Name</label>
-            <input className="lt-input" style={{ width: '100%' }} value={roFields.pickup_depot}
+        {roGroup('Pick Up Depot', 'grid-cols-[1fr_2fr]', <>
+          <Field label="Depot Name">
+            {ids => <Input {...ids} value={roFields.pickup_depot}
               onChange={e => setRoFields(f => ({ ...f, pickup_depot: e.target.value }))}
-              placeholder="e.g. Spectra Integrated Logistics" />
-          </div>
-          <div>
-            <label className="lt-label">Depot Address</label>
-            <input className="lt-input" style={{ width: '100%' }} value={roFields.pickup_depot_address}
+              placeholder="e.g. Spectra Integrated Logistics" />}
+          </Field>
+          <Field label="Depot Address">
+            {ids => <Input {...ids} value={roFields.pickup_depot_address}
               onChange={e => setRoFields(f => ({ ...f, pickup_depot_address: e.target.value }))}
-              placeholder="Full address" />
-          </div>
-        </div>
+              placeholder="Full address" />}
+          </Field>
+        </>)}
 
-        {/* Cargo */}
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 6 }}>Cargo</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 8, marginBottom: 12 }}>
-          <div>
-            <label className="lt-label">Cargo Description</label>
-            <input className="lt-input" style={{ width: '100%' }} value={roFields.cargo_description}
+        {roGroup('Cargo', 'grid-cols-[2fr_1fr]', <>
+          <Field label="Cargo Description">
+            {ids => <Input {...ids} value={roFields.cargo_description}
               onChange={e => setRoFields(f => ({ ...f, cargo_description: e.target.value }))}
-              placeholder="e.g. Coconut Milk" />
-          </div>
-          <div>
-            <label className="lt-label">Cargo Weight (kg)</label>
-            <input className="lt-input" style={{ width: '100%' }} value={roFields.cargo_weight}
+              placeholder="e.g. Coconut Milk" />}
+          </Field>
+          <Field label="Cargo Weight (kg)">
+            {ids => <Input {...ids} value={roFields.cargo_weight}
               onChange={e => setRoFields(f => ({ ...f, cargo_weight: e.target.value }))}
-              placeholder="e.g. 16,000" />
-          </div>
-        </div>
+              placeholder="e.g. 16,000" />}
+          </Field>
+        </>)}
 
-        {/* Schedule */}
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.5, color: 'var(--text-muted)', marginBottom: 6 }}>Vessel Schedule</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
-          <div>
-            <label className="lt-label">Cut-Off Date</label>
-            <input type="date" className="lt-input" style={{ width: '100%' }} value={roFields.cut_off_date}
-              onChange={e => setRoFields(f => ({ ...f, cut_off_date: e.target.value }))} />
-          </div>
-          <div>
-            <label className="lt-label">ETD</label>
-            <input type="date" className="lt-input" style={{ width: '100%' }} value={roFields.etd}
-              onChange={e => setRoFields(f => ({ ...f, etd: e.target.value }))} />
-          </div>
-          <div>
-            <label className="lt-label">ETA (Destination)</label>
-            <input type="date" className="lt-input" style={{ width: '100%' }} value={roFields.eta}
-              onChange={e => setRoFields(f => ({ ...f, eta: e.target.value }))} />
-          </div>
-        </div>
+        {roGroup('Vessel Schedule', 'grid-cols-3', <>
+          <Field label="Cut-Off Date">
+            {ids => <DatePicker {...ids} value={roFields.cut_off_date}
+              onChange={v => setRoFields(f => ({ ...f, cut_off_date: v }))} />}
+          </Field>
+          <Field label="ETD">
+            {ids => <DatePicker {...ids} value={roFields.etd}
+              onChange={v => setRoFields(f => ({ ...f, etd: v }))} />}
+          </Field>
+          <Field label="ETA (Destination)">
+            {ids => <DatePicker {...ids} value={roFields.eta}
+              onChange={v => setRoFields(f => ({ ...f, eta: v }))} />}
+          </Field>
+        </>)}
 
         {/* Optional */}
-        <div>
-          <label className="lt-label">Next Port of Discharge (if transshipment)</label>
-          <input className="lt-input" style={{ width: '100%' }} value={roFields.next_port_of_discharge ?? ''}
+        <Field label="Next Port of Discharge (if transshipment)">
+          {ids => <Input {...ids} value={roFields.next_port_of_discharge ?? ''}
             onChange={e => setRoFields(f => ({ ...f, next_port_of_discharge: e.target.value }))}
-            placeholder="Optional — leave blank for direct service" />
-        </div>
-      </div>
+            placeholder="Optional — leave blank for direct service" />}
+        </Field>
+      </section>
 
       {/* Notes */}
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Notes for CS (optional)</div>
-        <textarea className="lt-input" rows={2} style={{ width: '100%', resize: 'vertical' as const, fontSize: 13 }}
+      <Field label="Notes for CS (optional)">
+        {ids => <Textarea {...ids} rows={2} className="resize-y"
           value={formNote} onChange={e => setFormNote(e.target.value)}
-          placeholder="Any instructions or remarks for the CS team…" />
-      </div>
+          placeholder="Any instructions or remarks for the CS team…" />}
+      </Field>
       {/* Submit */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button className="db-btn primary"
-          style={{ background: '#7c3aed', borderColor: '#7c3aed' }}
-          disabled={!roFields.reference_nbr.trim()}
+      <div className="flex justify-end">
+        <Button variant="primary" disabled={!roFields.reference_nbr.trim()} icon={<Send size={14} aria-hidden="true" />}
           onClick={handleModalSubmit}>
-          <Send size={12} style={{ marginRight: 6 }} /> Send Release Order to CS
-        </button>
+          Send Release Order to CS
+        </Button>
       </div>
     </div>
   )
 })() : selectedItem.actionKind === 'confirm-liner-booking' && actionModal ? (() => {
   const { booking: cbBkg } = actionModal.sourceData
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      {/* Form header */}
-      <div style={{ padding: '8px 14px', background: '#16a34a', borderRadius: '8px 8px 0 0', marginBottom: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>LINER BOOKING CONFIRMATION</span>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>RA# {cbBkg.voyage_number || '—'}</span>
-      </div>
-      {/* Booking summary — read-only */}
-      <div style={{ border: '1px solid var(--border)', borderRadius: '0 0 8px 8px', overflow: 'hidden', marginBottom: 16 }}>
-        {[
-          { label: 'Customer', value: cbBkg.customer_name },
-          { label: 'Carrier', value: cbBkg.shipping_line || '—' },
-          { label: 'Container', value: `${cbBkg.quantity}x ${cbBkg.container_type}` },
-          { label: 'RA Number', value: cbBkg.voyage_number || 'Not assigned' },
-          { label: 'Vessel', value: cbBkg.vessel_name || '—' },
-          { label: 'Route', value: `${cbBkg.origin} → ${cbBkg.destination}` },
-        ].map(({ label, value }) => (
-          <div key={label} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>{label}</div>
-            <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text)', fontWeight: label === 'RA Number' ? 700 : 400 }}>{value}</div>
-          </div>
-        ))}
+    <div className="flex flex-col gap-4">
+      <div>
+        <StepHeader className="mb-px rounded-b-none" title="LINER BOOKING CONFIRMATION" subtitle={`RA# ${cbBkg.voyage_number || '—'}`} />
+        {/* Booking summary — read-only */}
+        <div className="overflow-hidden rounded-b-card border border-line-soft bg-surface">
+          {[
+            { label: 'Customer', value: cbBkg.customer_name },
+            { label: 'Carrier', value: cbBkg.shipping_line || '—' },
+            { label: 'Container', value: `${cbBkg.quantity}x ${cbBkg.container_type}` },
+            { label: 'RA Number', value: cbBkg.voyage_number || 'Not assigned' },
+            { label: 'Vessel', value: cbBkg.vessel_name || '—' },
+            { label: 'Route', value: `${cbBkg.origin} → ${cbBkg.destination}` },
+          ].map(({ label, value }) => (
+            <SummaryRow key={label} label={label} strong={label === 'RA Number'} className="last:border-b-0">{value}</SummaryRow>
+          ))}
+        </div>
       </div>
       {/* Booked? toggle */}
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 10 }}>Was the liner booking confirmed?</div>
-        <div style={{ display: 'flex', gap: 10 }}>
+      <div className="flex flex-col gap-1">
+        <span id="ws-clb-booked-label" className={labelClass}>Was the liner booking confirmed?</span>
+        <div role="group" aria-labelledby="ws-clb-booked-label" className="flex gap-2.5">
           {(['yes', 'no'] as const).map(v => (
-            <button key={v} onClick={() => setLinerBooked(v)}
-              style={{ flex: 1, padding: '10px 0', borderRadius: 8, border: `2px solid ${linerBooked === v ? (v === 'yes' ? '#16a34a' : '#dc2626') : 'var(--border)'}`,
-                background: linerBooked === v ? (v === 'yes' ? 'rgba(22,163,74,0.08)' : 'rgba(220,38,38,0.06)') : '#fff',
-                color: linerBooked === v ? (v === 'yes' ? '#16a34a' : '#dc2626') : 'var(--text-secondary)',
-                fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-              {v === 'yes' ? '✓ Yes, booked' : '✗ No, couldn\'t book'}
-            </button>
+            <Button key={v} aria-pressed={linerBooked === v}
+              className={cn('flex-1', linerBooked === v && (v === 'yes' ? SELECTED_SUCCESS : SELECTED_DANGER))}
+              icon={v === 'yes' ? <Check size={14} aria-hidden="true" /> : <X size={14} aria-hidden="true" />}
+              onClick={() => setLinerBooked(v)}>
+              {v === 'yes' ? 'Yes, booked' : 'No, couldn\'t book'}
+            </Button>
           ))}
         </div>
       </div>
       {/* Reason — shown only when No */}
       {linerBooked === 'no' && (
-        <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#dc2626', marginBottom: 6 }}>Reason (required)</div>
-          <textarea className="lt-input" rows={3} style={{ width: '100%', resize: 'vertical' as const, fontSize: 13 }}
+        <Field label="Reason (required)">
+          {ids => <Textarea {...ids} rows={3} className="resize-y"
             value={formNote} onChange={e => setFormNote(e.target.value)}
-            placeholder="Explain why the booking couldn't be made…" />
-        </div>
+            placeholder="Explain why the booking couldn't be made…" />}
+        </Field>
       )}
       {/* Submit */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
-        <button className="db-btn primary"
+      <div className="flex justify-end gap-2.5">
+        <Button variant={linerBooked === 'no' ? 'danger' : 'primary'}
           disabled={!linerBooked || (linerBooked === 'no' && !formNote.trim())}
-          style={{ background: linerBooked === 'no' ? '#dc2626' : '#16a34a', borderColor: linerBooked === 'no' ? '#dc2626' : '#16a34a',
-            opacity: (!linerBooked || (linerBooked === 'no' && !formNote.trim())) ? 0.5 : 1 }}
           onClick={handleModalSubmit}>
           {linerBooked === 'no' ? 'Revert to Pending Liner' : 'Confirm Liner Booking'}
-        </button>
+        </Button>
       </div>
     </div>
   )

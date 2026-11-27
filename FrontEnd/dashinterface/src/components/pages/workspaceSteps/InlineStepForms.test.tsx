@@ -338,3 +338,120 @@ describe('InlineStepForms send-pre-alert', () => {
     expect((screen.getByRole('textbox', { name: 'Generated Email' }) as HTMLTextAreaElement).value).toContain('Subject: Pre-Alert')
   })
 })
+
+describe('InlineStepForms release-booking', () => {
+  const rbBooking = booking({ status: 'Liner Confirmed', release_order_attached: true, release_order_fields: ro })
+  const rbProps = (over: Partial<InlineStepFormsProps> = {}): Partial<InlineStepFormsProps> => ({
+    releasePhase: 'review', setReleasePhase: () => {},
+    releaseDraft: '', setReleaseDraft: () => {},
+    mkReleaseOrderDraft: () => 'DRAFT',
+    draftCollapsed: false, setDraftCollapsed: () => {},
+    ...over,
+  })
+
+  it('review: lists the release order and proceeds to the send phase', async () => {
+    const user = userEvent.setup()
+    const setReleasePhase = vi.fn()
+    renderStep('release-booking', rbBooking, rbProps({ setReleasePhase }))
+    expect(screen.getByText('Liner Reference')).toBeInTheDocument()
+    expect(screen.getByText('Coconut Milk')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Proceed to Release/ }))
+    expect(setReleasePhase).toHaveBeenCalledWith('send')
+  })
+
+  it('review without a release order: shows the notice and disables Proceed', () => {
+    renderStep('release-booking', booking({ status: 'Liner Confirmed' }), rbProps())
+    expect(screen.getByText('No Release Order Attached')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Proceed to Release/ })).toBeDisabled()
+  })
+
+  it('send: switching method rebuilds the draft and resets both confirmations; Back returns to review', async () => {
+    const user = userEvent.setup()
+    const setSendMethod = vi.fn(); const setReleaseDraft = vi.fn(); const setWaConfirmed = vi.fn(); const setEmailConfirmed = vi.fn()
+    const setReleasePhase = vi.fn()
+    const mkReleaseOrderDraft = vi.fn(() => 'WA DRAFT')
+    renderStep('release-booking', rbBooking, rbProps({
+      releasePhase: 'send', releaseDraft: 'Dear customer', setSendMethod, setReleaseDraft, setWaConfirmed, setEmailConfirmed, setReleasePhase, mkReleaseOrderDraft,
+    }))
+    await user.click(within(screen.getByRole('group', { name: 'Send via' })).getByRole('button', { name: 'WhatsApp' }))
+    expect(setSendMethod).toHaveBeenCalledWith('whatsapp')
+    expect(mkReleaseOrderDraft).toHaveBeenCalledWith(rbBooking, 'whatsapp')
+    expect(setReleaseDraft).toHaveBeenCalledWith('WA DRAFT')
+    expect(setWaConfirmed).toHaveBeenCalledWith(false)
+    expect(setEmailConfirmed).toHaveBeenCalledWith(false)
+    setReleaseDraft.mockClear()
+    await user.type(screen.getByRole('textbox', { name: 'Email Draft' }), '!')
+    expect(setReleaseDraft).toHaveBeenCalledWith('Dear customer!')
+    await user.click(screen.getByRole('button', { name: /Back to Release Order Review/ }))
+    expect(setReleasePhase).toHaveBeenCalledWith('review')
+  })
+
+  it('send: submit needs the email, the draft and the confirmation', () => {
+    const { unmount } = renderStep('release-booking', rbBooking, rbProps({ releasePhase: 'send', releaseDraft: 'Dear customer', customerContactEmail: 'a@b.co' }))
+    expect(screen.getByRole('button', { name: /Send Release Order via Email/ })).toBeDisabled()
+    unmount()
+    renderStep('release-booking', rbBooking, rbProps({ releasePhase: 'send', releaseDraft: 'Dear customer', customerContactEmail: 'a@b.co', emailConfirmed: true }))
+    expect(screen.getByRole('button', { name: /Send Release Order via Email/ })).toBeEnabled()
+  })
+})
+
+describe('InlineStepForms attach-release-order', () => {
+  const emptyRo: ReleaseOrderFields = {
+    reference_nbr: '', pickup_empty_date: '', validity_expiration_date: '', pickup_depot: '', pickup_depot_address: '',
+    cargo_description: '', cargo_weight: '', cut_off_date: '', etd: '', eta: '',
+  }
+
+  it('renders the labelled fields; typing the reference updates roFields; submit needs a reference', async () => {
+    const user = userEvent.setup()
+    // The updater reads e.target.value, so it is applied while the change event runs, as React does.
+    const applied: ReleaseOrderFields[] = []
+    const setRoFields = vi.fn((u: ReleaseOrderFields | ((f: ReleaseOrderFields) => ReleaseOrderFields)) => { applied.push(typeof u === 'function' ? u(emptyRo) : u) })
+    const { unmount } = renderStep('attach-release-order', booking({ status: 'Liner Confirmed' }), { roFields: emptyRo, setRoFields })
+    for (const name of ['Pick Up Empty Date', 'Validity Expiration', 'Cut-Off Date', 'ETD', 'ETA (Destination)']) {
+      expect(screen.getByRole('group', { name })).toBeInTheDocument()
+    }
+    expect(screen.getByRole('textbox', { name: 'Notes for CS (optional)' }).tagName).toBe('TEXTAREA')
+    expect(screen.getByRole('button', { name: /Send Release Order to CS/ })).toBeDisabled()
+    await user.type(screen.getByRole('textbox', { name: 'Reference Nbr' }), 'E')
+    expect(applied).toEqual([{ ...emptyRo, reference_nbr: 'E' }])
+    unmount()
+    renderStep('attach-release-order', booking({ status: 'Liner Confirmed' }), { roFields: { ...emptyRo, reference_nbr: 'EBKG1' }, setRoFields })
+    expect(screen.getByRole('button', { name: /Send Release Order to CS/ })).toBeEnabled()
+  })
+})
+
+describe('InlineStepForms confirm-liner-booking', () => {
+  const cbBooking = booking({ status: 'RA Assigned' })
+
+  it('nothing chosen: both toggles unpressed and submit disabled; clicking sets the choice', async () => {
+    const user = userEvent.setup()
+    const setLinerBooked = vi.fn()
+    renderStep('confirm-liner-booking', cbBooking, { linerBooked: '', setLinerBooked })
+    const group = screen.getByRole('group', { name: 'Was the liner booking confirmed?' })
+    expect(within(group).getByRole('button', { name: 'Yes, booked' })).toHaveAttribute('aria-pressed', 'false')
+    expect(within(group).getByRole('button', { name: "No, couldn't book" })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Confirm Liner Booking' })).toBeDisabled()
+    await user.click(within(group).getByRole('button', { name: "No, couldn't book" }))
+    expect(setLinerBooked).toHaveBeenCalledWith('no')
+  })
+
+  it('yes: success colour and an enabled primary submit', () => {
+    renderStep('confirm-liner-booking', cbBooking, { linerBooked: 'yes', setLinerBooked: () => {} })
+    expect(screen.getByRole('button', { name: 'Yes, booked' })).toHaveClass('bg-success', 'text-white')
+    expect(screen.getByRole('button', { name: "No, couldn't book" })).not.toHaveClass('bg-danger')
+    expect(screen.queryByRole('textbox', { name: 'Reason (required)' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirm Liner Booking' })).toBeEnabled()
+  })
+
+  it('no: danger colour, a required reason, and a danger submit enabled once the reason is in', () => {
+    const { unmount } = renderStep('confirm-liner-booking', cbBooking, { linerBooked: 'no', setLinerBooked: () => {} })
+    expect(screen.getByRole('button', { name: "No, couldn't book" })).toHaveClass('bg-danger', 'text-white')
+    expect(screen.getByRole('textbox', { name: 'Reason (required)' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Revert to Pending Liner' })).toBeDisabled()
+    unmount()
+    renderStep('confirm-liner-booking', cbBooking, { linerBooked: 'no', setLinerBooked: () => {}, formNote: 'No space' })
+    const submit = screen.getByRole('button', { name: 'Revert to Pending Liner' })
+    expect(submit).toBeEnabled()
+    expect(submit).toHaveClass('ui-button--danger')
+  })
+})
