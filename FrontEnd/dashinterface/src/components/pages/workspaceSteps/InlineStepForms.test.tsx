@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { Booking, ReleaseOrderFields } from '../../../types'
@@ -846,5 +846,94 @@ describe('InlineStepForms create-bl', () => {
     expect(screen.getByText('No HBLs match your search.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Clear search' }))
     expect(setMblHblSearch).toHaveBeenCalledWith('')
+  })
+})
+
+describe('InlineStepForms booking-request', () => {
+  type Ctn = { type: string; qty: number }
+  const brProps = (over: Partial<InlineStepFormsProps> = {}): Partial<InlineStepFormsProps> => ({
+    bkShippingLine: '', setBkShippingLine: () => {}, bkContainers: [{ type: "40'HC", qty: 2 }], setBkContainers: () => {},
+    bkCommodity: '', setBkCommodity: () => {}, bkCargoReadyDate: '', setBkCargoReadyDate: () => {},
+    bkVessel: '', setBkVessel: () => {}, bkVesselEtd: '', setBkVesselEtd: () => {}, bkVoyage: '', setBkVoyage: () => {},
+    bkPod: '', setBkPod: () => {}, bkContractNo: '', setBkContractNo: () => {}, bkAgreedRate: '', setBkAgreedRate: () => {},
+    bkRateRemark: '', setBkRateRemark: () => {}, bkDeliveryTerm: '', setBkDeliveryTerm: () => {}, bkHsCode: '', setBkHsCode: () => {},
+    bkBlType: '', setBkBlType: () => {}, bkBookingType: '', setBkBookingType: () => {}, bkReeferTemp: '', setBkReeferTemp: () => {},
+    bkDeliveryAgent: '', setBkDeliveryAgent: () => {}, bkSpecificRouting: '', setBkSpecificRouting: () => {},
+    bkRaNumber: '', setBkRaNumber: () => {},
+    linerList: [{ lin_id: 1, name: 'Maersk', scac: 'MAEU', is_on_inttra: true, has_portal: false }],
+    ...over,
+  })
+  const filled: Partial<InlineStepFormsProps> = {
+    bkShippingLine: 'Maersk', bkVessel: 'V', bkVesselEtd: '2026-12-06', bkVoyage: 'Y', bkCargoReadyDate: '2026-12-01',
+    bkAgreedRate: '1200', bkDeliveryTerm: 'CY/CY', bkHsCode: '2106', bkBlType: 'OBL',
+  }
+
+  it('lists the missing required fields and enables submit once they are filled', () => {
+    const { unmount } = renderStep('booking-request', booking(), brProps())
+    expect(screen.getByText('Missing required fields: Carrier, Vessel, ETD, Voyage, Cargo Ready Date, Agreed Rate, Delivery Term, HS Code, BL Type')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Create Booking & Send to Procurement' })).toBeDisabled()
+    unmount()
+    renderStep('review-booking-request', booking(), brProps(filled))
+    expect(screen.queryByText(/Missing required fields/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Assign RA Number & Move to Booking' })).toBeEnabled()
+    const ready = screen.getByRole('group', { name: 'Cargo Ready Date' })
+    expect(within(ready).getByRole('spinbutton', { name: /month/ })).toHaveTextContent('12')
+    expect(within(ready).getByRole('spinbutton', { name: /year/ })).toHaveTextContent('2026')
+  })
+
+  it('carrier is a select, or read-only when the accepted quotation fixed the liner', async () => {
+    const user = userEvent.setup()
+    const setBkShippingLine = vi.fn()
+    const { unmount } = renderStep('booking-request', booking(), brProps({ setBkShippingLine }))
+    await user.click(screen.getByRole('button', { name: /Carrier/ }))
+    await user.click(screen.getByRole('option', { name: 'Maersk – MAEU' }))
+    expect(setBkShippingLine).toHaveBeenCalledWith('Maersk')
+    unmount()
+    const lockedItem: WorkspaceItem = { ...item, type: 'booking', actionKind: 'booking-request', sourceData: { acceptedQuotation: { lin_id: 1 } } }
+    render(<InlineStepForms {...({ ...brProps({ bkShippingLine: 'Maersk' }), selectedItem: lockedItem, actionModal: lockedItem, formNote: '', setFormNote: () => {}, handleModalSubmit: () => {}, handleAction: () => {} } as unknown as InlineStepFormsProps)} />)
+    expect(screen.getByRole('textbox', { name: /Carrier/ })).toHaveValue('Maersk')
+    expect(screen.getByRole('textbox', { name: /Carrier/ })).toHaveAttribute('readonly')
+  })
+
+  it('container rows update quantity (at least 1) and type, and can be added and removed', async () => {
+    const user = userEvent.setup()
+    const prev: Ctn[] = [{ type: "40'HC", qty: 2 }, { type: "20'GP", qty: 1 }]
+    // The updaters read e.target.value lazily (pre-existing), so apply them during the event, as React does.
+    const results: Ctn[][] = []
+    const setBkContainers = vi.fn((fn: (p: Ctn[]) => Ctn[]) => { results.push(fn(prev)) })
+    renderStep('booking-request', booking(), brProps({ setBkContainers, bkContainers: prev } as Partial<InlineStepFormsProps>))
+    expect(screen.getByText('(3)')).toBeInTheDocument()
+    const run = () => results[results.length - 1]
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Quantity, container 2' }), { target: { value: '4' } })
+    expect(run()).toEqual([{ type: "40'HC", qty: 2 }, { type: "20'GP", qty: 4 }])
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Quantity, container 1' }), { target: { value: '0' } })
+    expect(run()).toEqual([{ type: "40'HC", qty: 1 }, { type: "20'GP", qty: 1 }])
+    await user.click(screen.getByRole('button', { name: /Type, container 1/ }))
+    await user.click(screen.getByRole('option', { name: "20' RF (Reefer)" }))
+    expect(run()).toEqual([{ type: "20'RF", qty: 2 }, { type: "20'GP", qty: 1 }])
+    await user.click(screen.getByRole('button', { name: 'Remove container 1' }))
+    expect(run()).toEqual([{ type: "20'GP", qty: 1 }])
+    await user.click(screen.getByRole('button', { name: '+ Add Container' }))
+    expect(run()).toEqual([...prev, { type: "20'GP", qty: 1 }])
+  })
+
+  it('BL and booking type radios set their values; Contract No and RA No exclude each other', async () => {
+    const user = userEvent.setup()
+    const setBkBlType = vi.fn(), setBkBookingType = vi.fn(), setBkContractNo = vi.fn(), setBkRaNumber = vi.fn(), setBkAgreedRate = vi.fn()
+    const { unmount } = renderStep('booking-request', booking(), brProps({ setBkBlType, setBkBookingType, setBkContractNo, setBkRaNumber, setBkAgreedRate }))
+    await user.click(screen.getByRole('radio', { name: 'Seaway Bill' }))
+    expect(setBkBlType).toHaveBeenCalledWith('Seaway Bill')
+    await user.click(screen.getByRole('radio', { name: 'FAK Booking' }))
+    expect(setBkBookingType).toHaveBeenCalledWith('FAK')
+    await user.type(screen.getByRole('textbox', { name: 'Contract No' }), 'C')
+    expect(setBkContractNo).toHaveBeenCalledWith('C')
+    expect(setBkRaNumber).toHaveBeenCalledWith('')
+    await user.type(screen.getByRole('spinbutton', { name: /Agreed Rate/ }), '5')
+    expect(setBkAgreedRate).toHaveBeenCalledWith('5')
+    unmount()
+    renderStep('booking-request', booking(), brProps({ bkContractNo: 'C', bkRaNumber: 'R' }))
+    expect(screen.getByRole('textbox', { name: 'RA No' })).toBeDisabled()
+    expect(screen.getByRole('textbox', { name: 'Contract No' })).toBeDisabled()
+    expect(screen.getByText('A customer cannot have both Contract No and RA No. Please clear one.')).toBeInTheDocument()
   })
 })
