@@ -454,7 +454,7 @@ describe('RateCheck manual rate entry', () => {
     expect(screen.getByRole('textbox', { name: 'Vessel Name' })).toHaveValue('')
     expect(screen.getByRole('checkbox', { name: 'Mark as cancelled' })).not.toBeChecked()
     expect(origin).toHaveValue('Colombo/Sri Lanka')
-  })
+  }, 15000) // drives about 30 controls; over 5s when the suite runs in parallel on a busy machine
 
   it('adds an FAK rate and a Special rate with their own payload shapes', async () => {
     const { user } = await openManualEntry()
