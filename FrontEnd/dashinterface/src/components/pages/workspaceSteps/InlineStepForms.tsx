@@ -16,7 +16,7 @@ import type { CompletedRateRequest } from "../../../types"
 import type { WorkspaceItem, BlContainerRow, MblContainerRow, QuotationOptionOverride } from "./types"
 import { empName, openMailto, buildRateSection, generateQuotationPdf } from "./utils"
 import { lookupQuotationId } from "./useWorkspaceActions"
-import { Button, Checkbox, DatePicker, Field, Input, NumberInput, Select, Textarea, Tooltip, type Option } from "../../ui"
+import { Badge, Button, Checkbox, ComboBox, DatePicker, Field, FileButton, Input, NumberInput, Select, Textarea, Tooltip, type ComboBoxItem, type Option } from "../../ui"
 import { labelClass } from "../../ui/controlStyles"
 import { cn } from "../../../lib/cn"
 
@@ -198,12 +198,109 @@ function RegistryValue({ label, strong, className, children }: { label: string; 
   )
 }
 
-/** Label-cell row of the Prepare Quotation summary table. */
-function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
+/** Label-cell row of a summary table (Prepare Quotation, booking and release order details). */
+function SummaryRow({ label, strong = true, className, children }: { label: string; strong?: boolean; className?: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[140px_1fr] border-b border-line-soft">
+    <div className={cn('grid grid-cols-[140px_1fr] border-b border-line-soft', className)}>
       <div className={cn(labelClass, 'flex items-center border-r border-line-soft bg-canvas px-3 py-2')}>{label}</div>
-      <div className="px-2.5 py-2 text-control font-semibold text-fg">{children}</div>
+      <div className={cn('px-2.5 py-2 text-control text-fg', strong && 'font-semibold')}>{children}</div>
+    </div>
+  )
+}
+
+/** Collapsible release order summary above the Cut Offs and Cut Off Reminder forms. */
+function ReleaseOrderReference({ ro, bkg, collapsed, onToggle }: { ro: ReleaseOrderFields; bkg: Booking; collapsed: boolean; onToggle: () => void }) {
+  const rows: [string, string | undefined][] = [
+    ['Reference No.', ro.reference_nbr],
+    ['Pick Up Date', ro.pickup_empty_date],
+    ['Valid Until', ro.validity_expiration_date],
+    ['Depot', ro.pickup_depot],
+    ['Depot Address', ro.pickup_depot_address],
+    ['Vessel', bkg.vessel_name],
+    ['Voyage', bkg.voyage_number],
+    ['Cut-Off', ro.cut_off_date],
+    ['ETD', ro.etd],
+    ['ETA', ro.eta],
+    ['Container', `${bkg.quantity}x ${bkg.container_type}`],
+    ['Cargo', ro.cargo_description],
+    ['Weight', ro.cargo_weight ? `${ro.cargo_weight} kg` : undefined],
+  ]
+  return (
+    <div className="overflow-hidden rounded-card border border-line-soft">
+      <button type="button" aria-expanded={!collapsed} onClick={onToggle}
+        className="flex w-full items-center justify-between border-none bg-primary-subtle px-3 py-2 text-label hover:bg-surface-hover">
+        <span className="flex items-center gap-1.5 font-bold uppercase tracking-label text-primary">
+          <FileText size={12} aria-hidden="true" /> Release Order Reference
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="font-mono text-fg-muted">{ro.reference_nbr}</span>
+          <ChevronDown size={14} aria-hidden="true" className={cn('text-primary transition-transform', collapsed && '-rotate-90')} />
+        </span>
+      </button>
+      {!collapsed && (
+        <div className="border-t border-line-soft">
+          {rows.filter(([, v]) => v).map(([label, value]) => (
+            <SummaryRow key={label} label={label} strong={false} className="last:border-b-0">{value}</SummaryRow>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Email / WhatsApp toggle group. */
+function SendMethodToggle({ id, label, value, onSelect }: { id: string; label: string; value: 'email' | 'whatsapp'; onSelect: (m: 'email' | 'whatsapp') => void }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span id={id} className={labelClass}>{label}</span>
+      <div role="group" aria-labelledby={id} className="flex gap-2">
+        <Button aria-pressed={value === 'email'} className={cn(value === 'email' && SELECTED_TOGGLE)}
+          icon={<Mail size={14} aria-hidden="true" />} onClick={() => onSelect('email')}>
+          Email
+        </Button>
+        <Button aria-pressed={value === 'whatsapp'} className={cn(value === 'whatsapp' && SELECTED_TOGGLE)}
+          icon={<MessageCircle size={14} aria-hidden="true" />} onClick={() => onSelect('whatsapp')}>
+          WhatsApp
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/** "I confirm that I have sent…" checkbox in a tinted box (info for email, success for WhatsApp). */
+function ConfirmCheck({ tone, checked, onChange, hint, children }: { tone: 'info' | 'success'; checked: boolean; onChange: (v: boolean) => void; hint: string; children: ReactNode }) {
+  return (
+    <div className={cn('rounded-card border px-3.5 py-2.5', tone === 'info' ? 'border-info-line bg-info-bg' : 'border-success-line bg-success-bg')}>
+      <Checkbox checked={checked} onChange={onChange} className="items-start">
+        <span className="leading-4 text-fg-label">
+          {children}
+          <span className="mt-0.5 block text-label text-fg-muted">{hint}</span>
+        </span>
+      </Checkbox>
+    </div>
+  )
+}
+
+/** File picker plus the chosen file's name and a remove button. */
+function FileAttach({ accept, label, fileName, onFile, onRemove, describedBy }: {
+  accept: string; label: string; fileName: string; onFile: (file: File) => void; onRemove: () => void; describedBy?: string
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <FileButton accept={accept} size="sm" aria-describedby={describedBy}
+        onSelect={files => { const file = files[0]; if (file) onFile(file) }}>
+        {fileName ? 'Replace file' : label}
+      </FileButton>
+      {fileName && (
+        <div className="flex items-center gap-1.5 text-control">
+          <FileText size={14} className="text-success" aria-hidden="true" />
+          <span className="font-semibold text-fg">{fileName}</span>
+          <Tooltip content="Remove file">
+            <Button variant="ghost" size="sm" className="w-7 px-0" aria-label={`Remove ${fileName}`}
+              icon={<X size={12} aria-hidden="true" />} onClick={onRemove} />
+          </Tooltip>
+        </div>
+      )}
     </div>
   )
 }
@@ -766,149 +863,90 @@ export default function InlineStepForms({
 })() : selectedItem.actionKind === 'record-cutoff' && actionModal ? (() => {
   const coBkg = actionModal.sourceData.booking as Booking
   const coRo = coBkg.release_order_fields
+  // Same entries as the old datalist: value = liner name, shown with its SCAC. ComboBox items are keyed by value, so repeats are dropped.
+  const coLinerItems: ComboBoxItem[] = linerList
+    .filter((l, i, all) => l.name && all.findIndex(x => x.name === l.name) === i)
+    .map(l => ({ value: l.name, description: linerDisplay(l) }))
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="flex flex-col gap-4">
       {/* Booking summary */}
-      <div style={{ padding: '10px 14px', background: 'rgba(44,44,130,0.06)', border: '1px solid rgba(44,44,130,0.15)', borderRadius: 8, fontSize: 12 }}>
+      <div className="rounded-card border border-line-soft bg-primary-subtle px-3.5 py-2.5 text-control text-fg">
         <strong>{coBkg.customer_name}</strong> — {coBkg.origin} → {coBkg.destination}
-        <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
+        <div className="mt-0.5 text-fg-muted">
           {coBkg.quantity}x {coBkg.container_type} · {coBkg.shipping_line || 'No liner'}
         </div>
       </div>
 
       {/* Collapsible Release Order reference */}
-      {coRo && (
-        <div style={{ border: '1px solid rgba(124,58,237,0.2)', borderRadius: 8, overflow: 'hidden' }}>
-          <button type="button" onClick={() => setRoRefCollapsed(!roRefCollapsed)}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(124,58,237,0.06)', border: 'none', cursor: 'pointer' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <FileText size={12} style={{ color: '#7c3aed' }} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase' as const, letterSpacing: 0.4 }}>Release Order Reference</span>
-            </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{coRo.reference_nbr}</span>
-              <ChevronDown size={14} style={{ color: '#7c3aed', transform: roRefCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
-            </span>
-          </button>
-          {!roRefCollapsed && (
-            <div style={{ fontSize: 11, borderTop: '1px solid rgba(124,58,237,0.12)' }}>
-              {[
-                ['Reference No.', coRo.reference_nbr],
-                ['Pick Up Date', coRo.pickup_empty_date],
-                ['Valid Until', coRo.validity_expiration_date],
-                ['Depot', coRo.pickup_depot],
-                ['Depot Address', coRo.pickup_depot_address],
-                ['Vessel', coBkg.vessel_name],
-                ['Voyage', coBkg.voyage_number],
-                ['Cut-Off', coRo.cut_off_date],
-                ['ETD', coRo.etd],
-                ['ETA', coRo.eta],
-                ['Container', `${coBkg.quantity}x ${coBkg.container_type}`],
-                ['Cargo', coRo.cargo_description],
-                ['Weight', coRo.cargo_weight ? `${coRo.cargo_weight} kg` : undefined],
-              ].filter(([, v]) => v).map(([label, value]) => (
-                <div key={label} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>
-                  <div style={{ padding: '4px 10px', background: 'rgba(124,58,237,0.04)', fontSize: 11, fontWeight: 600, color: '#7c3aed', display: 'flex', alignItems: 'center', borderRight: '1px solid rgba(124,58,237,0.08)' }}>{label}</div>
-                  <div style={{ padding: '4px 10px', fontSize: 11, color: 'var(--text)' }}>{value}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {coRo && <ReleaseOrderReference ro={coRo} bkg={coBkg} collapsed={roRefCollapsed} onToggle={() => setRoRefCollapsed(!roRefCollapsed)} />}
 
-      <div>
-        <label className="lt-label">Shipping Line / Liner</label>
-        <input list="ws-cut-liners-inline" className="lt-input" style={{ width: '100%' }} value={cutoffLiner}
-          onChange={e => setCutoffLiner(e.target.value)}
-          placeholder="e.g. Maersk, MSC, Hapag-Lloyd" />
-        <datalist id="ws-cut-liners-inline">
-          {linerList.map(l => <option key={l.lin_id} value={l.name}>{linerDisplay(l)}</option>)}
-        </datalist>
-      </div>
+      <Field label="Shipping Line / Liner">
+        {ids => <ComboBox {...ids} value={cutoffLiner} onChange={setCutoffLiner} items={coLinerItems}
+          placeholder="e.g. Maersk, MSC, Hapag-Lloyd" />}
+      </Field>
 
       {/* Paste / Upload toggle */}
-      <div>
-        <label className="lt-label">Cutoff Schedule</label>
-        <div style={{ display: 'flex', gap: 8, marginTop: 4, marginBottom: 8 }}>
-          <button className={`db-btn ${cutoffMode === 'paste' ? 'primary' : ''}`}
-            style={cutoffMode !== 'paste' ? { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' } : {}}
-            onClick={() => setCutoffMode('paste')}><ClipboardPaste size={13} style={{ marginRight: 4 }} /> Paste</button>
-          <button className={`db-btn ${cutoffMode === 'upload' ? 'primary' : ''}`}
-            style={cutoffMode !== 'upload' ? { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' } : {}}
-            onClick={() => setCutoffMode('upload')}><Paperclip size={13} style={{ marginRight: 4 }} /> Upload</button>
+      <div className="flex flex-col gap-1">
+        <span id="ws-co-schedule-label" className={labelClass}>Cutoff Schedule</span>
+        <div role="group" aria-labelledby="ws-co-schedule-label" className="mb-1 flex gap-2">
+          <Button aria-pressed={cutoffMode === 'paste'} className={cn(cutoffMode === 'paste' && SELECTED_TOGGLE)}
+            icon={<ClipboardPaste size={14} aria-hidden="true" />}
+            onClick={() => setCutoffMode('paste')}>
+            Paste
+          </Button>
+          <Button aria-pressed={cutoffMode === 'upload'} className={cn(cutoffMode === 'upload' && SELECTED_TOGGLE)}
+            icon={<Paperclip size={14} aria-hidden="true" />}
+            onClick={() => setCutoffMode('upload')}>
+            Upload
+          </Button>
         </div>
         {cutoffMode === 'paste' && (
-          <textarea className="lt-input" style={{ width: '100%', minHeight: 90, fontFamily: 'monospace', fontSize: 11, lineHeight: 1.5, resize: 'vertical' as const }}
+          <Textarea aria-labelledby="ws-co-schedule-label" className="min-h-[90px] resize-y font-mono text-label leading-normal"
             value={cutoffContent} onChange={e => setCutoffContent(e.target.value)}
             placeholder="Paste vessel cutoff schedule here..." />
         )}
         {cutoffMode === 'upload' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <label className="db-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer', background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
-              <Paperclip size={13} />
-              {cutoffFileName ? 'Replace file' : 'Choose file'}
-              <input type="file" accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.txt" style={{ display: 'none' }}
-                onChange={e => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
-                  setCutoffFileName(file.name)
-                  const reader = new FileReader()
-                  reader.onload = () => setCutoffContent(reader.result as string)
-                  reader.readAsDataURL(file)
-                  e.target.value = ''
-                }} />
-            </label>
-            {cutoffFileName && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                <FileText size={13} style={{ color: '#16a34a' }} />
-                <span style={{ fontWeight: 600 }}>{cutoffFileName}</span>
-                <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--text-muted)' }}
-                  onClick={() => { setCutoffFileName(''); setCutoffContent('') }}><X size={12} /></button>
-              </div>
-            )}
-          </div>
+          <FileAttach accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.txt" label="Choose file" fileName={cutoffFileName}
+            describedBy="ws-co-schedule-label"
+            onFile={file => {
+              setCutoffFileName(file.name)
+              const reader = new FileReader()
+              reader.onload = () => setCutoffContent(reader.result as string)
+              reader.readAsDataURL(file)
+            }}
+            onRemove={() => { setCutoffFileName(''); setCutoffContent('') }} />
         )}
       </div>
 
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: 0.4, color: 'var(--text-muted)', marginBottom: 10 }}>Cutoff Dates from Liner</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div>
-            <label className="lt-label">SI/BL Cutoff Date</label>
-            <input className="lt-input" style={{ width: '100%' }} type="date"
-              value={cutoffSiDate} onChange={e => { setCutoffSiDate(e.target.value); setCutoffBlDate(e.target.value) }} />
-          </div>
-          <div>
-            <label className="lt-label">VGM Cutoff Date</label>
-            <input className="lt-input" style={{ width: '100%' }} type="date"
-              value={cutoffVgmDate} onChange={e => setCutoffVgmDate(e.target.value)} />
-          </div>
-          <div>
-            <label className="lt-label">Filing Cutoff Date</label>
-            <input className="lt-input" style={{ width: '100%' }} type="date"
-              value={cutoffFilingDate} onChange={e => setCutoffFilingDate(e.target.value)} />
-          </div>
+      <section className="flex flex-col gap-3">
+        <SectionHead>Cutoff Dates from Liner</SectionHead>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+          <Field label="SI/BL Cutoff Date">
+            {ids => <DatePicker {...ids} value={cutoffSiDate} onChange={v => { setCutoffSiDate(v); setCutoffBlDate(v) }} />}
+          </Field>
+          <Field label="VGM Cutoff Date">
+            {ids => <DatePicker {...ids} value={cutoffVgmDate} onChange={setCutoffVgmDate} />}
+          </Field>
+          <Field label="Filing Cutoff Date">
+            {ids => <DatePicker {...ids} value={cutoffFilingDate} onChange={setCutoffFilingDate} />}
+          </Field>
         </div>
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+      </section>
+      <p className="m-0 text-label text-fg-muted">
         SI/BL cutoff dates trigger downstream follow-up tasks and reminders.
-      </div>
+      </p>
 
-      <div>
-        <label className="lt-label">Notes (optional)</label>
-        <input className="lt-input" style={{ width: '100%' }} value={cutoffNotes}
+      <Field label="Notes (optional)">
+        {ids => <Input {...ids} value={cutoffNotes}
           onChange={e => setCutoffNotes(e.target.value)}
-          placeholder="Any notes about vessel cutoff schedule..." />
-      </div>
+          placeholder="Any notes about vessel cutoff schedule..." />}
+      </Field>
 
       {/* Submit button */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button className="db-btn primary"
-          style={{ background: '#0891b2', borderColor: '#0891b2' }}
-          onClick={handleModalSubmit}>
-          <Ship size={12} style={{ marginRight: 6 }} /> Record Cutoff & Push
-        </button>
+      <div className="flex justify-end">
+        <Button variant="primary" icon={<Ship size={14} aria-hidden="true" />} onClick={handleModalSubmit}>
+          Record Cutoff & Push
+        </Button>
       </div>
     </div>
   )
@@ -918,151 +956,78 @@ export default function InlineStepForms({
   const siblCutoff = siBkg.si_cutoff_date || siBkg.bl_cutoff_date
   const dLeft = siblCutoff ? daysUntil(siblCutoff) : 999
   const isOvd = dLeft < 0
-  const urgencyColor = isOvd ? '#dc2626' : dLeft === 0 ? '#d97706' : '#0891b2'
-  const urgencyText = isOvd
+  const urgencyTone = isOvd ? 'danger' : dLeft === 0 ? 'warning' : 'info'
+  const urgencyCard = { danger: 'border-danger-line bg-danger-bg', warning: 'border-warning-line bg-warning-bg', info: 'border-info-line bg-info-bg' }[urgencyTone]
+  const urgencyClass = { danger: 'text-danger', warning: 'text-warning', info: 'text-accent' }[urgencyTone]
+  const urgencyLabel = isOvd
     ? `OVERDUE by ${Math.abs(dLeft)} day(s)`
     : dLeft === 0 ? 'Due TODAY' : `${dLeft} day(s) remaining`
   const canSend = sendMethod === 'email'
     ? customerContactEmail.trim() !== '' && customerContactEmail.includes('@') && emailConfirmed
     : waConfirmed
+  const cutoffRow = (label: string, date: string) => {
+    const d = daysUntil(date)
+    return (
+      <div className="flex items-center gap-2">
+        <span className="w-25 text-label font-semibold text-fg-muted">{label}</span>
+        <span className="font-bold">{date}</span>
+        <span className="text-label text-fg-muted">({d < 0 ? `${Math.abs(d)}d overdue` : `${d}d left`})</span>
+      </div>
+    )
+  }
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="flex flex-col gap-4">
       {/* Context card */}
-      {ctx && (
-        <div className="ws-context-card" style={{ marginTop: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-            <User size={11} style={{ color: 'var(--text-muted)' }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
-              {empName(ctx.actor_id)} ({ROLE_LABELS[ctx.actor_role]})
-            </span>
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{ctx.action}</div>
-        </div>
-      )}
+      {ctx && <ContextCard ctx={ctx} />}
 
       {/* Collapsible Release Order reference */}
-      {siBkg.release_order_fields && (() => {
-        const siRo = siBkg.release_order_fields!
-        return (
-          <div style={{ border: '1px solid rgba(124,58,237,0.2)', borderRadius: 8, overflow: 'hidden' }}>
-            <button type="button" onClick={() => setRoRefCollapsed(!roRefCollapsed)}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(124,58,237,0.06)', border: 'none', cursor: 'pointer' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <FileText size={12} style={{ color: '#7c3aed' }} />
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase' as const, letterSpacing: 0.4 }}>Release Order Reference</span>
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{siRo.reference_nbr}</span>
-                <ChevronDown size={14} style={{ color: '#7c3aed', transform: roRefCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
-              </span>
-            </button>
-            {!roRefCollapsed && (
-              <div style={{ fontSize: 11, borderTop: '1px solid rgba(124,58,237,0.12)' }}>
-                {[
-                  ['Reference No.', siRo.reference_nbr],
-                  ['Pick Up Date', siRo.pickup_empty_date],
-                  ['Valid Until', siRo.validity_expiration_date],
-                  ['Depot', siRo.pickup_depot],
-                  ['Depot Address', siRo.pickup_depot_address],
-                  ['Vessel', siBkg.vessel_name],
-                  ['Voyage', siBkg.voyage_number],
-                  ['Cut-Off', siRo.cut_off_date],
-                  ['ETD', siRo.etd],
-                  ['ETA', siRo.eta],
-                  ['Container', `${siBkg.quantity}x ${siBkg.container_type}`],
-                  ['Cargo', siRo.cargo_description],
-                  ['Weight', siRo.cargo_weight ? `${siRo.cargo_weight} kg` : undefined],
-                ].filter(([, v]) => v).map(([label, value]) => (
-                  <div key={label} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>
-                    <div style={{ padding: '4px 10px', background: 'rgba(124,58,237,0.04)', fontSize: 11, fontWeight: 600, color: '#7c3aed', display: 'flex', alignItems: 'center', borderRight: '1px solid rgba(124,58,237,0.08)' }}>{label}</div>
-                    <div style={{ padding: '4px 10px', fontSize: 11, color: 'var(--text)' }}>{value}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })()}
+      {siBkg.release_order_fields && (
+        <ReleaseOrderReference ro={siBkg.release_order_fields} bkg={siBkg} collapsed={roRefCollapsed} onToggle={() => setRoRefCollapsed(!roRefCollapsed)} />
+      )}
 
       {/* Cutoff dates card */}
-      <div style={{ padding: '14px 16px', background: urgencyColor + '0a', border: `1px solid ${urgencyColor}30`, borderRadius: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-          <AlertTriangle size={14} style={{ color: urgencyColor }} />
-          <span style={{ fontSize: 13, fontWeight: 700, color: urgencyColor }}>Cutoff Dates</span>
-          <span style={{ fontSize: 11, fontWeight: 700, color: urgencyColor, marginLeft: 'auto', padding: '2px 8px', background: urgencyColor + '15', borderRadius: 10 }}>
-            {urgencyText}
-          </span>
+      <div className={cn('rounded-card border px-4 py-3.5', urgencyCard)}>
+        <div className="mb-2 flex items-center gap-1.5">
+          <AlertTriangle size={14} className={urgencyClass} aria-hidden="true" />
+          <span className={cn('text-control font-bold', urgencyClass)}>Cutoff Dates</span>
+          <Badge tone={urgencyTone} className="ml-auto">{urgencyLabel}</Badge>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, marginBottom: 8 }}>
-          {siblCutoff && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ width: 100, color: 'var(--text-muted)', fontWeight: 600, fontSize: 11 }}>SI/BL Cutoff</span>
-              <span style={{ fontWeight: 700 }}>{siblCutoff}</span>
-              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>({dLeft < 0 ? `${Math.abs(dLeft)}d overdue` : `${dLeft}d left`})</span>
-            </div>
-          )}
-          {siBkg.vgm_cutoff_date && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ width: 100, color: 'var(--text-muted)', fontWeight: 600, fontSize: 11 }}>VGM Cutoff</span>
-              <span style={{ fontWeight: 700 }}>{siBkg.vgm_cutoff_date}</span>
-              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>({daysUntil(siBkg.vgm_cutoff_date) < 0 ? `${Math.abs(daysUntil(siBkg.vgm_cutoff_date))}d overdue` : `${daysUntil(siBkg.vgm_cutoff_date)}d left`})</span>
-            </div>
-          )}
-          {siBkg.filing_cutoff_date && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ width: 100, color: 'var(--text-muted)', fontWeight: 600, fontSize: 11 }}>Filing Cutoff</span>
-              <span style={{ fontWeight: 700 }}>{siBkg.filing_cutoff_date}</span>
-              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>({daysUntil(siBkg.filing_cutoff_date) < 0 ? `${Math.abs(daysUntil(siBkg.filing_cutoff_date))}d overdue` : `${daysUntil(siBkg.filing_cutoff_date)}d left`})</span>
-            </div>
-          )}
+        <div className="mb-2 flex flex-col gap-1 text-control text-fg">
+          {siblCutoff && cutoffRow('SI/BL Cutoff', siblCutoff)}
+          {siBkg.vgm_cutoff_date && cutoffRow('VGM Cutoff', siBkg.vgm_cutoff_date)}
+          {siBkg.filing_cutoff_date && cutoffRow('Filing Cutoff', siBkg.filing_cutoff_date)}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px', fontSize: 12 }}>
-          <div><span style={{ color: 'var(--text-muted)' }}>Customer:</span> <strong>{siBkg.customer_name}</strong></div>
-          <div><span style={{ color: 'var(--text-muted)' }}>Route:</span> {siBkg.origin} → {siBkg.destination}</div>
-          <div><span style={{ color: 'var(--text-muted)' }}>Vessel:</span> {siBkg.vessel_name || 'TBD'}</div>
-          <div><span style={{ color: 'var(--text-muted)' }}>Voyage:</span> {siBkg.voyage_number || 'TBD'}</div>
-          <div><span style={{ color: 'var(--text-muted)' }}>Container:</span> {siBkg.quantity}x {siBkg.container_type}</div>
-          <div><span style={{ color: 'var(--text-muted)' }}>Liner:</span> {siBkg.shipping_line || 'N/A'}</div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-control text-fg">
+          <div><span className="text-fg-muted">Customer:</span> <strong>{siBkg.customer_name}</strong></div>
+          <div><span className="text-fg-muted">Route:</span> {siBkg.origin} → {siBkg.destination}</div>
+          <div><span className="text-fg-muted">Vessel:</span> {siBkg.vessel_name || 'TBD'}</div>
+          <div><span className="text-fg-muted">Voyage:</span> {siBkg.voyage_number || 'TBD'}</div>
+          <div><span className="text-fg-muted">Container:</span> {siBkg.quantity}x {siBkg.container_type}</div>
+          <div><span className="text-fg-muted">Liner:</span> {siBkg.shipping_line || 'N/A'}</div>
         </div>
       </div>
 
       {/* Send method toggle */}
-      <div>
-        <label className="lt-label">Contact Customer via</label>
-        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-          <button className={`db-btn ${sendMethod === 'email' ? 'primary' : ''}`}
-            style={sendMethod !== 'email' ? { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' } : {}}
-            onClick={() => { setSendMethod('email'); setEmailConfirmed(false) }}><Mail size={13} style={{ marginRight: 4 }} /> Email</button>
-          <button className={`db-btn ${sendMethod === 'whatsapp' ? 'primary' : ''}`}
-            style={sendMethod === 'whatsapp' ? { background: '#25d366', borderColor: '#25d366' } : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-            onClick={() => { setSendMethod('whatsapp'); setEmailConfirmed(false) }}><MessageCircle size={13} style={{ marginRight: 4 }} /> WhatsApp</button>
-        </div>
-      </div>
+      <SendMethodToggle id="ws-si-method-label" label="Contact Customer via" value={sendMethod}
+        onSelect={m => { setSendMethod(m); setEmailConfirmed(false) }} />
 
       {sendMethod === 'email' && (
         <>
-          <div>
-            <label className="lt-label">Customer Email <span style={{ color: '#dc2626' }}>*</span></label>
-            <input className="lt-input" style={{ width: '100%' }} type="email"
+          <Field label="Customer Email" required>
+            {ids => <Input {...ids} type="email"
               value={customerContactEmail} onChange={e => setCustomerContactEmail(e.target.value)}
-              placeholder="customer@example.com" />
-          </div>
+              placeholder="customer@example.com" />}
+          </Field>
           {customerContactEmail.includes('@') && (
             <>
-              <button className="db-btn" type="button"
-                onClick={() => openMailto(customerContactEmail, `SI/BL Cutoff Reminder — ${siBkg.id} — ${siBkg.customer_name}`, `Dear ${siBkg.customer_name},\n\nThis is a reminder that the SI/BL cutoff date is approaching${siblCutoff ? ` (${siblCutoff})` : ''}. Please submit your shipping instructions at your earliest convenience.\n\nBest regards,\n${activeEmployee.name}\nSynergy Shipping & Logistics`)}
-                style={{ background: '#0078d4', borderColor: '#0078d4', color: '#fff', width: '100%' }}>
-                <Mail size={13} style={{ marginRight: 6 }} /> Open in Outlook
-              </button>
-              <div style={{ padding: '10px 14px', background: 'rgba(0,120,212,0.06)', border: '1px solid rgba(0,120,212,0.2)', borderRadius: 8 }}>
-                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)' }}>
-                  <input type="checkbox" checked={emailConfirmed} onChange={e => setEmailConfirmed(e.target.checked)} style={{ marginTop: 2 }} />
-                  <span>
-                    I confirm that I have sent the cutoff reminder to the customer via email.
-                    <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Click "Open in Outlook" above, send the email, then check this box.</span>
-                  </span>
-                </label>
-              </div>
+              <Button variant="primary" className="w-full justify-start" icon={<Mail size={14} aria-hidden="true" />}
+                onClick={() => openMailto(customerContactEmail, `SI/BL Cutoff Reminder — ${siBkg.id} — ${siBkg.customer_name}`, `Dear ${siBkg.customer_name},\n\nThis is a reminder that the SI/BL cutoff date is approaching${siblCutoff ? ` (${siblCutoff})` : ''}. Please submit your shipping instructions at your earliest convenience.\n\nBest regards,\n${activeEmployee.name}\nSynergy Shipping & Logistics`)}>
+                Open in Outlook
+              </Button>
+              <ConfirmCheck tone="info" checked={emailConfirmed} onChange={setEmailConfirmed}
+                hint='Click "Open in Outlook" above, send the email, then check this box.'>
+                I confirm that I have sent the cutoff reminder to the customer via email.
+              </ConfirmCheck>
             </>
           )}
         </>
@@ -1070,73 +1035,47 @@ export default function InlineStepForms({
 
       {sendMethod === 'whatsapp' && (
         <>
-          <div>
-            <label className="lt-label">Customer WhatsApp Number</label>
-            <input className="lt-input" style={{ width: '100%' }}
+          <Field label="Customer WhatsApp Number">
+            {ids => <Input {...ids}
               value={customerContactPhone} onChange={e => setCustomerContactPhone(e.target.value)}
-              placeholder="+94 7X XXX XXXX" />
-          </div>
-          <div style={{ padding: '10px 14px', background: 'rgba(37,211,102,0.06)', border: '1px solid rgba(37,211,102,0.2)', borderRadius: 8 }}>
-            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)' }}>
-              <input type="checkbox" checked={waConfirmed} onChange={e => setWaConfirmed(e.target.checked)} style={{ marginTop: 2 }} />
-              <span>I confirm that I have sent the cutoff reminder to the customer via WhatsApp.
-                <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>No WhatsApp integration — manual confirmation.</span>
-              </span>
-            </label>
-          </div>
+              placeholder="+94 7X XXX XXXX" />}
+          </Field>
+          <ConfirmCheck tone="success" checked={waConfirmed} onChange={setWaConfirmed}
+            hint="No WhatsApp integration — manual confirmation.">
+            I confirm that I have sent the cutoff reminder to the customer via WhatsApp.
+          </ConfirmCheck>
         </>
       )}
 
       {/* VGM Certificate upload */}
       {siBkg.vgm_cutoff_date && (
-        <div>
-          <label className="lt-label">VGM Certificate (optional)</label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-            <label className="db-btn"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer', background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
-              <Paperclip size={13} />
-              {vgmCertFileName ? 'Replace file' : 'Attach VGM certificate'}
-              <input type="file" accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.doc,.docx" style={{ display: 'none' }}
-                onChange={e => {
-                  const f = e.target.files?.[0]
-                  if (!f) return
-                  setVgmCertFileName(f.name)
-                  const r = new FileReader()
-                  r.onload = () => setVgmCertContent(r.result as string)
-                  r.readAsDataURL(f)
-                  e.target.value = ''
-                }} />
-            </label>
-            {vgmCertFileName && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                <FileText size={13} style={{ color: '#16a34a' }} />
-                <span style={{ fontWeight: 600 }}>{vgmCertFileName}</span>
-                <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--text-muted)' }}
-                  onClick={() => { setVgmCertFileName(''); setVgmCertContent('') }}><X size={12} /></button>
-              </div>
-            )}
-          </div>
+        <div className="flex flex-col gap-1">
+          <span id="ws-si-vgm-label" className={labelClass}>VGM Certificate (optional)</span>
+          <FileAttach accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.doc,.docx" label="Attach VGM certificate" fileName={vgmCertFileName}
+            describedBy="ws-si-vgm-label"
+            onFile={f => {
+              setVgmCertFileName(f.name)
+              const r = new FileReader()
+              r.onload = () => setVgmCertContent(r.result as string)
+              r.readAsDataURL(f)
+            }}
+            onRemove={() => { setVgmCertFileName(''); setVgmCertContent('') }} />
         </div>
       )}
 
-      <div>
-        <label className="lt-label">Notes (optional)</label>
-        <input className="lt-input" style={{ width: '100%' }} value={formNote}
+      <Field label="Notes (optional)">
+        {ids => <Input {...ids} value={formNote}
           onChange={e => setFormNote(e.target.value)}
-          placeholder="Any instructions or reminders for the customer..." />
-      </div>
+          placeholder="Any instructions or reminders for the customer..." />}
+      </Field>
 
       {/* Submit button */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button className="db-btn primary"
-          disabled={!canSend}
-          style={
-            !canSend ? { opacity: 0.4, cursor: 'not-allowed' }
-              : sendMethod === 'whatsapp' ? { background: '#25d366', borderColor: '#25d366' } : {}
-          }
+      <div className="flex justify-end">
+        <Button variant="primary" disabled={!canSend}
+          icon={sendMethod === 'email' ? <Mail size={14} aria-hidden="true" /> : <MessageCircle size={14} aria-hidden="true" />}
           onClick={handleModalSubmit}>
-          {sendMethod === 'email' ? <><Mail size={12} style={{ marginRight: 6 }} /> Send Reminder via Email</> : <><MessageCircle size={12} style={{ marginRight: 6 }} /> Confirm Reminder Sent</>}
-        </button>
+          {sendMethod === 'email' ? 'Send Reminder via Email' : 'Confirm Reminder Sent'}
+        </Button>
       </div>
     </div>
   )
