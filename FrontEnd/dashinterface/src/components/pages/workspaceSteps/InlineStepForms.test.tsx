@@ -652,6 +652,31 @@ describe('InlineStepForms save-vessel-schedule', () => {
     expect(setShowVesselSuggestions).toHaveBeenLastCalledWith(false)
   })
 
+  it('focusing a pre-filled Vessel field shows the recent suggestions, with a constant hint', async () => {
+    const user = userEvent.setup()
+    renderStep('save-vessel-schedule', booking(), svsProps({
+      formVessel: 'MSC Aurora', formVoyage: 'RA-1', vesselSchedules: [schedule('VS-1', 'AU-112E', 'FCL'), schedule('VS-2', 'AU-113W', 'CONSOL')],
+    }))
+    expect(screen.getByText('Recent vessels from the last 2 weeks')).toBeInTheDocument()
+    await user.click(screen.getByRole('combobox', { name: 'Vessel' }))
+    expect(screen.getAllByRole('option').map(o => o.textContent)).toEqual([
+      expect.stringMatching(/^MSC Aurora \/ AU-112E/), expect.stringMatching(/^MSC Aurora \/ AU-113W/),
+    ])
+  })
+
+  it('right after a pick the list stays closed; leaving the field shows it again next time', async () => {
+    const user = userEvent.setup()
+    const setShowVesselSuggestions = vi.fn()
+    renderStep('save-vessel-schedule', booking(), svsProps({
+      formVessel: 'MSC Aurora', formVoyage: 'AU-113W', showVesselSuggestions: false, setShowVesselSuggestions,
+      vesselSchedules: [schedule('VS-1', 'AU-112E', 'FCL'), schedule('VS-2', 'AU-113W', 'CONSOL')],
+    }))
+    await user.click(screen.getByRole('combobox', { name: 'Vessel' }))
+    expect(screen.queryByRole('option')).not.toBeInTheDocument()
+    await user.tab()
+    expect(setShowVesselSuggestions).toHaveBeenCalledWith(true)
+  })
+
   it('dates have a clear button; submit needs vessel and voyage and saves the schedule', async () => {
     const user = userEvent.setup()
     const setVesselEtdPol = vi.fn(), onAddVesselSchedule = vi.fn(), setActionModal = vi.fn()
@@ -673,7 +698,7 @@ describe('InlineStepForms create-vessel-booking', () => {
     formVessel: '', setFormVessel: () => {}, formVoyage: '', setFormVoyage: () => {},
     vesselPol: '', setVesselPol: () => {}, vesselFinalPod: '', setVesselFinalPod: () => {},
     vesselEtdPol: '', setVesselEtdPol: () => {}, vesselEtaFpod: '', setVesselEtaFpod: () => {}, vesselRoutingType: 'DIRECT',
-    unknownVoyageWarning: null, setUnknownVoyageWarning: () => {},
+    unknownVoyageWarning: null, setUnknownVoyageWarning: () => {}, voyageDropOpen: false, setVoyageDropOpen: () => {},
     vesselPickedRef: { current: false }, voyagePickedRef: { current: false },
     bkgField: rec({ hbl_issue_term: '' }), setBkgField: () => {},
     activeRole: 'cs', onMarkBlBookingCreated: () => {}, onLogActivity: () => {}, onFlash: () => {}, setActionModal: () => {}, setActiveStep: () => {},
@@ -690,6 +715,8 @@ describe('InlineStepForms create-vessel-booking', () => {
       expect.stringMatching(/^CE-509E · Colombo Express · Hapag-Lloyd/), expect.stringMatching(/^CE-510W · Colombo Express/),
     ])
     await user.click(screen.getByRole('option', { name: /CE-510W/ }))
+    // Items are keyed by id (OV-002); the pick maps back and stores the voyage number.
+    expect(setFormVoyage).toHaveBeenCalledWith('OV-002')
     expect(setFormVoyage).toHaveBeenLastCalledWith('CE-510W')
     expect(setFormVessel).toHaveBeenCalledWith('Colombo Express')
     expect(setVesselPol).toHaveBeenCalledWith('Colombo')
@@ -715,6 +742,16 @@ describe('InlineStepForms create-vessel-booking', () => {
     await new Promise(r => setTimeout(r, 200))
     expect(setUnknownVoyageWarning).not.toHaveBeenCalled()
     expect(vesselPickedRef.current).toBe(false)
+  })
+
+  it('leaving the voyage field with an unknown number raises the voyage warning', async () => {
+    const user = userEvent.setup()
+    const setUnknownVoyageWarning = vi.fn(), setVoyageDropOpen = vi.fn()
+    renderStep('create-vessel-booking', booking(), cvbProps({ formVoyage: 'ZZ-999', setUnknownVoyageWarning, setVoyageDropOpen }))
+    await user.click(screen.getByRole('combobox', { name: 'Voyage' }))
+    await user.tab()
+    await waitFor(() => expect(setUnknownVoyageWarning).toHaveBeenCalledWith({ field: 'voyage', value: 'ZZ-999' }))
+    expect(setVoyageDropOpen).toHaveBeenCalledWith(true)
   })
 
   it('the warning dialog keeps editing or goes to the vessel step', async () => {

@@ -425,6 +425,7 @@ export default function InlineStepForms({
   vesselFinalPod, setVesselFinalPod, vesselEtaFpod, setVesselEtaFpod,
   vesselRemarks, setVesselRemarks, vesselAgent, setVesselAgent,
   selectedReleaseOrderId, setSelectedReleaseOrderId,
+  voyageDropOpen, setVoyageDropOpen,
   showVesselSuggestions, setShowVesselSuggestions,
   unknownVoyageWarning, setUnknownVoyageWarning,
   vesselPickedRef, voyagePickedRef, bkgField, setBkgField,
@@ -2209,8 +2210,10 @@ export default function InlineStepForms({
     setVesselAgent(vs.agent); setShowVesselSuggestions(false)
   }
   // Picking a suggestion fills the whole schedule; items are keyed by schedule id because one vessel can have several voyages.
-  // The pick replaces the text with the vessel name, so the list is emptied (showVesselSuggestions = false) to keep it closed.
-  const vesselItems: ComboBoxItem[] = (showVesselSuggestions ? vesselMatches : []).map(vs => ({
+  // The pick replaces the text with the vessel name, which would reopen the list, so right after a pick (fields match a
+  // suggestion and showVesselSuggestions is false) the list is empty. Typing or leaving the field shows it again.
+  const vesselJustPicked = !showVesselSuggestions && vesselMatches.some(vs => vs.vessel_name === formVessel && vs.voyage_number === formVoyage)
+  const vesselItems: ComboBoxItem[] = (vesselJustPicked ? [] : vesselMatches).map(vs => ({
     value: vs.id,
     label: `${vs.vessel_name} / ${vs.voyage_number}`,
     description: `${vs.pol}${vs.final_pod ? ` → ${vs.final_pod}` : ''}${vs.etd_pol ? ` · ETD ${vs.etd_pol}` : ''} · ${vs.schedule_type}`,
@@ -2248,10 +2251,9 @@ export default function InlineStepForms({
         onSelect={setVesselScheduleType} stretch />
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-        {/* Suggestions are recent vessels (last 2 weeks) */}
-        <Field label="Vessel">
+        <Field label="Vessel" hint="Recent vessels from the last 2 weeks">
           {ids => <ComboBox {...ids} value={formVessel} onChange={v => { setFormVessel(v); setShowVesselSuggestions(true) }} items={vesselItems}
-            filter={() => true} menuTrigger="focus"
+            filter={() => true} menuTrigger="focus" onBlur={() => setShowVesselSuggestions(true)}
             onPick={id => { const vs = vesselMatches.find(v => v.id === id); if (vs) applyVesselSchedule(vs) }}
             placeholder="e.g. MSC America" />}
         </Field>
@@ -2350,12 +2352,15 @@ export default function InlineStepForms({
     .map(v => ({ value: v.vesselName, description: v.shippingLine }))
   const cvbVoyageQ = formVoyage.toLowerCase()
   const cvbVesselFilter = formVessel.trim().toLowerCase()
-  const cvbVoyageItems: ComboBoxItem[] = MOCK_OPEN_VOYAGES
+  // Keyed by id so repeated voyage numbers stay separate. A pick sets the text to the voyage number, which would reopen the
+  // list, so right after a pick (vessel and voyage match an open voyage, voyageDropOpen false) the list is empty.
+  const cvbVoyageJustPicked = !voyageDropOpen && MOCK_OPEN_VOYAGES.some(v => v.vesselName === formVessel && v.voyageNumber === formVoyage)
+  const cvbVoyageItems: ComboBoxItem[] = cvbVoyageJustPicked ? [] : MOCK_OPEN_VOYAGES
     .filter(v =>
       (v.voyageNumber.toLowerCase().includes(cvbVoyageQ) || v.vesselName.toLowerCase().includes(cvbVoyageQ)) &&
       (!cvbVesselFilter || v.vesselName.toLowerCase().includes(cvbVesselFilter))
     )
-    .map(v => ({ value: v.voyageNumber, label: `${v.voyageNumber} · ${v.vesselName} · ${v.shippingLine}`, description: `${v.pol} → ${v.fpod} · ETD ${v.etdPol} · ETA ${v.etaFpod}` }))
+    .map(v => ({ value: v.id, label: `${v.voyageNumber} · ${v.vesselName} · ${v.shippingLine}`, description: `${v.pol} → ${v.fpod} · ETD ${v.etdPol} · ETA ${v.etaFpod}` }))
   return (
     <div className="flex flex-col gap-4">
 
@@ -2416,11 +2421,12 @@ export default function InlineStepForms({
         {/* Voyage combobox — selecting a voyage auto-fills all vessel fields */}
         <Field label="Voyage">
           {ids => <ComboBox {...ids} value={formVoyage} items={cvbVoyageItems} filter={() => true} menuTrigger="focus"
-            onChange={v => { voyagePickedRef.current = false; setFormVoyage(v) }}
-            onPick={voyageNumber => {
-              const v = MOCK_OPEN_VOYAGES.find(o => o.voyageNumber === voyageNumber)
+            onChange={v => { voyagePickedRef.current = false; setFormVoyage(v); setVoyageDropOpen(true) }}
+            onPick={id => {
+              const v = MOCK_OPEN_VOYAGES.find(o => o.id === id)
               if (!v) return
               voyagePickedRef.current = true
+              setVoyageDropOpen(false)
               setFormVessel(v.vesselName)
               setFormVoyage(v.voyageNumber)
               setVesselPol(v.pol)
@@ -2428,12 +2434,12 @@ export default function InlineStepForms({
               setVesselEtdPol(v.etdPol)
               setVesselEtaFpod(v.etaFpod)
             }}
-            onBlur={() => setTimeout(() => {
+            onBlur={() => { setVoyageDropOpen(true); setTimeout(() => {
               if (voyagePickedRef.current) { voyagePickedRef.current = false; return }
               const v = formVoyage.trim()
               if (v && !MOCK_OPEN_VOYAGES.some(o => o.voyageNumber.toLowerCase() === v.toLowerCase()))
                 setUnknownVoyageWarning({ field: 'voyage', value: v })
-            }, 150)}
+            }, 150) }}
             placeholder="Search voyage number…" />}
         </Field>
         {readOnlyInput('Port of Loading', vesselPol)}
