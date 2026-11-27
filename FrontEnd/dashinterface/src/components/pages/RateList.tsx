@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef, Fragment, type ReactNode } from 'react'
-import { Eye, Pencil, MessageSquarePlus, X, RefreshCw, Loader2, Save, Send, DollarSign } from 'lucide-react'
+import { Eye, Pencil, MessageSquarePlus, RefreshCw, Loader2, Save, Send, DollarSign } from 'lucide-react'
 import {
   RATE_SOURCE_COLORS, linerDisplay,
   type UnifiedRate, type RateSourceType,
@@ -7,7 +7,11 @@ import {
 } from '../../types'
 import { apiFetchAllRates, apiUpdateRate, apiGetLiners, apiGetTradeLanes } from '../../api'
 import { useRole } from '../../RoleContext'
-import { PAGE_WRAPPER, PAGE_TITLE_ROW, PAGE_TITLE_ICON, PAGE_TITLE_H2, CARD, SECTION_LABEL, FIELD_LABEL, INPUT_STYLE } from './pageStyles'
+import {
+  Badge, Button, Checkbox, DatePicker, EmptyState, Field, Input, LoadingState, Modal, NumberInput, Select, Textarea, Tooltip,
+  type BadgeProps, type Option,
+} from '../ui'
+import { cn } from '../../lib/cn'
 
 // Rate types visible to CS and Sales (read-only, no record access)
 const CS_SALES_ALLOWED: RateSourceType[] = ['FAK', 'Tariff Rate', 'Spot']
@@ -24,6 +28,16 @@ const SOURCE_OPTIONS: RateSourceType[] = [
   'Contracted', 'FAK', 'Spot', 'Tariff Rate', 'NAC', 'Special',
 ]
 
+/** Select options keyed by value: the backend can repeat a liner or lane name, and a Select needs unique values. */
+const uniqueOptions = (options: Option[]): Option[] => {
+  const seen = new Set<string>()
+  return options.filter(o => {
+    if (seen.has(o.value)) return false
+    seen.add(o.value)
+    return true
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Dynamic column definitions per rate type
 // ---------------------------------------------------------------------------
@@ -34,48 +48,51 @@ interface ColDef {
   render: (r: UnifiedRate) => ReactNode
 }
 
-const TH: React.CSSProperties = { padding: '10px 8px', borderBottom: '1px solid var(--border)' }
-const TD: React.CSSProperties = { padding: '12px 8px' }
-const MONO: React.CSSProperties = { ...TD, color: 'var(--text-muted)', fontFamily: 'monospace', fontSize: 11 }
-const MUTED: React.CSSProperties = { ...TD, color: 'var(--text-muted)', fontSize: 11 }
-const SEC: React.CSSProperties = { ...TD, color: 'var(--text-secondary)', fontSize: 11 }
+const TH = 'border-0 border-b border-line px-2 py-2.5 text-left align-bottom text-label font-semibold uppercase tracking-label text-fg-label'
+const TD = 'px-2 py-3 align-middle'
+const MONO = cn(TD, 'font-mono text-label text-fg-muted')
+const MUTED = cn(TD, 'text-label text-fg-muted')
+const SEC = cn(TD, 'text-label text-fg-label')
 
-const dash = <span style={{ color: 'var(--text-muted)' }}>-</span>
+const dash = <span className="text-fg-muted">-</span>
+
+/** Rate type tag in its category colour (shared with the rate badges elsewhere). */
+function TypePill({ type }: { type: RateSourceType }) {
+  const c = RATE_SOURCE_COLORS[type]
+  return (
+    <span
+      className="whitespace-nowrap rounded-control px-2 py-0.5 text-label font-bold uppercase tracking-label"
+      style={{ background: c + '15', color: c }}
+    >
+      {type}
+    </span>
+  )
+}
+
+const SCOPE_TONE: Record<string, BadgeProps['tone']> = { Import: 'info', Export: 'success', Within: 'warning' }
 
 // Shared column builders
 const colId: ColDef = {
   key: 'id', label: 'ID',
-  render: r => <td style={MONO}>{r.id.split(':')[1] ?? r.id}</td>,
+  render: r => <td className={MONO}>{r.id.split(':')[1] ?? r.id}</td>,
 }
 const colType: ColDef = {
   key: 'type', label: 'Type',
-  render: r => {
-    const c = RATE_SOURCE_COLORS[r.source_type]
-    return (
-      <td style={TD}>
-        <span style={{
-          fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
-          background: c + '15', color: c, textTransform: 'uppercase', letterSpacing: '0.3px', whiteSpace: 'nowrap',
-        }}>
-          {r.source_type}
-        </span>
-      </td>
-    )
-  },
+  render: r => <td className={TD}><TypePill type={r.source_type} /></td>,
 }
 const colLiner: ColDef = {
   key: 'liner', label: 'Liner',
-  render: r => <td style={{ ...TD, color: 'var(--text)', fontWeight: 600 }}>{r.liner_name ?? dash}</td>,
+  render: r => <td className={cn(TD, 'font-semibold text-fg')}>{r.liner_name ?? dash}</td>,
 }
 const colRoute: ColDef = {
   key: 'route', label: 'Origin → Destination',
   render: r => (
-    <td style={{ ...TD, color: 'var(--text-secondary)', fontSize: 12, whiteSpace: 'nowrap' }}>
+    <td className={cn(TD, 'whitespace-nowrap text-fg-label')}>
       {r.origin && r.destination ? (
         <>
-          <span style={{ color: 'var(--text)' }}>{r.origin}</span>
-          <span style={{ margin: '0 6px', color: 'var(--text-muted)' }}>→</span>
-          <span style={{ color: 'var(--text)' }}>{r.destination}</span>
+          <span className="text-fg">{r.origin}</span>
+          <span className="mx-1.5 text-fg-muted">→</span>
+          <span className="text-fg">{r.destination}</span>
         </>
       ) : dash}
     </td>
@@ -83,68 +100,61 @@ const colRoute: ColDef = {
 }
 const colOrigin: ColDef = {
   key: 'origin', label: 'Origin',
-  render: r => <td style={{ ...TD, color: 'var(--text)' }}>{r.origin || dash}</td>,
+  render: r => <td className={cn(TD, 'text-fg')}>{r.origin || dash}</td>,
 }
 const colDestination: ColDef = {
   key: 'destination', label: 'Destination',
-  render: r => <td style={{ ...TD, color: 'var(--text)' }}>{r.destination || dash}</td>,
+  render: r => <td className={cn(TD, 'text-fg')}>{r.destination || dash}</td>,
 }
 const colContainer: ColDef = {
   key: 'container', label: 'Container Type',
-  render: r => <td style={SEC}>{r.container_type ?? dash}</td>,
+  render: r => <td className={SEC}>{r.container_type ?? dash}</td>,
 }
 const colRate: ColDef = {
   key: 'rate', label: 'Rate',
-  render: r => <td style={{ ...TD, fontWeight: 700, color: 'var(--text)', fontSize: 13 }}>{r.rate != null ? `$${r.rate.toLocaleString()}` : '-'}</td>,
+  render: r => <td className={cn(TD, 'font-bold text-fg')}>{r.rate != null ? `$${r.rate.toLocaleString()}` : '-'}</td>,
 }
 const colCurrency: ColDef = {
   key: 'currency', label: 'Currency',
-  render: r => <td style={MUTED}>{r.currency}</td>,
+  render: r => <td className={MUTED}>{r.currency}</td>,
 }
 const colTradeLane: ColDef = {
   key: 'tradeLane', label: 'Trade Lane',
-  render: r => <td style={SEC}>{r.trade_lane ?? dash}</td>,
+  render: r => <td className={SEC}>{r.trade_lane ?? dash}</td>,
 }
 const colValidFrom: ColDef = {
   key: 'validFrom', label: 'Valid From',
-  render: r => <td style={MUTED}>{r.valid_from ?? '-'}</td>,
+  render: r => <td className={MUTED}>{r.valid_from ?? '-'}</td>,
 }
 const colValidTo: ColDef = {
   key: 'validTo', label: 'Valid To',
-  render: r => <td style={MUTED}>{r.valid_to ?? '-'}</td>,
+  render: r => <td className={MUTED}>{r.valid_to ?? '-'}</td>,
 }
 const colSoldStatus: ColDef = {
   key: 'sold', label: 'Sold',
   render: r => (
-    <td style={TD}>
-      {r.is_sold === true && <span className="db-badge danger" style={{ fontSize: 11 }}>Sold</span>}
-      {r.is_sold === false && <span className="db-badge accent" style={{ fontSize: 11 }}>Available</span>}
-      {r.is_sold == null && <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>-</span>}
+    <td className={TD}>
+      {r.is_sold === true && <Badge tone="danger">Sold</Badge>}
+      {r.is_sold === false && <Badge tone="info">Available</Badge>}
+      {r.is_sold == null && <span className="text-label text-fg-muted">-</span>}
     </td>
   ),
 }
 const colVessel: ColDef = {
   key: 'vessel', label: 'Vessel',
-  render: r => <td style={SEC}>{r.vessel_name ?? dash}</td>,
+  render: r => <td className={SEC}>{r.vessel_name ?? dash}</td>,
 }
 const colDepartureDate: ColDef = {
   key: 'departure', label: 'Departure',
-  render: r => <td style={MUTED}>{r.departure_date ?? '-'}</td>,
+  render: r => <td className={MUTED}>{r.departure_date ?? '-'}</td>,
 }
 const colServiceScope: ColDef = {
   key: 'scope', label: 'Service Lane',
   render: r => {
-    if (!r.service_scope) return <td style={MUTED}>-</td>
-    const scopeColor: Record<string, string> = { Import: '#2563eb', Export: '#059669', Within: '#d97706' }
-    const c = scopeColor[r.service_scope] ?? 'var(--text-secondary)'
+    if (!r.service_scope) return <td className={MUTED}>-</td>
     return (
-      <td style={TD}>
-        <span style={{
-          fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 4,
-          background: c + '12', color: c, letterSpacing: '0.3px',
-        }}>
-          {r.service_scope}
-        </span>
+      <td className={TD}>
+        <Badge tone={SCOPE_TONE[r.service_scope] ?? 'neutral'}>{r.service_scope}</Badge>
       </td>
     )
   },
@@ -153,22 +163,22 @@ const colServiceScope: ColDef = {
 // NAC-specific columns
 const colClient: ColDef = {
   key: 'client', label: 'Customer',
-  render: r => <td style={{ ...TD, color: 'var(--text)', fontWeight: 600 }}>{r.client_name ?? dash}</td>,
+  render: r => <td className={cn(TD, 'font-semibold text-fg')}>{r.client_name ?? dash}</td>,
 }
 
 const colEmployee: ColDef = {
   key: 'employee', label: 'Salesperson',
-  render: r => <td style={SEC}>{r.employee_name ?? dash}</td>,
+  render: r => <td className={SEC}>{r.employee_name ?? dash}</td>,
 }
 
 // Special-specific columns
 const colCommodityName: ColDef = {
   key: 'commodityName', label: 'Commodity',
-  render: r => <td style={{ ...TD, color: 'var(--text)', fontWeight: 600 }}>{r.commodity_name ?? dash}</td>,
+  render: r => <td className={cn(TD, 'font-semibold text-fg')}>{r.commodity_name ?? dash}</td>,
 }
 const colCommodityType: ColDef = {
   key: 'commodityType', label: 'Commodity Type',
-  render: r => <td style={SEC}>{r.commodity_type ?? dash}</td>,
+  render: r => <td className={SEC}>{r.commodity_type ?? dash}</td>,
 }
 
 // Columns per rate type
@@ -180,6 +190,24 @@ const COLUMNS_BY_TYPE: Record<SourceFilter, ColDef[]> = {
   'Tariff Rate': [colId, colServiceScope, colLiner, colTradeLane, colContainer, colRate, colCurrency, colValidFrom, colValidTo],
   NAC:           [colId, colServiceScope, colClient, colEmployee, colOrigin, colDestination, colTradeLane, colRate, colCurrency, colValidFrom, colValidTo],
   Special:       [colId, colServiceScope, colCommodityName, colCommodityType, colRate, colCurrency, colValidFrom, colValidTo],
+}
+
+/** Icon-only row action with an aria-label and Tooltip. */
+function IconAction({ label, icon, onClick }: { label: string; icon: ReactNode; onClick: () => void }) {
+  return (
+    <Tooltip content={label}>
+      <Button size="sm" className="w-7 px-0" icon={icon} aria-label={label} onClick={onClick} />
+    </Tooltip>
+  )
+}
+
+function PreviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-2 py-1.5 text-control">
+      <span className="text-fg-muted">{label}</span>
+      <span className="text-right font-semibold text-fg">{value}</span>
+    </div>
+  )
 }
 
 // Detail fields per rate type (for the view modal)
@@ -266,6 +294,8 @@ export default function RateList({ onFlash }: { onFlash: (msg: string) => void }
   const [remarkFocused, setRemarkFocused] = useState(false)
   const [remarkText, setRemarkText] = useState('')
   const [remarkSaving, setRemarkSaving] = useState(false)
+  // In-flight guards: the save buttons stay enabled while saving (disabling the focused button would drop focus out of the dialog)
+  const remarkSavingRef = useRef(false)
   const remarkRef = useRef<HTMLTextAreaElement>(null)
 
   // Auto-focus the remark textarea when opened via note icon
@@ -291,7 +321,8 @@ export default function RateList({ onFlash }: { onFlash: (msg: string) => void }
   }
 
   const handleRemarkSave = () => {
-    if (!viewing) return
+    if (!viewing || remarkSavingRef.current) return
+    remarkSavingRef.current = true
     setRemarkSaving(true)
     apiUpdateRate(viewing.id, { remark: remarkText.trim() || null })
       .then(() => {
@@ -300,13 +331,14 @@ export default function RateList({ onFlash }: { onFlash: (msg: string) => void }
         loadRates()
       })
       .catch(() => onFlash('Failed to save remark'))
-      .finally(() => setRemarkSaving(false))
+      .finally(() => { remarkSavingRef.current = false; setRemarkSaving(false) })
   }
 
   // ---- Edit modal ----
   const [editing, setEditing] = useState<UnifiedRate | null>(null)
   const [editForm, setEditForm] = useState<Record<string, unknown>>({})
   const [saving, setSaving] = useState(false)
+  const savingRef = useRef(false)
 
   const openEdit = (r: UnifiedRate) => {
     setEditing(r)
@@ -328,7 +360,8 @@ export default function RateList({ onFlash }: { onFlash: (msg: string) => void }
   const setEf = (key: string, val: unknown) => setEditForm(p => ({ ...p, [key]: val }))
 
   const handleSave = () => {
-    if (!editing) return
+    if (!editing || savingRef.current) return
+    savingRef.current = true
     setSaving(true)
     const payload: Record<string, unknown> = {}
     const t = editing.source_type
@@ -355,7 +388,7 @@ export default function RateList({ onFlash }: { onFlash: (msg: string) => void }
     apiUpdateRate(editing.id, payload)
       .then(() => { setEditing(null); loadRates() })
       .catch(() => onFlash('Failed to update rate'))
-      .finally(() => setSaving(false))
+      .finally(() => { savingRef.current = false; setSaving(false) })
   }
 
   // ---- Fetch reference data on mount ----
@@ -379,157 +412,114 @@ export default function RateList({ onFlash }: { onFlash: (msg: string) => void }
     })
   }, [rates, sourceFilter, linerFilter, laneFilter, originFilter, destFilter, containerFilter, isRestrictedRole])
 
+  const sourceOptions: Option[] = [{ value: 'all', label: 'All Types' }, ...(isRestrictedRole ? CS_SALES_ALLOWED : SOURCE_OPTIONS).map(s => ({ value: s, label: s }))]
+  const linerOptions = useMemo(() => uniqueOptions([{ value: 'all', label: 'All' }, ...liners.map(l => ({ value: l.name, label: linerDisplay(l) }))]), [liners])
+  const laneOptions = useMemo(() => uniqueOptions([{ value: 'all', label: 'All' }, ...tradeLanes.map(tl => ({ value: tl.trln_name, label: tl.trln_name }))]), [tradeLanes])
+
   // ---- Active columns based on selected type ----
   const columns = COLUMNS_BY_TYPE[sourceFilter]
   const colCount = columns.length + 1 // +1 for Actions column
 
+  const closeView = () => setViewing(null)
+  const closeEdit = () => setEditing(null)
+
   return (
-    <div style={PAGE_WRAPPER}>
-      <div style={PAGE_TITLE_ROW}>
-        <DollarSign size={18} style={PAGE_TITLE_ICON} />
-        <h2 style={PAGE_TITLE_H2}>Rates</h2>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+    <div className="mx-auto max-w-[1200px] p-6">
+      <div className="mb-4 flex items-center gap-2">
+        <DollarSign size={18} aria-hidden="true" className="text-primary" />
+        <h2 className="m-0 text-title font-bold text-fg">Rates</h2>
+        <span className="ml-2 text-label text-fg-muted">
           View, filter and manage all freight rates across all rate tables
         </span>
-        <span style={{ flex: 1 }} />
-        <button
-          className="db-btn primary"
-          style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}
+        <Button
+          variant="primary"
+          className="ml-auto"
+          icon={<RefreshCw size={14} aria-hidden="true" />}
+          isPending={loading}
           onClick={() => { setLoaded(false); loadRates() }}
-          disabled={loading}
         >
-          {loading ? <Loader2 size={13} className="spin" /> : <RefreshCw size={13} />}
           Refresh
-        </button>
+        </Button>
       </div>
 
       {/* Filters */}
-      <div style={{ ...CARD, marginBottom: 18 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
-          <div>
-            <label style={FIELD_LABEL}>By Rate Type</label>
-            <select
-              value={sourceFilter}
-              onChange={e => setSourceFilter(e.target.value as SourceFilter)}
-              style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
-            >
-              <option value="all">All Types</option>
-              {(isRestrictedRole ? CS_SALES_ALLOWED : SOURCE_OPTIONS).map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label style={FIELD_LABEL}>By Liner</label>
-            <select
-              value={linerFilter}
-              onChange={e => setLinerFilter(e.target.value)}
-              style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
-            >
-              <option value="all">All</option>
-              {liners.map(l => (
-                <option key={l.lin_id} value={l.name}>{linerDisplay(l)}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label style={FIELD_LABEL}>By Trade Lane</label>
-            <select
-              value={laneFilter}
-              onChange={e => setLaneFilter(e.target.value)}
-              style={{ ...INPUT_STYLE, padding: '10px 12px', fontSize: 13, borderRadius: 8 }}
-            >
-              <option value="all">All</option>
-              {tradeLanes.map(tl => (
-                <option key={tl.trln_id} value={tl.trln_name}>{tl.trln_name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label style={FIELD_LABEL}>Origin</label>
-            <input
-              value={originFilter}
-              onChange={e => setOriginFilter(e.target.value)}
-              placeholder="Search origin..."
-              style={INPUT_STYLE}
-            />
-          </div>
-          <div>
-            <label style={FIELD_LABEL}>Destination</label>
-            <input
-              value={destFilter}
-              onChange={e => setDestFilter(e.target.value)}
-              placeholder="Search destination..."
-              style={INPUT_STYLE}
-            />
-          </div>
-          <div>
-            <label style={FIELD_LABEL}>Container Type</label>
-            <input
-              value={containerFilter}
-              onChange={e => setContainerFilter(e.target.value)}
-              placeholder="e.g. 40'HC..."
-              style={INPUT_STYLE}
-            />
-          </div>
+      <div className="mb-4 rounded-card border border-line-soft bg-surface p-4">
+        <div className="grid grid-cols-6 gap-3">
+          <Field label="By Rate Type">
+            {ids => <Select {...ids} value={sourceFilter} onChange={v => setSourceFilter(v as SourceFilter)} options={sourceOptions} />}
+          </Field>
+          <Field label="By Liner">
+            {ids => <Select {...ids} value={linerFilter} onChange={setLinerFilter} options={linerOptions} />}
+          </Field>
+          <Field label="By Trade Lane">
+            {ids => <Select {...ids} value={laneFilter} onChange={setLaneFilter} options={laneOptions} />}
+          </Field>
+          <Field label="Origin">
+            {ids => <Input {...ids} value={originFilter} onChange={e => setOriginFilter(e.target.value)} placeholder="Search origin..." />}
+          </Field>
+          <Field label="Destination">
+            {ids => <Input {...ids} value={destFilter} onChange={e => setDestFilter(e.target.value)} placeholder="Search destination..." />}
+          </Field>
+          <Field label="Container Type">
+            {ids => <Input {...ids} value={containerFilter} onChange={e => setContainerFilter(e.target.value)} placeholder="e.g. 40'HC..." />}
+          </Field>
         </div>
       </div>
 
       {/* Table */}
-      <div style={CARD}>
-        <div style={{ marginBottom: 14 }}>
-          <div style={SECTION_LABEL}>
+      <div className="rounded-card border border-line-soft bg-surface p-4">
+        <div className="mb-3.5">
+          <h3 className="m-0 mb-2.5 text-label font-bold uppercase tracking-label text-fg-label">
             {sourceFilter === 'all' ? 'All Rates' : `${sourceFilter} Rates`}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+          </h3>
+          <div className="text-label text-fg-muted">
             {loaded
               ? `Showing ${filtered.length} of ${rates.length}`
               : loading ? 'Loading...' : 'Click Refresh to load rates'}
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-control">
             <thead>
-              <tr style={{ textAlign: 'left', color: 'var(--text-muted)', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.06em' }}>
+              <tr>
                 {columns.map(col => (
-                  <th key={col.key} style={TH}>{col.label}</th>
+                  <th key={col.key} className={TH}>{col.label}</th>
                 ))}
-                <th style={TH}>Actions</th>
+                <th className={TH}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading && !loaded ? (
                 <tr>
-                  <td colSpan={colCount} style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    <Loader2 size={20} className="spin" style={{ marginBottom: 8, display: 'inline-block' }} />
-                    <div style={{ fontSize: 13 }}>Loading rates from database...</div>
+                  <td colSpan={colCount} className="p-0">
+                    <LoadingState label="Loading rates from database..." />
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={colCount} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
-                    {loaded ? 'No rates match these filters.' : 'No rates loaded yet.'}
+                  <td colSpan={colCount} className="p-0">
+                    <EmptyState title={loaded ? 'No rates match these filters.' : 'No rates loaded yet.'} />
                   </td>
                 </tr>
               ) : (
                 filtered.map(r => (
-                  <tr key={r.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <tr key={r.id} className="border-0 border-b border-line-soft">
                     {columns.map(col => (
                       <Fragment key={col.key}>{col.render(r)}</Fragment>
                     ))}
-                    <td style={{ ...TD, whiteSpace: 'nowrap' }}>
-                      <button className="lt-icon-btn" title="View Details" onClick={() => { setRemarkFocused(false); setRemarkText(r.remark ?? ''); setViewing(r) }} style={{ marginRight: 4 }}>
-                        <Eye size={12} />
-                      </button>
-                      <button className="lt-icon-btn" title="Add Note" onClick={() => openNote(r)} style={{ marginRight: 4 }}>
-                        <MessageSquarePlus size={12} />
-                      </button>
-                      {!isRestrictedRole && (
-                        <button className="lt-icon-btn" title="Edit Rate" onClick={() => openEdit(r)}>
-                          <Pencil size={12} />
-                        </button>
-                      )}
+                    <td className={TD}>
+                      <div className="flex gap-1.5">
+                        <IconAction
+                          label="View Details"
+                          icon={<Eye size={14} aria-hidden="true" />}
+                          onClick={() => { setRemarkFocused(false); setRemarkText(r.remark ?? ''); setViewing(r) }}
+                        />
+                        <IconAction label="Add Note" icon={<MessageSquarePlus size={14} aria-hidden="true" />} onClick={() => openNote(r)} />
+                        {!isRestrictedRole && (
+                          <IconAction label="Edit Rate" icon={<Pencil size={14} aria-hidden="true" />} onClick={() => openEdit(r)} />
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -541,193 +531,152 @@ export default function RateList({ onFlash }: { onFlash: (msg: string) => void }
 
       {/* View modal */}
       {viewing && (
-        <div className="lt-modal-backdrop" onClick={() => setViewing(null)}>
-          <div className="lt-modal" onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: 4 }}>{viewing.id}</div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {viewing.rate != null ? `$${viewing.rate.toLocaleString()}` : 'No rate'}
-                  <span style={{
-                    fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
-                    background: RATE_SOURCE_COLORS[viewing.source_type] + '15',
-                    color: RATE_SOURCE_COLORS[viewing.source_type],
-                    textTransform: 'uppercase',
-                  }}>
-                    {viewing.source_type}
-                  </span>
-                </div>
-              </div>
-              <button className="lt-icon-btn" onClick={() => setViewing(null)}><X size={14} /></button>
+        <Modal isOpen onClose={closeView} title={viewing.rate != null ? `$${viewing.rate.toLocaleString()}` : 'No rate'}>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-label text-fg-muted">{viewing.id}</span>
+            <TypePill type={viewing.source_type} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-x-4">
+            {detailFields(viewing).map(([k, v]) => <PreviewRow key={k} label={k} value={v} />)}
+          </div>
+
+          {/* Existing remark display */}
+          {viewing.remark && !remarkFocused && (
+            <div className="rounded-card border border-info-line bg-info-bg px-2.5 py-2 text-control">
+              <h3 className="m-0 mb-1 text-label font-bold uppercase tracking-label text-fg-muted">Remark</h3>
+              <div className="text-fg-label">{viewing.remark}</div>
             </div>
+          )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              {detailFields(viewing).map(([k, v]) => (
-                <div key={k} className="lt-preview-row" style={{ padding: '6px 0' }}>
-                  <span className="lt-preview-key">{k}</span>
-                  <span className="lt-preview-val">{v}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Existing remark display */}
-            {viewing.remark && !remarkFocused && (
-              <div style={{
-                marginTop: 14, padding: '8px 10px',
-                background: 'rgba(59,130,246,0.04)', border: '1px solid rgba(59,130,246,0.12)',
-                borderRadius: 8, fontSize: 12,
-              }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>
-                  Remark
-                </div>
-                <div style={{ color: 'var(--text-secondary)' }}>{viewing.remark}</div>
-              </div>
-            )}
-
-            {/* Add / Edit Note section */}
-            <div style={{ marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-                {viewing.remark ? 'Edit Note' : 'Add Note'}
-              </div>
-              <textarea
-                ref={remarkRef}
-                style={{ ...INPUT_STYLE, minHeight: 60, resize: 'vertical', marginBottom: 8, fontSize: 12 }}
-                placeholder="Write a note..."
-                value={remarkText}
-                onChange={e => setRemarkText(e.target.value)}
-              />
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button
-                  className="db-btn primary"
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11 }}
-                  disabled={remarkSaving || remarkText.trim() === (viewing.remark ?? '')}
-                  onClick={handleRemarkSave}
-                >
-                  {remarkSaving ? <Loader2 size={11} className="spin" /> : <Send size={11} />}
-                  Save Note
-                </button>
-              </div>
+          {/* Add / Edit Note section */}
+          <div className="flex flex-col gap-2 border-0 border-t border-line-soft pt-3.5">
+            <Field label={viewing.remark ? 'Edit Note' : 'Add Note'}>
+              {ids => (
+                <Textarea
+                  {...ids}
+                  ref={remarkRef}
+                  className="resize-y"
+                  placeholder="Write a note..."
+                  value={remarkText}
+                  onChange={e => setRemarkText(e.target.value)}
+                />
+              )}
+            </Field>
+            <div className="flex justify-end">
+              <Button
+                variant="primary"
+                aria-busy={remarkSaving || undefined}
+                icon={remarkSaving ? <Loader2 size={14} aria-hidden="true" className="animate-spin" /> : <Send size={14} aria-hidden="true" />}
+                disabled={remarkText.trim() === (viewing.remark ?? '')}
+                onClick={handleRemarkSave}
+              >
+                Save Note
+              </Button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Edit modal - Procurement/Admin only */}
       {editing && !isRestrictedRole && (
-        <div className="lt-modal-backdrop" onClick={() => setEditing(null)}>
-          <div className="lt-modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace', marginBottom: 4 }}>{editing.id}</div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  Edit Rate
-                  <span style={{
-                    fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
-                    background: RATE_SOURCE_COLORS[editing.source_type] + '15',
-                    color: RATE_SOURCE_COLORS[editing.source_type],
-                    textTransform: 'uppercase',
-                  }}>
-                    {editing.source_type}
-                  </span>
-                </div>
-              </div>
-              <button className="lt-icon-btn" onClick={() => setEditing(null)}><X size={14} /></button>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              {/* Rate */}
-              <div>
-                <label style={FIELD_LABEL}>Rate *</label>
-                <input style={INPUT_STYLE} type="number" min={0}
-                  value={ef('rate')} onChange={e => setEf('rate', e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="e.g. 2450.00" />
-              </div>
-              {/* Currency */}
-              <div>
-                <label style={FIELD_LABEL}>Currency</label>
-                <input style={INPUT_STYLE}
-                  value={ef('currency')} onChange={e => setEf('currency', e.target.value)}
-                  placeholder="USD" />
-              </div>
-
-              {/* Container Type - Contracted/FAK/Spot/Tariff Rate */}
-              {['Contracted', 'FAK', 'Spot', 'Tariff Rate'].includes(editing.source_type) && (
-                <div>
-                  <label style={FIELD_LABEL}>Container Type</label>
-                  <input style={INPUT_STYLE}
-                    value={ef('container_type')} onChange={e => setEf('container_type', e.target.value)}
-                    placeholder="e.g. 40'HC" />
-                </div>
-              )}
-
-              {/* Sold - Spot only */}
-              {editing.source_type === 'Spot' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 22 }}>
-                  <input type="checkbox" id="edit-is-sold"
-                    checked={editForm.is_sold as boolean}
-                    onChange={e => setEf('is_sold', e.target.checked)}
-                    style={{ width: 16, height: 16 }} />
-                  <label htmlFor="edit-is-sold" style={{ fontSize: 13, color: 'var(--text)' }}>Sold</label>
-                </div>
-              )}
-
-              {/* Departure Date - Spot only */}
-              {editing.source_type === 'Spot' && (
-                <div>
-                  <label style={FIELD_LABEL}>Departure Date</label>
-                  <input style={INPUT_STYLE} type="date"
-                    value={ef('departure_date')} onChange={e => setEf('departure_date', e.target.value)} />
-                </div>
-              )}
-
-              {/* Origin / Destination - NAC only */}
-              {editing.source_type === 'NAC' && (
-                <>
-                  <div>
-                    <label style={FIELD_LABEL}>Origin</label>
-                    <input style={INPUT_STYLE}
-                      value={ef('origin')} onChange={e => setEf('origin', e.target.value)} />
-                  </div>
-                  <div>
-                    <label style={FIELD_LABEL}>Destination</label>
-                    <input style={INPUT_STYLE}
-                      value={ef('destination')} onChange={e => setEf('destination', e.target.value)} />
-                  </div>
-                </>
-              )}
-
-              {/* Valid From / To */}
-              <div>
-                <label style={FIELD_LABEL}>Valid From</label>
-                <input style={INPUT_STYLE} type="date"
-                  value={ef('valid_from')} onChange={e => setEf('valid_from', e.target.value)} />
-              </div>
-              <div>
-                <label style={FIELD_LABEL}>Valid To</label>
-                <input style={INPUT_STYLE} type="date"
-                  value={ef('valid_to')} onChange={e => setEf('valid_to', e.target.value)} />
-              </div>
-
-              {/* Remark - full width */}
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label style={FIELD_LABEL}>Remark</label>
-                <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: 'vertical' }}
-                  value={ef('remark')} onChange={e => setEf('remark', e.target.value)}
-                  placeholder="Add a remark..." />
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
-              <button className="db-btn" onClick={() => setEditing(null)} disabled={saving}>Cancel</button>
-              <button className="db-btn primary" onClick={handleSave} disabled={saving}
-                style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                {saving ? <Loader2 size={13} className="spin" /> : <Save size={13} />}
+        <Modal
+          isOpen
+          onClose={closeEdit}
+          title="Edit Rate"
+          isDismissable={!saving}
+          footer={
+            <>
+              <Button disabled={saving} onClick={closeEdit}>Cancel</Button>
+              {/* Not disabled while saving: disabling the focused button would drop focus out of the dialog.
+                  handleSave's in-flight guard ignores repeat presses. */}
+              <Button
+                variant="primary"
+                aria-busy={saving || undefined}
+                icon={saving ? <Loader2 size={14} aria-hidden="true" className="animate-spin" /> : <Save size={14} aria-hidden="true" />}
+                onClick={handleSave}
+              >
                 Save
-              </button>
-            </div>
+              </Button>
+            </>
+          }
+        >
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-label text-fg-muted">{editing.id}</span>
+            <TypePill type={editing.source_type} />
           </div>
-        </div>
+
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            <Field label="Rate" required>
+              {ids => (
+                <NumberInput
+                  {...ids}
+                  min={0}
+                  value={ef('rate')}
+                  onChange={e => setEf('rate', e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="e.g. 2450.00"
+                />
+              )}
+            </Field>
+            <Field label="Currency">
+              {ids => <Input {...ids} value={ef('currency')} onChange={e => setEf('currency', e.target.value)} placeholder="USD" />}
+            </Field>
+
+            {/* Container Type - Contracted/FAK/Spot/Tariff Rate */}
+            {['Contracted', 'FAK', 'Spot', 'Tariff Rate'].includes(editing.source_type) && (
+              <Field label="Container Type">
+                {ids => <Input {...ids} value={ef('container_type')} onChange={e => setEf('container_type', e.target.value)} placeholder="e.g. 40'HC" />}
+              </Field>
+            )}
+
+            {/* Sold - Spot only */}
+            {editing.source_type === 'Spot' && (
+              <div className="flex h-8 items-center self-end">
+                <Checkbox checked={editForm.is_sold as boolean} onChange={v => setEf('is_sold', v)}>Sold</Checkbox>
+              </div>
+            )}
+
+            {/* Departure Date - Spot only */}
+            {editing.source_type === 'Spot' && (
+              <Field label="Departure Date">
+                {ids => <DatePicker {...ids} value={ef('departure_date')} onChange={v => setEf('departure_date', v)} />}
+              </Field>
+            )}
+
+            {/* Origin / Destination - NAC only */}
+            {editing.source_type === 'NAC' && (
+              <>
+                <Field label="Origin">
+                  {ids => <Input {...ids} value={ef('origin')} onChange={e => setEf('origin', e.target.value)} />}
+                </Field>
+                <Field label="Destination">
+                  {ids => <Input {...ids} value={ef('destination')} onChange={e => setEf('destination', e.target.value)} />}
+                </Field>
+              </>
+            )}
+
+            {/* Valid From / To */}
+            <Field label="Valid From">
+              {ids => <DatePicker {...ids} value={ef('valid_from')} onChange={v => setEf('valid_from', v)} />}
+            </Field>
+            <Field label="Valid To">
+              {ids => <DatePicker {...ids} value={ef('valid_to')} onChange={v => setEf('valid_to', v)} />}
+            </Field>
+
+            {/* Remark - full width */}
+            <Field label="Remark" className="col-span-2">
+              {ids => (
+                <Textarea
+                  {...ids}
+                  className="resize-y"
+                  value={ef('remark')}
+                  onChange={e => setEf('remark', e.target.value)}
+                  placeholder="Add a remark..."
+                />
+              )}
+            </Field>
+          </div>
+        </Modal>
       )}
     </div>
   )
