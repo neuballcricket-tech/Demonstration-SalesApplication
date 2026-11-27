@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { I18nProvider } from 'react-aria-components'
 import { useState, type ComponentProps } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { RoleContext, type RoleContextValue } from '../../RoleContext'
@@ -328,6 +329,193 @@ describe('RateCheck submit and escalation', () => {
     await waitFor(() => expect(onGoToQuotations).toHaveBeenCalledTimes(1))
     expect(api.apiPatchRateRequestProc.mock.calls[0][0]).toBe(951)
     expect(api.apiAddRateRequestOption).toHaveBeenCalledExactlyOnceWith(951, { request_id: 951, rate_type: 'tariff_rates', rate_id: 511, schedule_id: 9102 })
+  })
+})
+
+// ---- Manual rate entry (procurement) ----
+
+const manualInquiry = { ...inquiry, preferred_liners: ['Maersk', 'MSC'], com_ids: [12] } as unknown as Inquiry
+
+async function openManualEntry(inq: Inquiry = manualInquiry) {
+  api.apiGetLiners.mockResolvedValue([
+    { lin_id: 3, name: 'Maersk', scac: 'MAEU', is_on_inttra: true, has_portal: false },
+    { lin_id: 5, name: 'MSC', scac: 'MSCU', is_on_inttra: true, has_portal: false },
+    { lin_id: 9, name: 'CMA CGM', scac: null, is_on_inttra: false, has_portal: false },
+  ])
+  api.apiGetTradeLanes.mockResolvedValue([{ trln_id: 1, trln_name: 'Asia - North Europe' }, { trln_id: 2, trln_name: 'Asia - Mediterranean' }])
+  api.apiGetEmployeesDb.mockResolvedValue([{ emp_id: 1, name: 'Alice Sales', desig: null, dept: 'sales' }])
+  api.apiGetPorts.mockResolvedValue([{ name: 'Colombo', country: 'Sri Lanka' }, { name: 'Hamburg', country: 'Germany' }])
+  const props = { onAdvanceWorkflow: vi.fn(), onLogActivity: vi.fn(), onFlash: vi.fn(), onGoBack: vi.fn(), onGoToQuotations: vi.fn() }
+  render(
+    <I18nProvider locale="en-GB">
+      <RoleContext.Provider value={role}><RateCheck inquiry={inq} customers={[]} variant="procurement" {...props} /></RoleContext.Provider>
+    </I18nProvider>,
+  )
+  const user = userEvent.setup()
+  await screen.findAllByRole('button', { name: 'Attach manual rate to this schedule' })
+  await user.click(screen.getByRole('button', { name: 'Enter Rates Manually' }))
+  // Reference data has loaded once the trade lane list has options
+  await user.click(screen.getByRole('button', { name: /Trade Lane/ }))
+  await user.click(await screen.findByRole('option', { name: 'Asia - North Europe' }))
+  return { ...props, user }
+}
+
+type User = ReturnType<typeof userEvent.setup>
+const pick = async (user: User, trigger: RegExp | string, option: string) => {
+  await user.click(screen.getByRole('button', { name: trigger }))
+  await user.click(screen.getByRole('option', { name: option }))
+}
+const typeDate = async (user: User, group: string, ddmmyyyy: string) => {
+  await user.click(within(screen.getByRole('group', { name: group })).getAllByRole('spinbutton')[0])
+  await user.keyboard(ddmmyyyy)
+}
+const typeTime = async (user: User, group: string, hhmm: string) => {
+  await user.click(within(screen.getByRole('group', { name: group })).getAllByRole('spinbutton')[0])
+  await user.keyboard(hhmm)
+}
+
+describe('RateCheck manual rate entry', () => {
+  it('switches rate type with navy pressed toggles and shows the matching sections', async () => {
+    const { user } = await openManualEntry()
+    const tabs = within(screen.getByRole('group', { name: 'Rate type' }))
+    expect(tabs.getByRole('button', { name: 'Spot Rate' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('textbox', { name: 'Vessel Name' })).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Commodity Type' })).not.toBeInTheDocument()
+    expect(screen.getByText('Valid From', { selector: 'label' })).not.toHaveTextContent('*')
+
+    await user.click(tabs.getByRole('button', { name: 'FAK' }))
+    expect(tabs.getByRole('button', { name: 'FAK' })).toHaveAttribute('aria-pressed', 'true')
+    expect(tabs.getByRole('button', { name: 'Spot Rate' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.queryByRole('textbox', { name: 'Vessel Name' })).not.toBeInTheDocument()
+    expect(screen.getByText('Valid From', { selector: 'label' })).toHaveTextContent('*')
+
+    await user.click(tabs.getByRole('button', { name: 'Special Rate' }))
+    expect(screen.getByRole('combobox', { name: 'Commodity Type' })).toBeInTheDocument()
+  })
+
+  it('round-trips Select, ComboBox, DatePicker and TimeField values into the vessel rate payload', async () => {
+    const { user } = await openManualEntry()
+    const add = screen.getByRole('button', { name: 'Add to brief' })
+    expect(add).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: 'Maersk' }))
+    expect(screen.getByRole('button', { name: 'Maersk' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: / Liner$/ })).toHaveTextContent('Maersk – MAEU')
+    await pick(user, /Sales Contact/, 'Alice Sales')
+    expect(screen.getByRole('button', { name: /Sales Contact/ })).toHaveTextContent('Alice Sales')
+
+    const service = screen.getByRole('combobox', { name: 'Service Lane' })
+    await user.type(service, 'Medit')
+    await user.click(screen.getByRole('option', { name: 'Asia - Mediterranean' }))
+    expect(service).toHaveValue('Asia - Mediterranean')
+    const origin = screen.getByRole('combobox', { name: 'Origin' })
+    await user.clear(origin)
+    await user.type(origin, 'Colombo')
+    await user.click(screen.getByRole('option', { name: /Colombo\/Sri Lanka/ }))
+    expect(origin).toHaveValue('Colombo/Sri Lanka')
+    await user.type(screen.getByRole('textbox', { name: 'Free Days' }), '14')
+
+    await user.type(screen.getByRole('textbox', { name: 'Vessel Name' }), 'Spot Vessel')
+    await user.type(screen.getByRole('textbox', { name: 'Voyage' }), '2607E')
+    await typeDate(user, 'Vessel ETD', '05122026')
+    await typeDate(user, 'Vessel ETA', '29122026')
+    await typeDate(user, 'FCL Opening', '01122026')
+    await typeTime(user, 'FCL opening time', '0800')
+    await typeDate(user, 'FCL Cutoff', '03122026')
+    await typeTime(user, 'FCL cutoff time', '1830')
+    expect(within(screen.getByRole('group', { name: 'Vessel ETD' })).getByRole('spinbutton', { name: /day/ })).toHaveTextContent('05')
+
+    await user.type(screen.getByRole('textbox', { name: 'TUs, row 1' }), '10')
+    await user.type(screen.getByRole('spinbutton', { name: 'Rate, row 1' }), '1650')
+    await pick(user, /Currency, row 1/, 'EUR')
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    await user.type(screen.getByRole('combobox', { name: 'Surcharge type, row 1' }), 'BA')
+    await user.click(screen.getByRole('option', { name: 'BAF' }))
+    await user.type(screen.getByRole('spinbutton', { name: 'Surcharge amount, row 1' }), '50')
+    await user.click(screen.getByRole('checkbox', { name: 'Mark as cancelled' }))
+    await user.type(screen.getByRole('textbox', { name: 'Cancellation Reason' }), 'Rolled')
+    await user.type(screen.getByRole('spinbutton', { name: 'Cancellation Charge' }), '200')
+
+    expect(add).toBeEnabled()
+    await user.click(add)
+    await waitFor(() => expect(api.apiCreateVesselRate).toHaveBeenCalledTimes(1))
+    expect(api.apiCreateVesselRate).toHaveBeenCalledWith({
+      inq_id: 4, lin_id: 3, voyage: '2607E', vessel_name: 'Spot Vessel', eta: '2026-12-29', etd: '2026-12-05',
+      rate: 1650, currency: 'EUR', fcl_opening: '2026-12-01T08:00:00', fcl_cutoff: '2026-12-03T18:30:00',
+      origin: 'Colombo/Sri Lanka', destination: 'DEHAM', tr_ln_id: 1, container_type: '20GP', volume: 10,
+      free_days: '14', max_weight: undefined, note: undefined, special_remark: undefined, issold: undefined,
+      iscancelled: true, cancellationreason: 'Rolled', cancellationfee: 200,
+      surcharges: [{ rate_id: 0, type: 'BAF', amt: 50, currency: 'USD' }], schedule_id: undefined,
+    })
+
+    // The entry lands in the sidebar and the rate fields reset; carrier and route stay
+    expect(screen.getByText('Added Manual Rates (1)')).toBeInTheDocument()
+    expect(screen.getByText(/20GP: \$1,700 EUR/)).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Vessel Name' })).toHaveValue('')
+    expect(screen.getByRole('checkbox', { name: 'Mark as cancelled' })).not.toBeChecked()
+    expect(origin).toHaveValue('Colombo/Sri Lanka')
+  })
+
+  it('adds an FAK rate and a Special rate with their own payload shapes', async () => {
+    const { user } = await openManualEntry()
+    const tabs = within(screen.getByRole('group', { name: 'Rate type' }))
+    await user.click(tabs.getByRole('button', { name: 'FAK' }))
+    await pick(user, / Liner$/, 'MSC – MSCU')
+    await typeDate(user, 'Valid From', '01122026')
+    await typeDate(user, 'Valid To', '31122026')
+    await pick(user, /Container type, row 1/, '40 HC')
+    await user.type(screen.getByRole('spinbutton', { name: 'Rate, row 1' }), '1500')
+    await user.click(screen.getByRole('checkbox', { name: 'Mark as sold' }))
+    await user.click(screen.getByRole('button', { name: 'Add to brief' }))
+    await waitFor(() => expect(api.apiCreateFakRate).toHaveBeenCalledTimes(1))
+    expect(api.apiCreateFakRate).toHaveBeenCalledWith(expect.objectContaining({
+      lin_id: 5, tr_ln_id: 1, inq_id: 4, valid_from: '2026-12-01T00:00:00', valid_to: '2026-12-31T00:00:00',
+      container_type: '40HC', rate: 1500, currency: 'USD', volume: 1, issold: true, origin: 'LKCMB', destination: 'DEHAM',
+    }))
+
+    await user.click(tabs.getByRole('button', { name: 'Special Rate' }))
+    const commodity = screen.getByRole('combobox', { name: 'Commodity Type' })
+    await user.clear(commodity)
+    await user.type(commodity, 'Textiles')
+    await user.tab()
+    expect(commodity).toHaveValue('Textiles')
+    await typeDate(user, 'Valid From', '01122026')
+    await typeDate(user, 'Valid To', '31122026')
+    await user.type(screen.getByRole('spinbutton', { name: 'Rate, row 1' }), '1800')
+    await user.click(screen.getByRole('button', { name: 'Add to brief' }))
+    await waitFor(() => expect(api.apiCreateSpecialRate).toHaveBeenCalledTimes(1))
+    expect(api.apiCreateSpecialRate).toHaveBeenCalledWith(expect.objectContaining({ lin_id: 5, com_id: 12, rate: 1800, container_type: '20GP' }))
+    expect(screen.getByText('Added Manual Rates (2)')).toBeInTheDocument()
+  })
+
+  it('switches the liner to a free-text search with Other and back to the preferred list', async () => {
+    const { user } = await openManualEntry()
+    await user.click(screen.getByRole('button', { name: 'Other' }))
+    const liner = screen.getByRole('combobox', { name: 'Liner' })
+    await user.type(liner, 'CMA')
+    await user.click(screen.getByRole('option', { name: /CMA CGM/ }))
+    expect(liner).toHaveValue('CMA CGM')
+    await user.click(screen.getByRole('button', { name: 'Back to preferred liners' }))
+    expect(screen.getByRole('button', { name: / Liner$/ })).toHaveTextContent('Select preferred liner')
+    await pick(user, / Liner$/, 'Other')
+    expect(screen.getByRole('combobox', { name: 'Liner' })).toHaveValue('')
+  })
+
+  it('keeps one container row: its remove button is disabled until a second row exists', async () => {
+    const { user } = await openManualEntry()
+    expect(screen.getByRole('button', { name: 'Remove container row 1' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'Add container' }))
+    expect(screen.getByRole('spinbutton', { name: 'Rate, row 2' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Remove container row 2' }))
+    expect(screen.queryByRole('spinbutton', { name: 'Rate, row 2' })).not.toBeInTheDocument()
+  })
+
+  it('collapses and re-opens the brief sidebar', async () => {
+    const { user } = await openManualEntry()
+    await user.click(within(screen.getByText('Rate Brief').parentElement!).getByRole('button', { name: 'Collapse sidebar' }))
+    expect(screen.queryByText('Rate Brief')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show brief' }))
+    expect(screen.getByText('Rate Brief')).toBeInTheDocument()
   })
 })
 

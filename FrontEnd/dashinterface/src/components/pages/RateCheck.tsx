@@ -9,10 +9,10 @@ import {
   linerDisplay,
 } from '../../types'
 import { useRole } from '../../RoleContext'
-import { FIELD_LABEL, INPUT_STYLE } from './pageStyles'
 import { apiFetchAllRates, apiGetPorts, apiGetLiners, apiGetTradeLanes, apiGetEmployeesDb, apiGetAuthEmployees, apiCreateVesselRate, apiCreateFakRate, apiCreateSpecialRate, apiCreateRateRequest, apiPatchRateRequestProc, apiAddRateRequestOption, apiGetIncomingRateRequests, apiGetAggregateScheduleRates, apiGetEnrichedScheduleRates, BACKEND_ACTOR_ID } from '../../api'
 import { COLOR } from '../ui/tokens'
-import { Badge, Button, Checkbox, EmptyState, Field, Input, LoadingState, Tooltip } from '../ui'
+import { Badge, Button, Checkbox, ComboBox, DatePicker, EmptyState, Field, Input, LoadingState, NumberInput, Select, TimeField, Tooltip, type ComboBoxItem, type Option } from '../ui'
+import { labelClass } from '../ui/controlStyles'
 import { cn } from '../../lib/cn'
 
 type ManualRateTab = 'vessel-spot' | 'fak' | 'special'
@@ -688,6 +688,58 @@ function RateSectionDivider({ title, selectedCount }: { title: string; selectedC
       <div className="h-px flex-1 bg-line-soft" />
     </div>
   )
+}
+
+// ---- Manual rate entry pieces ----
+
+const SELECTED_TOGGLE = 'border-primary bg-primary text-white hover:bg-primary-hover'
+const READ_ONLY = 'bg-canvas text-fg-muted'
+const CONTAINER_GRID = 'grid grid-cols-[1.1fr_0.7fr_0.9fr_0.9fr_0.8fr_32px] gap-2'
+const SIDEBAR_HEAD = 'mb-1.5 text-label font-bold uppercase tracking-label text-fg-muted'
+const TYPE_PILL = 'rounded-control border px-1.5 py-px text-label font-semibold'
+
+const toOptions = (values: readonly string[]): Option[] => values.map(value => ({ value, label: value }))
+const RATE_CURRENCY_OPTIONS = toOptions(['USD', 'EUR', 'GBP', 'LKR', 'CNY', 'JPY', 'SGD'])
+const CURRENCY_OPTIONS = toOptions(['USD', 'EUR', 'GBP', 'LKR', 'CNY'])
+const CONTAINER_TYPE_OPTIONS: Option[] = MR_VESSEL_CONTAINER_TYPES.map(c => ({ value: c, label: CONTAINER_TYPE_LABELS[c as keyof typeof CONTAINER_TYPE_LABELS] ?? c }))
+const SURCHARGE_ITEMS: ComboBoxItem[] = SURCHARGE_TYPES.map(value => ({ value }))
+const COMMODITY_ITEMS: ComboBoxItem[] = COMMODITY_TYPES.map(value => ({ value }))
+
+/** Drops empty and repeated values (ComboBox items are keyed by value). */
+const uniqueItems = (items: ComboBoxItem[]): ComboBoxItem[] => {
+  const seen = new Set<string>()
+  return items.filter(item => {
+    if (!item.value || seen.has(item.value)) return false
+    seen.add(item.value)
+    return true
+  })
+}
+
+function SectionTitle({ action, children }: { action?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex min-h-7 items-center gap-2 border-b border-line-soft pb-2 text-label font-bold uppercase tracking-label text-fg-muted">
+      {children}
+      {action && <span className="ml-auto">{action}</span>}
+    </div>
+  )
+}
+
+/** Column heading above the container-rate rows. */
+function ColumnLabel({ required, children }: { required?: boolean; children: ReactNode }) {
+  return (
+    <span className={labelClass}>
+      {children}
+      {required && <span aria-hidden="true" className="ml-0.5 text-danger">*</span>}
+    </span>
+  )
+}
+
+/** Icon-only "Remove" button. The tooltip is left off while disabled: a disabled button cannot be focused or hovered. */
+function RemoveButton({ label, size = 'md', disabled, onClick }: { label: string; size?: 'sm' | 'md'; disabled?: boolean; onClick: () => void }) {
+  const button = (
+    <Button variant="ghost" size={size} className={size === 'sm' ? 'w-7 shrink-0 px-0' : 'w-8 px-0'} icon={<X size={14} aria-hidden="true" />} aria-label={label} disabled={disabled} onClick={onClick} />
+  )
+  return disabled ? button : <Tooltip content="Remove">{button}</Tooltip>
 }
 
 interface RateCheckProps {
@@ -1700,7 +1752,20 @@ export default function RateCheck({
 
   const reviewAction = getReviewAction()
 
-  const sectionTitle: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#d97706', marginBottom: 10 }
+  // Options for the manual entry controls
+  const preferredLinerOptions: Option[] = [
+    ...(inquiry.preferred_liners || []).map(name => {
+      const lr = linerList.find(x => x.name === name)
+      return { value: name, label: lr ? linerDisplay(lr) : name }
+    }),
+    { value: '__other__', label: 'Other' },
+  ]
+  const linerItems = useMemo(() => uniqueItems(linerList.map(l => ({ value: l.name, description: linerDisplay(l) }))), [linerList])
+  const tradeLaneOptions: Option[] = tradeLaneList.map(t => ({ value: t.trln_name, label: t.trln_name }))
+  const serviceLaneItems = uniqueItems(tradeLaneList.map(t => ({ value: t.trln_name })))
+  // Optional field: the empty choice stays selectable
+  const salesContactOptions: Option[] = [{ value: '', label: 'Select sales contact' }, ...employeeList.map(e => ({ value: e.name, label: e.name }))]
+  const portItems = useMemo(() => uniqueItems(portOptions(portList).map(o => ({ value: o.value, description: o.label }))), [portList])
 
   const backLabel = mode === 'review' ? 'Back to Edit' : mode === 'manual-entry' ? 'Back to Rate Check' : 'Back to Workspace'
   const inquiryPanel = (
@@ -1931,113 +1996,85 @@ export default function RateCheck({
             {inquiryPanel}
 
             {/* ── CENTER: Manual entry form ── */}
-            <div style={{ flex: 1, minWidth: 0, paddingRight: sidebarOpen ? 24 : 0 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div className={cn('min-w-0 flex-1', sidebarOpen && 'pr-6')}>
+              <div className="flex flex-col gap-4">
 
                 {/* Schedule-linked banner (Path 3) */}
                 {linkedSchedule && (
-                  <div style={{
-                    padding: '8px 12px',
-                    background: 'rgba(44,44,130,0.06)',
-                    border: '1px solid rgba(44,44,130,0.18)',
-                    borderRadius: 8,
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  }}>
-                    <div style={{ fontSize: 12, color: COLOR.primary, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <Ship size={13} />
-                      <strong>Linked to Schedule:</strong>{' '}
-                      {linkedSchedule.linerName || '-'} / {linkedSchedule.vesselName || '-'}
-                      {linkedSchedule.voyageNumber ? ` V.${linkedSchedule.voyageNumber}` : ''}
-                      {' · '}ETD: {linkedSchedule.etd ? new Date(linkedSchedule.etd).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '-'}
-                      {' · '}ETA: {linkedSchedule.eta ? new Date(linkedSchedule.eta).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '-'}
+                  <div className="flex items-center justify-between gap-3 rounded-card border border-info-line bg-primary-subtle px-3 py-2">
+                    <div className="flex items-center gap-1.5 text-control text-primary">
+                      <Ship size={14} aria-hidden="true" className="shrink-0" />
+                      <span>
+                        <strong>Linked to Schedule:</strong>{' '}
+                        {linkedSchedule.linerName || '-'} / {linkedSchedule.vesselName || '-'}
+                        {linkedSchedule.voyageNumber ? ` V.${linkedSchedule.voyageNumber}` : ''}
+                        {' · '}ETD: {linkedSchedule.etd ? new Date(linkedSchedule.etd).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '-'}
+                        {' · '}ETA: {linkedSchedule.eta ? new Date(linkedSchedule.eta).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '-'}
+                      </span>
                     </div>
-                    <button
-                      onClick={() => setLinkedSchedule(null)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 11, textDecoration: 'underline' }}
-                    >
-                      Unlink
-                    </button>
+                    <Button variant="ghost" size="sm" onClick={() => setLinkedSchedule(null)}>Unlink</Button>
                   </div>
                 )}
 
-                {/* Rate type tabs - pill style */}
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {/* Rate type tabs */}
+                <div role="group" aria-label="Rate type" className="flex flex-wrap gap-2">
                   {(['vessel-spot', 'fak', 'special'] as ManualRateTab[]).map(tab => (
-                    <button
+                    <Button
                       key={tab}
-                      style={{
-                        padding: '6px 14px', fontSize: 12, fontWeight: mrTab === tab ? 700 : 500,
-                        background: mrTab === tab ? '#d97706' : 'var(--card)',
-                        color: mrTab === tab ? '#fff' : '#64748b',
-                        border: `1px solid ${mrTab === tab ? '#d97706' : 'var(--border)'}`,
-                        borderRadius: 20, cursor: 'pointer', transition: 'all 0.15s',
-                      }}
+                      size="sm"
+                      aria-pressed={mrTab === tab}
+                      className={cn(mrTab === tab && SELECTED_TOGGLE)}
                       onClick={() => setMrTab(tab)}
                     >
                       {MR_TAB_LABELS[tab]}
-                    </button>
+                    </Button>
                   ))}
                 </div>
 
                 {/* Form card */}
-                <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div className="flex flex-col gap-5 rounded-card border border-line-soft bg-surface p-5">
 
                   {/* ── Carrier & service ── */}
-                  <div>
-                    <div style={sectionTitle}>Carrier &amp; service</div>
+                  <section className="flex flex-col gap-3">
+                    <SectionTitle>Carrier &amp; service</SectionTitle>
                     {(inquiry.preferred_liners?.length ?? 0) > 0 && !mrLinerOther && (
-                      <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+                      <div role="group" aria-label="Preferred liners" className="flex flex-wrap gap-2">
                         {(inquiry.preferred_liners || []).map(l => (
-                          <button key={l} type="button" onClick={() => setMrLiner(l)}
-                            style={{
-                              padding: '4px 12px', borderRadius: 16, fontSize: 12, cursor: 'pointer',
-                              background: mrLiner === l ? 'rgba(217,119,6,0.1)' : 'var(--bg)',
-                              color: mrLiner === l ? '#d97706' : '#475569',
-                              border: `1px solid ${mrLiner === l ? '#d97706' : 'var(--border)'}`,
-                              fontWeight: mrLiner === l ? 600 : 400,
-                            }}>
+                          <Button key={l} size="sm" aria-pressed={mrLiner === l} className={cn(mrLiner === l && SELECTED_TOGGLE)} onClick={() => setMrLiner(l)}>
                             {l}
-                          </button>
+                          </Button>
                         ))}
-                        <button type="button" onClick={() => { setMrLinerOther(true); setMrLiner('') }}
-                          style={{ padding: '4px 12px', borderRadius: 16, fontSize: 12, color: '#94a3b8', background: 'var(--bg)', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                        <Button size="sm" variant="ghost" onClick={() => { setMrLinerOther(true); setMrLiner('') }}>
                           Other
-                        </button>
+                        </Button>
                       </div>
                     )}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
-                      <div>
-                        <label style={FIELD_LABEL}>Liner <span style={{ color: '#dc2626' }}>*</span></label>
-                        {linkedSchedule ? (
-                          <input style={{ ...INPUT_STYLE, opacity: 0.7, background: 'var(--bg)' }} value={mrLiner} readOnly />
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                      <Field label="Liner" required>
+                        {ids => linkedSchedule ? (
+                          <Input {...ids} className={READ_ONLY} value={mrLiner} readOnly />
                         ) : !mrLinerOther ? (
-                          <select
-                            style={INPUT_STYLE}
+                          <Select
+                            {...ids}
                             value={mrLiner}
-                            onChange={e => {
-                              if (e.target.value === '__other__') {
+                            onChange={v => {
+                              if (v === '__other__') {
                                 setMrLinerOther(true)
                                 setMrLiner('')
                               } else {
-                                setMrLiner(e.target.value)
+                                setMrLiner(v)
                               }
                             }}
-                          >
-                            <option value="">Select preferred liner</option>
-                            {(inquiry.preferred_liners || []).map(name => {
-                              const lr = linerList.find(x => x.name === name)
-                              return <option key={name} value={name}>{lr ? linerDisplay(lr) : name}</option>
-                            })}
-                            <option value="__other__">Other</option>
-                          </select>
+                            placeholder="Select preferred liner"
+                            options={preferredLinerOptions}
+                          />
                         ) : (
                           <>
-                            <input list="mr-liners" style={INPUT_STYLE} value={mrLiner} onChange={e => setMrLiner(e.target.value)} placeholder="Type to search liners..." />
-                            <datalist id="mr-liners">{linerList.map(l => <option key={l.lin_id} value={l.name}>{linerDisplay(l)}</option>)}</datalist>
+                            <ComboBox {...ids} value={mrLiner} onChange={setMrLiner} items={linerItems} placeholder="Type to search liners..." />
                             {inquiry.preferred_liners?.length ? (
                               <button
                                 type="button"
-                                style={{ background: 'none', border: 'none', padding: 0, fontSize: 11, color: 'var(--accent)', cursor: 'pointer', marginTop: 3, textDecoration: 'underline' }}
+                                className="self-start border-none bg-transparent p-0 text-label text-primary underline"
                                 onClick={() => { setMrLinerOther(false); setMrLiner('') }}
                               >
                                 Back to preferred liners
@@ -2045,271 +2082,206 @@ export default function RateCheck({
                             ) : null}
                           </>
                         )}
-                      </div>
-                      <div>
-                        <label style={FIELD_LABEL}>Trade Lane</label>
-                        <select style={INPUT_STYLE} value={mrTradeLane} onChange={e => setMrTradeLane(e.target.value)}>
-                          <option value="">Select trade lane</option>
-                          {tradeLaneList.map(t => <option key={t.trln_id} value={t.trln_name}>{t.trln_name}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label style={FIELD_LABEL}>Service Lane</label>
-                        <input list="mr-svc-lanes" style={INPUT_STYLE} value={mrServiceLane} onChange={e => setMrServiceLane(e.target.value)} placeholder="Type to search..." />
-                        <datalist id="mr-svc-lanes">{tradeLaneList.map(t => <option key={t.trln_id} value={t.trln_name} />)}</datalist>
-                      </div>
-                      <div>
-                        <label style={FIELD_LABEL}>Sales Contact</label>
-                        <select style={INPUT_STYLE} value={mrSalesperson} onChange={e => setMrSalesperson(e.target.value)}>
-                          <option value="">Select sales contact</option>
-                          {employeeList.map(e => <option key={e.emp_id} value={e.name}>{e.name}</option>)}
-                        </select>
-                      </div>
+                      </Field>
+                      <Field label="Trade Lane">
+                        {ids => <Select {...ids} value={mrTradeLane} onChange={setMrTradeLane} placeholder="Select trade lane" options={tradeLaneOptions} />}
+                      </Field>
+                      <Field label="Service Lane">
+                        {ids => <ComboBox {...ids} value={mrServiceLane} onChange={setMrServiceLane} items={serviceLaneItems} placeholder="Type to search..." />}
+                      </Field>
+                      <Field label="Sales Contact">
+                        {ids => <Select {...ids} value={mrSalesperson} onChange={setMrSalesperson} options={salesContactOptions} />}
+                      </Field>
                     </div>
-                  </div>
+                  </section>
 
                   {/* ── Route & free time ── */}
-                  <div>
-                    <div style={sectionTitle}>Route &amp; free time</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.7fr', gap: '12px 16px' }}>
-                      <div>
-                        <label style={FIELD_LABEL}>Origin <span style={{ color: '#dc2626' }}>*</span></label>
-                        {linkedSchedule ? (
-                          <input style={{ ...INPUT_STYLE, opacity: 0.7, background: 'var(--bg)' }} value={mrOrigin} readOnly />
-                        ) : (
-                          <>
-                            <input list="mr-ports-o" style={INPUT_STYLE} value={mrOrigin} onChange={e => setMrOrigin(e.target.value)} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />
-                            <datalist id="mr-ports-o">{portOptions(portList).map((o, i) => <option key={i} value={o.value} label={o.label} />)}</datalist>
-                          </>
-                        )}
-                      </div>
-                      <div>
-                        <label style={FIELD_LABEL}>Destination <span style={{ color: '#dc2626' }}>*</span></label>
-                        {linkedSchedule ? (
-                          <input style={{ ...INPUT_STYLE, opacity: 0.7, background: 'var(--bg)' }} value={mrDestination} readOnly />
-                        ) : (
-                          <>
-                            <input list="mr-ports-d" style={INPUT_STYLE} value={mrDestination} onChange={e => setMrDestination(e.target.value)} placeholder="e.g. Hamburg/Germany or DEHAM" />
-                            <datalist id="mr-ports-d">{portOptions(portList).map((o, i) => <option key={i} value={o.value} label={o.label} />)}</datalist>
-                          </>
-                        )}
-                      </div>
-                      <div>
-                        <label style={FIELD_LABEL}>Free Days</label>
-                        <input style={INPUT_STYLE} value={mrFreeTime} onChange={e => setMrFreeTime(e.target.value)} placeholder="e.g. 14" />
-                      </div>
+                  <section className="flex flex-col gap-3">
+                    <SectionTitle>Route &amp; free time</SectionTitle>
+                    <div className="grid grid-cols-[1fr_1fr_0.7fr] gap-x-4 gap-y-3">
+                      <Field label="Origin" required>
+                        {ids => linkedSchedule
+                          ? <Input {...ids} className={READ_ONLY} value={mrOrigin} readOnly />
+                          : <ComboBox {...ids} value={mrOrigin} onChange={setMrOrigin} items={portItems} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />}
+                      </Field>
+                      <Field label="Destination" required>
+                        {ids => linkedSchedule
+                          ? <Input {...ids} className={READ_ONLY} value={mrDestination} readOnly />
+                          : <ComboBox {...ids} value={mrDestination} onChange={setMrDestination} items={portItems} placeholder="e.g. Hamburg/Germany or DEHAM" />}
+                      </Field>
+                      <Field label="Free Days">
+                        {ids => <Input {...ids} value={mrFreeTime} onChange={e => setMrFreeTime(e.target.value)} placeholder="e.g. 14" />}
+                      </Field>
                     </div>
-                  </div>
+                  </section>
 
                   {/* ── Vessel (spot rate only) ── */}
                   {mrTab === 'vessel-spot' && (
-                    <div>
-                      <div style={sectionTitle}>Vessel</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', marginBottom: 14 }}>
-                        <div>
-                          <label style={FIELD_LABEL}>Vessel Name <span style={{ color: '#dc2626' }}>*</span></label>
-                          <input style={INPUT_STYLE} value={mrVesselName} onChange={e => setMrVesselName(e.target.value)} placeholder="e.g. Maersk Sealand" />
-                        </div>
-                        <div>
-                          <label style={FIELD_LABEL}>Voyage <span style={{ color: '#dc2626' }}>*</span></label>
-                          <input style={INPUT_STYLE} value={mrVoyage} onChange={e => setMrVoyage(e.target.value)} placeholder="e.g. 2607E" />
-                        </div>
-                        <div>
-                          <label style={FIELD_LABEL}>Vessel ETD <span style={{ color: '#dc2626' }}>*</span></label>
-                          <input style={INPUT_STYLE} type="date" value={mrVesselEtd} onChange={e => setMrVesselEtd(e.target.value)} />
-                        </div>
-                        <div>
-                          <label style={FIELD_LABEL}>Vessel ETA <span style={{ color: '#dc2626' }}>*</span></label>
-                          <input style={INPUT_STYLE} type="date" value={mrVesselEta} onChange={e => setMrVesselEta(e.target.value)} />
-                        </div>
+                    <section className="flex flex-col gap-3">
+                      <SectionTitle>Vessel</SectionTitle>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                        <Field label="Vessel Name" required>
+                          {ids => <Input {...ids} value={mrVesselName} onChange={e => setMrVesselName(e.target.value)} placeholder="e.g. Maersk Sealand" />}
+                        </Field>
+                        <Field label="Voyage" required>
+                          {ids => <Input {...ids} value={mrVoyage} onChange={e => setMrVoyage(e.target.value)} placeholder="e.g. 2607E" />}
+                        </Field>
+                        <Field label="Vessel ETD" required>
+                          {ids => <DatePicker {...ids} value={mrVesselEtd} onChange={setMrVesselEtd} />}
+                        </Field>
+                        <Field label="Vessel ETA" required>
+                          {ids => <DatePicker {...ids} value={mrVesselEta} onChange={setMrVesselEta} />}
+                        </Field>
+                        <Field label="FCL Opening" required className="col-span-full">
+                          {ids => (
+                            <div className="grid grid-cols-2 gap-x-4">
+                              <DatePicker {...ids} value={mrFclOpenDate} onChange={setMrFclOpenDate} />
+                              <TimeField aria-label="FCL opening time" value={mrFclOpenTime} onChange={setMrFclOpenTime} />
+                            </div>
+                          )}
+                        </Field>
+                        <Field label="FCL Cutoff" required className="col-span-full">
+                          {ids => (
+                            <div className="grid grid-cols-2 gap-x-4">
+                              <DatePicker {...ids} value={mrFclCutDate} onChange={setMrFclCutDate} />
+                              <TimeField aria-label="FCL cutoff time" value={mrFclCutTime} onChange={setMrFclCutTime} />
+                            </div>
+                          )}
+                        </Field>
                       </div>
-                      <label style={FIELD_LABEL}>FCL Opening <span style={{ color: '#dc2626' }}>*</span></label>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px', marginBottom: 14 }}>
-                        <input style={INPUT_STYLE} type="date" value={mrFclOpenDate} onChange={e => setMrFclOpenDate(e.target.value)} />
-                        <input style={INPUT_STYLE} type="time" value={mrFclOpenTime} onChange={e => setMrFclOpenTime(e.target.value)} />
-                      </div>
-                      <label style={FIELD_LABEL}>FCL Cutoff <span style={{ color: '#dc2626' }}>*</span></label>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
-                        <input style={INPUT_STYLE} type="date" value={mrFclCutDate} onChange={e => setMrFclCutDate(e.target.value)} />
-                        <input style={INPUT_STYLE} type="time" value={mrFclCutTime} onChange={e => setMrFclCutTime(e.target.value)} />
-                      </div>
-                    </div>
+                    </section>
                   )}
 
                   {/* ── Commodity (special only) ── */}
                   {mrTab === 'special' && (
-                    <div>
-                      <div style={sectionTitle}>Commodity</div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
-                        <div>
-                          <label style={FIELD_LABEL}>Commodity Type</label>
-                          <input list="mr-commodity-types" style={INPUT_STYLE} value={mrCommodityType} onChange={e => setMrCommodityType(e.target.value)} placeholder="Select or type..." />
-                          <datalist id="mr-commodity-types">{COMMODITY_TYPES.map(ct => <option key={ct} value={ct} />)}</datalist>
-                        </div>
-                        <div>
-                          <label style={FIELD_LABEL}>Commodity Name</label>
-                          <input style={INPUT_STYLE} value={mrCommodityName} onChange={e => setMrCommodityName(e.target.value)} placeholder="e.g. Cotton T-shirts" />
-                        </div>
+                    <section className="flex flex-col gap-3">
+                      <SectionTitle>Commodity</SectionTitle>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                        <Field label="Commodity Type">
+                          {ids => <ComboBox {...ids} value={mrCommodityType} onChange={setMrCommodityType} items={COMMODITY_ITEMS} placeholder="Select or type..." />}
+                        </Field>
+                        <Field label="Commodity Name">
+                          {ids => <Input {...ids} value={mrCommodityName} onChange={e => setMrCommodityName(e.target.value)} placeholder="e.g. Cotton T-shirts" />}
+                        </Field>
                       </div>
-                    </div>
+                    </section>
                   )}
 
                   {/* ── Container rates ── */}
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                      <span style={sectionTitle}>Container rates</span>
-                      <button type="button" onClick={addMrContainer}
-                        style={{ padding: '5px 11px', borderRadius: 7, background: 'var(--card)', border: '1px solid #fbd8a8', color: '#d97706', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-                        + Add container
-                      </button>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <section className="flex flex-col gap-3">
+                    <SectionTitle action={<Button size="sm" icon={<Plus size={14} aria-hidden="true" />} onClick={addMrContainer}>Add container</Button>}>
+                      Container rates
+                    </SectionTitle>
+                    <div className="flex flex-col gap-2">
+                      <div className={cn(CONTAINER_GRID, 'items-end')}>
+                        <ColumnLabel>Container type</ColumnLabel>
+                        <ColumnLabel>TUs</ColumnLabel>
+                        <ColumnLabel>Max weight</ColumnLabel>
+                        <ColumnLabel required>Rate</ColumnLabel>
+                        <ColumnLabel>Currency</ColumnLabel>
+                        <div />
+                      </div>
                       {mrContainers.map((ct, idx) => (
-                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.7fr 0.9fr 0.9fr 0.8fr 24px', gap: 8, alignItems: 'end' }}>
-                          <div>
-                            {idx === 0 && <label style={FIELD_LABEL}>Container type</label>}
-                            <select style={INPUT_STYLE} value={ct.containerType} onChange={e => updateMrContainer(idx, { containerType: e.target.value })}>
-                              {MR_VESSEL_CONTAINER_TYPES.map(c => <option key={c} value={c}>{CONTAINER_TYPE_LABELS[c as keyof typeof CONTAINER_TYPE_LABELS] ?? c}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            {idx === 0 && <label style={FIELD_LABEL}>TUs</label>}
-                            <input style={INPUT_STYLE} value={ct.tus} onChange={e => updateMrContainer(idx, { tus: e.target.value })} placeholder="10" />
-                          </div>
-                          <div>
-                            {idx === 0 && <label style={FIELD_LABEL}>Max weight</label>}
-                            <input style={INPUT_STYLE} value={ct.maxWeight} onChange={e => updateMrContainer(idx, { maxWeight: e.target.value })} placeholder="28000 kg" />
-                          </div>
-                          <div>
-                            {idx === 0 && <label style={FIELD_LABEL}>Rate <span style={{ color: '#dc2626' }}>*</span></label>}
-                            <input style={INPUT_STYLE} type="number" value={ct.rate} onChange={e => updateMrContainer(idx, { rate: e.target.value })} placeholder="1650" min={0} />
-                          </div>
-                          <div>
-                            {idx === 0 && <label style={FIELD_LABEL}>Currency</label>}
-                            <select style={INPUT_STYLE} value={ct.currency} onChange={e => updateMrContainer(idx, { currency: e.target.value })}>
-                              <option>USD</option><option>EUR</option><option>GBP</option><option>LKR</option><option>CNY</option><option>JPY</option><option>SGD</option>
-                            </select>
-                          </div>
-                          <button type="button" onClick={() => removeMrContainer(idx)}
-                            style={{ height: 34, background: 'none', border: 'none', cursor: mrContainers.length > 1 ? 'pointer' : 'not-allowed', color: '#94a3b8', fontSize: 15, alignSelf: 'flex-end', opacity: mrContainers.length > 1 ? 1 : 0.3 }}>
-                            ×
-                          </button>
+                        <div key={idx} className={cn(CONTAINER_GRID, 'items-center')}>
+                          <Select aria-label={`Container type, row ${idx + 1}`} value={ct.containerType} onChange={v => updateMrContainer(idx, { containerType: v })} options={CONTAINER_TYPE_OPTIONS} />
+                          <Input aria-label={`TUs, row ${idx + 1}`} value={ct.tus} onChange={e => updateMrContainer(idx, { tus: e.target.value })} placeholder="10" />
+                          <Input aria-label={`Max weight, row ${idx + 1}`} value={ct.maxWeight} onChange={e => updateMrContainer(idx, { maxWeight: e.target.value })} placeholder="28000 kg" />
+                          <NumberInput aria-label={`Rate, row ${idx + 1}`} value={ct.rate} onChange={e => updateMrContainer(idx, { rate: e.target.value })} placeholder="1650" min={0} />
+                          <Select aria-label={`Currency, row ${idx + 1}`} value={ct.currency} onChange={v => updateMrContainer(idx, { currency: v })} options={RATE_CURRENCY_OPTIONS} />
+                          <RemoveButton label={`Remove container row ${idx + 1}`} disabled={mrContainers.length === 1} onClick={() => removeMrContainer(idx)} />
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </section>
 
                   {/* ── Validity ── */}
-                  <div>
-                    <div style={sectionTitle}>Validity</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 16px' }}>
-                      <div>
-                        <label style={FIELD_LABEL}>Valid From {mrTab !== 'vessel-spot' && <span style={{ color: '#dc2626' }}>*</span>}</label>
-                        <input style={INPUT_STYLE} type="date" value={mrValidFrom} onChange={e => setMrValidFrom(e.target.value)} />
-                      </div>
-                      <div>
-                        <label style={FIELD_LABEL}>Valid To {mrTab !== 'vessel-spot' && <span style={{ color: '#dc2626' }}>*</span>}</label>
-                        <input style={INPUT_STYLE} type="date" value={mrValidTo} onChange={e => setMrValidTo(e.target.value)} />
-                      </div>
+                  <section className="flex flex-col gap-3">
+                    <SectionTitle>Validity</SectionTitle>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                      <Field label="Valid From" required={mrTab !== 'vessel-spot'}>
+                        {ids => <DatePicker {...ids} value={mrValidFrom} onChange={setMrValidFrom} />}
+                      </Field>
+                      <Field label="Valid To" required={mrTab !== 'vessel-spot'}>
+                        {ids => <DatePicker {...ids} value={mrValidTo} onChange={setMrValidTo} />}
+                      </Field>
                     </div>
-                  </div>
+                  </section>
 
                   {/* ── Flags ── */}
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, alignItems: 'center' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, cursor: 'pointer', color: '#334155' }}>
-                      <input type="checkbox" checked={mrIsSold} onChange={e => setMrIsSold(e.target.checked)} />
-                      <span style={{ fontWeight: mrIsSold ? 600 : 400, color: mrIsSold ? '#059669' : '#334155' }}>Mark as sold</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, cursor: 'pointer', color: '#334155' }}>
-                      <input type="checkbox" checked={mrIsCancelled} onChange={e => setMrIsCancelled(e.target.checked)} />
-                      <span style={{ fontWeight: mrIsCancelled ? 600 : 400, color: mrIsCancelled ? '#dc2626' : '#334155' }}>Mark as cancelled</span>
-                    </label>
+                  <div className="flex flex-wrap items-center gap-5">
+                    <Checkbox checked={mrIsSold} onChange={setMrIsSold}>
+                      <span className={cn(mrIsSold && 'font-semibold text-success')}>Mark as sold</span>
+                    </Checkbox>
+                    <Checkbox checked={mrIsCancelled} onChange={setMrIsCancelled}>
+                      <span className={cn(mrIsCancelled && 'font-semibold text-danger')}>Mark as cancelled</span>
+                    </Checkbox>
                   </div>
 
                   {/* ── Cancellation details ── */}
                   {mrIsCancelled && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <div>
-                        <label style={FIELD_LABEL}>Cancellation Reason</label>
-                        <input style={INPUT_STYLE} value={mrCancelReason} onChange={e => setMrCancelReason(e.target.value)} placeholder="Reason for cancellation..." />
-                      </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.45fr', gap: 10 }}>
-                        <div>
-                          <label style={FIELD_LABEL}>Cancellation Charge</label>
-                          <input style={INPUT_STYLE} type="number" min={0} value={mrCancelCharge} onChange={e => setMrCancelCharge(e.target.value)} placeholder="e.g. 200" />
-                        </div>
-                        <div>
-                          <label style={FIELD_LABEL}>Currency</label>
-                          <select style={INPUT_STYLE} value={mrCancelChargeCurrency} onChange={e => setMrCancelChargeCurrency(e.target.value)}>
-                            <option>USD</option><option>EUR</option><option>GBP</option><option>LKR</option><option>CNY</option>
-                          </select>
-                        </div>
+                    <div className="flex flex-col gap-3">
+                      <Field label="Cancellation Reason">
+                        {ids => <Input {...ids} value={mrCancelReason} onChange={e => setMrCancelReason(e.target.value)} placeholder="Reason for cancellation..." />}
+                      </Field>
+                      <div className="grid grid-cols-[1fr_0.45fr] gap-x-4">
+                        <Field label="Cancellation Charge">
+                          {ids => <NumberInput {...ids} min={0} value={mrCancelCharge} onChange={e => setMrCancelCharge(e.target.value)} placeholder="e.g. 200" />}
+                        </Field>
+                        <Field label="Currency">
+                          {ids => <Select {...ids} value={mrCancelChargeCurrency} onChange={setMrCancelChargeCurrency} options={CURRENCY_OPTIONS} />}
+                        </Field>
                       </div>
                     </div>
                   )}
 
                   {/* ── Surcharges ── */}
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                      <span style={sectionTitle}>Surcharges</span>
-                      <button onClick={() => setMrSurcharges(prev => [...prev, { type: '', amount: '', currency: 'USD' }])}
-                        style={{ padding: '5px 11px', borderRadius: 7, background: 'var(--card)', border: '1px solid #fbd8a8', color: '#d97706', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-                        + Add
-                      </button>
-                    </div>
+                  <section className="flex flex-col gap-3">
+                    <SectionTitle action={
+                      <Button size="sm" icon={<Plus size={14} aria-hidden="true" />} onClick={() => setMrSurcharges(prev => [...prev, { type: '', amount: '', currency: 'USD' }])}>
+                        Add
+                      </Button>
+                    }>
+                      Surcharges
+                    </SectionTitle>
                     {mrSurcharges.length === 0 && (
-                      <div style={{ fontSize: 12, color: '#94a3b8', padding: '4px 0' }}>No surcharges added.</div>
+                      <div className="text-control text-fg-muted">No surcharges added.</div>
                     )}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {mrSurcharges.map((sc, idx) => (
-                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 0.8fr 24px', gap: 8, alignItems: 'flex-end' }}>
-                          <input list="mr-surcharge-types" style={INPUT_STYLE} value={sc.type}
-                            onChange={e => { const v = e.target.value; setMrSurcharges(prev => prev.map((s, i) => i === idx ? { ...s, type: v } : s)) }}
-                            placeholder="e.g. BAF" />
-                          <input style={INPUT_STYLE} type="number" value={sc.amount}
-                            onChange={e => { const v = e.target.value; setMrSurcharges(prev => prev.map((s, i) => i === idx ? { ...s, amount: v } : s)) }}
-                            placeholder="Amount" min={0} />
-                          <select style={INPUT_STYLE} value={sc.currency}
-                            onChange={e => { const v = e.target.value; setMrSurcharges(prev => prev.map((s, i) => i === idx ? { ...s, currency: v } : s)) }}>
-                            <option>USD</option><option>EUR</option><option>GBP</option><option>LKR</option><option>CNY</option>
-                          </select>
-                          <button style={{ height: 34, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 15 }}
-                            onClick={() => setMrSurcharges(prev => prev.filter((_, i) => i !== idx))}>×</button>
-                        </div>
-                      ))}
-                    </div>
-                    <datalist id="mr-surcharge-types">{SURCHARGE_TYPES.map(s => <option key={s} value={s} />)}</datalist>
-                  </div>
+                    {mrSurcharges.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        {mrSurcharges.map((sc, idx) => (
+                          <div key={idx} className="grid grid-cols-[1.4fr_1fr_0.8fr_32px] items-center gap-2">
+                            <ComboBox aria-label={`Surcharge type, row ${idx + 1}`} value={sc.type}
+                              onChange={v => setMrSurcharges(prev => prev.map((s, i) => i === idx ? { ...s, type: v } : s))}
+                              items={SURCHARGE_ITEMS} placeholder="e.g. BAF" />
+                            <NumberInput aria-label={`Surcharge amount, row ${idx + 1}`} value={sc.amount}
+                              onChange={e => { const v = e.target.value; setMrSurcharges(prev => prev.map((s, i) => i === idx ? { ...s, amount: v } : s)) }}
+                              placeholder="Amount" min={0} />
+                            <Select aria-label={`Surcharge currency, row ${idx + 1}`} value={sc.currency}
+                              onChange={v => setMrSurcharges(prev => prev.map((s, i) => i === idx ? { ...s, currency: v } : s))}
+                              options={CURRENCY_OPTIONS} />
+                            <RemoveButton label={`Remove surcharge row ${idx + 1}`} onClick={() => setMrSurcharges(prev => prev.filter((_, i) => i !== idx))} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </section>
 
                   {/* ── Additional information ── */}
-                  <div>
-                    <div style={sectionTitle}>Additional information</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      <div>
-                        <label style={FIELD_LABEL}>Note</label>
-                        <input style={INPUT_STYLE} value={mrNote} onChange={e => setMrNote(e.target.value)} placeholder="Any notes..." />
-                      </div>
-                      <div>
-                        <label style={FIELD_LABEL}>Analysis Note</label>
-                        <input style={INPUT_STYLE} value={mrSpecialRemark} onChange={e => setMrSpecialRemark(e.target.value)} placeholder="Analysis notes..." />
-                      </div>
-                    </div>
-                  </div>
+                  <section className="flex flex-col gap-3">
+                    <SectionTitle>Additional information</SectionTitle>
+                    <Field label="Note">
+                      {ids => <Input {...ids} value={mrNote} onChange={e => setMrNote(e.target.value)} placeholder="Any notes..." />}
+                    </Field>
+                    <Field label="Analysis Note">
+                      {ids => <Input {...ids} value={mrSpecialRemark} onChange={e => setMrSpecialRemark(e.target.value)} placeholder="Analysis notes..." />}
+                    </Field>
+                  </section>
 
                   {/* ── Add to Brief ── */}
-                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <button
-                      style={{
-                        padding: '9px 16px', borderRadius: 9,
-                        background: canAddEntry ? '#d97706' : 'rgba(217,119,6,0.4)',
-                        color: '#fff', border: 'none', fontSize: 12, fontWeight: 600,
-                        cursor: canAddEntry ? 'pointer' : 'not-allowed',
-                      }}
-                      disabled={!canAddEntry}
-                      onClick={addEntryToBrief}
-                    >
-                      + Add to brief
-                    </button>
+                  <div className="flex justify-end">
+                    <Button variant="primary" icon={<Plus size={14} aria-hidden="true" />} disabled={!canAddEntry} onClick={addEntryToBrief}>
+                      Add to brief
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -2317,37 +2289,32 @@ export default function RateCheck({
 
             {/* Right sidebar */}
             {sidebarOpen ? (
-              <div style={{ width: 340, flexShrink: 0, borderLeft: '1px solid var(--border)', paddingLeft: 20 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14, height: '100%' }}>
+              <div className="w-[340px] shrink-0 border-l border-line-soft pl-5">
+                <div className="flex h-full flex-col gap-3.5">
                   {/* Sidebar header */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>Rate Brief</span>
-                    <button
-                      className="lt-icon-btn"
-                      style={{ padding: 4 }}
-                      onClick={() => setSidebarOpen(false)}
-                      title="Collapse sidebar"
-                    >
-                      <X size={14} />
-                    </button>
+                  <div className="flex items-center justify-between">
+                    <span className="text-body font-bold text-fg">Rate Brief</span>
+                    <Tooltip content="Collapse sidebar">
+                      <Button variant="ghost" size="sm" className="w-7 px-0" icon={<X size={14} aria-hidden="true" />} aria-label="Collapse sidebar" onClick={() => setSidebarOpen(false)} />
+                    </Tooltip>
                   </div>
 
                   {/* Selected DB Rates */}
                   {hasDbSelections && (
                     <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Selected DB Rates</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div className={SIDEBAR_HEAD}>Selected DB Rates</div>
+                      <div className="flex flex-col gap-1">
                         {displayRates.filter(r => selectedIds.has(r.id)).map(rate => {
-                          const badgeColor = RATE_SOURCE_COLORS[rate.source_type] || '#64748b'
+                          const badgeColor = RATE_SOURCE_COLORS[rate.source_type] || COLOR.muted
                           return (
-                            <div key={rate.id} style={{ padding: '5px 8px', border: '1px solid var(--border)', borderRadius: 6, background: 'rgba(44,44,130,0.03)' }}>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <div key={rate.id} className="rounded-control border border-line-soft bg-canvas px-2 py-1.5">
+                              <div className="flex items-center gap-1.5 text-control font-semibold text-fg">
                                 {rate.liner_name || 'N/A'}
-                                <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 5px', borderRadius: 3, background: `${badgeColor}18`, color: badgeColor, border: `1px solid ${badgeColor}30` }}>
+                                <span className={TYPE_PILL} style={{ background: `${badgeColor}18`, color: badgeColor, borderColor: `${badgeColor}30` }}>
                                   {rate.source_type}
                                 </span>
                               </div>
-                              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                              <div className="mt-px text-label text-fg-muted">
                                 ${(rate.rate ?? 0).toLocaleString()} {rate.currency} · {rate.container_type || 'N/A'}
                               </div>
                             </div>
@@ -2360,38 +2327,36 @@ export default function RateCheck({
                   {/* Added Manual Rates */}
                   {manualEntries.length > 0 && (
                     <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Added Manual Rates ({manualEntries.length})</div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div className={SIDEBAR_HEAD}>Added Manual Rates ({manualEntries.length})</div>
+                      <div className="flex flex-col gap-1">
                         {manualEntries.map((entry, idx) => {
-                          const accent = ({ 'vessel-spot': RATE_SOURCE_COLORS['Spot'], fak: RATE_SOURCE_COLORS['FAK'], special: RATE_SOURCE_COLORS['Special'] } as Record<ManualRateTab, string>)[entry.tab] || '#d97706'
+                          const accent = ({ 'vessel-spot': RATE_SOURCE_COLORS['Spot'], fak: RATE_SOURCE_COLORS['FAK'], special: RATE_SOURCE_COLORS['Special'] } as Record<ManualRateTab, string>)[entry.tab] || COLOR.warning
                           const entrySurTotal = totalSurcharge(entry)
                           const entrySurNames = surchargeTypeNames(entry)
                           return (
-                            <div key={entry.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--card)' }}>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                                  <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 5px', borderRadius: 3, background: `${accent}18`, color: accent, border: `1px solid ${accent}30` }}>{MR_TAB_LABELS[entry.tab]}</span>
+                            <div key={entry.id} className="flex items-center gap-1.5 rounded-control border border-line-soft bg-surface px-2 py-1.5">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 text-control font-semibold text-fg">
+                                  <span className={TYPE_PILL} style={{ background: `${accent}18`, color: accent, borderColor: `${accent}30` }}>{MR_TAB_LABELS[entry.tab]}</span>
                                   {entry.liner}
                                 </div>
-                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+                                <div className="mt-px text-label text-fg-muted">
                                   {entry.containers.map(c => `${c.containerType}: $${(Number(c.rate) + entrySurTotal).toLocaleString()} ${c.currency}`).join(', ')}
                                   {' · '}{entry.origin || '?'} → {entry.destination || '?'}
-                                  {entry.isCancelled && <span style={{ color: '#dc2626', fontWeight: 600, marginLeft: 4 }}>CANCELLED</span>}
+                                  {entry.isCancelled && <span className="ml-1 font-semibold text-danger">CANCELLED</span>}
                                 </div>
                                 {entrySurNames.length > 0 && (
-                                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1, fontStyle: 'italic' }}>
+                                  <div className="mt-px text-label italic text-fg-muted">
                                     Inclusive of {entrySurNames.join(', ')}
                                   </div>
                                 )}
                                 {entry.scheduleId != null && entry.scheduleSummary && (
-                                  <div style={{ fontSize: 11, color: COLOR.primary, marginTop: 1, display: 'flex', alignItems: 'center', gap: 3 }}>
-                                    <Ship size={8} /> Linked: {entry.scheduleSummary}
+                                  <div className="mt-px flex items-center gap-1 text-label text-primary">
+                                    <Ship size={12} aria-hidden="true" /> Linked: {entry.scheduleSummary}
                                   </div>
                                 )}
                               </div>
-                              <button className="lt-icon-btn" style={{ padding: 3, flexShrink: 0 }} onClick={() => removeEntry(idx)} title="Remove">
-                                <X size={12} />
-                              </button>
+                              <RemoveButton size="sm" label={`Remove ${MR_TAB_LABELS[entry.tab]} ${entry.liner}`} onClick={() => removeEntry(idx)} />
                             </div>
                           )
                         })}
@@ -2400,44 +2365,30 @@ export default function RateCheck({
                   )}
 
                   {/* Notes */}
-                  <div>
-                    <label style={FIELD_LABEL}>Notes (optional)</label>
-                    <input style={INPUT_STYLE} value={formNote}
-                      onChange={e => setFormNote(e.target.value)}
-                      placeholder="Any notes for Sales..." />
-                  </div>
+                  <Field label="Notes (optional)">
+                    {ids => <Input {...ids} value={formNote} onChange={e => setFormNote(e.target.value)} placeholder="Any notes for Sales..." />}
+                  </Field>
 
                   {/* Review & Send button */}
-                  <div style={{ marginTop: 'auto' }}>
-                    <button
-                      className="db-btn primary"
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, fontSize: 12, width: '100%',
-                        background: '#d97706', borderColor: '#d97706',
-                        opacity: canReview ? 1 : 0.5,
-                        cursor: canReview ? 'pointer' : 'not-allowed',
-                      }}
-                      disabled={!canReview}
-                      onClick={() => setMode('review')}
-                    >
-                      <FileDown size={12} /> Review &amp; Send
-                    </button>
+                  <div className="mt-auto">
+                    <Button variant="primary" className="w-full" icon={<FileDown size={14} aria-hidden="true" />} disabled={!canReview} onClick={() => setMode('review')}>
+                      Review &amp; Send
+                    </Button>
                   </div>
                 </div>
               </div>
             ) : (
-              <button
-                onClick={() => setSidebarOpen(true)}
-                title="Show Brief"
-                style={{
-                  padding: '8px 4px', borderLeft: '1px solid var(--border)',
-                  background: 'transparent', border: 'none', cursor: 'pointer',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                }}
-              >
-                <PanelRight size={16} style={{ color: 'var(--text-muted)' }} />
-                <span style={{ writingMode: 'vertical-rl', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>BRIEF</span>
-              </button>
+              <Tooltip content="Show brief">
+                <button
+                  type="button"
+                  aria-label="Show brief"
+                  onClick={() => setSidebarOpen(true)}
+                  className="ml-3 flex flex-col items-center gap-1 border-0 border-l border-line-soft bg-transparent px-1 py-2 text-label font-semibold text-fg-muted hover:text-primary"
+                >
+                  <PanelRight size={16} aria-hidden="true" />
+                  <span className="[writing-mode:vertical-rl]">BRIEF</span>
+                </button>
+              </Tooltip>
             )}
           </div>
         ) : (
