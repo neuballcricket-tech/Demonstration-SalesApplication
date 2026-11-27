@@ -10,7 +10,8 @@ const api = vi.hoisted(() => ({
   apiFetchAllRates: vi.fn(), apiGetEnrichedScheduleRates: vi.fn(), apiGetAuthEmployees: vi.fn(),
   apiGetPorts: vi.fn(), apiGetLiners: vi.fn(), apiGetTradeLanes: vi.fn(), apiGetEmployeesDb: vi.fn(),
   apiGetIncomingRateRequests: vi.fn(), apiGetAggregateScheduleRates: vi.fn(),
-  apiCreateRateRequest: vi.fn(), apiAddRateRequestOption: vi.fn(),
+  apiCreateRateRequest: vi.fn(), apiAddRateRequestOption: vi.fn(), apiPatchRateRequestProc: vi.fn(),
+  apiCreateVesselRate: vi.fn(), apiCreateFakRate: vi.fn(), apiCreateSpecialRate: vi.fn(),
 }))
 vi.mock('../../api', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../api')>()), ...api }))
 
@@ -88,7 +89,20 @@ beforeEach(() => {
   api.apiGetAggregateScheduleRates.mockResolvedValue(AGGREGATE)
   api.apiCreateRateRequest.mockResolvedValue({ request_id: 77 })
   api.apiAddRateRequestOption.mockResolvedValue({})
+  api.apiPatchRateRequestProc.mockResolvedValue({})
+  api.apiCreateVesselRate.mockResolvedValue({ srid: 7001 })
+  api.apiCreateFakRate.mockResolvedValue({ fak_id: 7002 })
+  api.apiCreateSpecialRate.mockResolvedValue({ sprid: 7003 })
 })
+
+/** A promise the test settles by hand, to hold a request in flight. */
+function deferred<T>() {
+  let resolve!: (v: T) => void
+  const promise = new Promise<T>(r => { resolve = r })
+  return { promise, resolve }
+}
+
+const clickBox = async (user: ReturnType<typeof userEvent.setup>, name: string) => user.click(await screen.findByRole('checkbox', { name }))
 
 // ---- SelectablePivotRateTable ----
 
@@ -229,3 +243,91 @@ describe('RateCheck rate selection', () => {
     expect(screen.getByDisplayValue('TEST-AUDIT-FIX Vessel A')).toBeInTheDocument()
   })
 })
+
+// ---- Submit and escalate (main view and review) ----
+
+describe('RateCheck submit and escalation', () => {
+  it('a double click on Go to Quotation sends one rate request, with a busy button while it runs', async () => {
+    const pending = deferred<{ request_id: number }>()
+    api.apiCreateRateRequest.mockReturnValue(pending.promise)
+    const { user, onAdvanceWorkflow, onGoToQuotations } = renderRateCheck('cs-sales')
+    await user.click(await screen.findByRole('checkbox', { name: 'Select Tariff rates for MSC TEST-AUDIT-FIX Vessel B / 610W' }))
+    await user.click(screen.getByRole('button', { name: /Review & Send/ }))
+    const go = screen.getByRole('button', { name: /Go to Quotation \(1 rate\)/ })
+    await user.dblClick(go)
+    expect(api.apiCreateRateRequest).toHaveBeenCalledTimes(1)
+    expect(go).toBeDisabled()
+    expect(go).toHaveAttribute('aria-busy', 'true')
+
+    pending.resolve({ request_id: 77 })
+    await waitFor(() => expect(onGoToQuotations).toHaveBeenCalledTimes(1))
+    expect(api.apiCreateRateRequest).toHaveBeenCalledTimes(1)
+    expect(api.apiAddRateRequestOption).toHaveBeenCalledTimes(1)
+    expect(onAdvanceWorkflow).toHaveBeenCalledWith('INQ-4', 'quotation-prep')
+    expect(go).not.toBeDisabled()
+  })
+
+  it('Request Rates escalates the selected schedules once, with the note, and goes back', async () => {
+    const pending = deferred<{ request_id: number }>()
+    api.apiCreateRateRequest.mockReturnValue(pending.promise)
+    const { user, onAdvanceWorkflow, onGoBack, onFlash } = renderRateCheck('cs-sales')
+    await clickBox(user, 'Select schedule MSC TEST-AUDIT-FIX Vessel B / 610W')
+    await user.type(screen.getByRole('textbox', { name: 'Notes (optional)' }), 'Need spot')
+    const escalate = screen.getByRole('button', { name: 'Request Rates (1 schedule)' })
+    await user.dblClick(escalate)
+    expect(escalate).toHaveAttribute('aria-busy', 'true')
+    pending.resolve({ request_id: 78 })
+    await waitFor(() => expect(onGoBack).toHaveBeenCalledTimes(1))
+
+    expect(api.apiCreateRateRequest).toHaveBeenCalledTimes(1)
+    const body = api.apiCreateRateRequest.mock.calls[0][0]
+    expect(body).toMatchObject({ inq_id: 4, is_given: false })
+    expect(body.remark).toBe('Escalated to Procurement with 1 selected schedule(s) for rate sourcing. 4: LKCMB → DEHAM. Customer: TEST-AUDIT-FIX Client (delete me). Need spot')
+    expect(body.selected_schedules.map((s: { vessel_name: string }) => s.vessel_name)).toEqual(['TEST-AUDIT-FIX Vessel B'])
+    expect(onAdvanceWorkflow).toHaveBeenCalledWith('INQ-4', 'procurement-request')
+    expect(onFlash).toHaveBeenCalledWith('INQ-4 → Escalated to Procurement (1 schedules)')
+  })
+
+  it('with no rates found, the review escalates to Procurement from its footer button', async () => {
+    api.apiGetEnrichedScheduleRates.mockResolvedValue({})
+    const pending = deferred<{ request_id: number }>()
+    api.apiCreateRateRequest.mockReturnValue(pending.promise)
+    const { user, onAdvanceWorkflow, onGoBack } = renderRateCheck('cs-sales')
+    expect(await screen.findByText('No rates found')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Review & Send/ }))
+    expect(screen.getByText(/will be escalated to the Procurement team to source rates for LKCMB → DEHAM/)).toBeInTheDocument()
+    await user.dblClick(screen.getByRole('button', { name: 'Escalate to Procurement' }))
+    pending.resolve({ request_id: 79 })
+    await waitFor(() => expect(onGoBack).toHaveBeenCalledTimes(1))
+    expect(api.apiCreateRateRequest).toHaveBeenCalledTimes(1)
+    expect(api.apiCreateRateRequest.mock.calls[0][0]).toMatchObject({ is_given: false, remark: 'No suitable rates found. Escalating to Procurement for rate sourcing. 4: LKCMB → DEHAM.' })
+    expect(onAdvanceWorkflow).toHaveBeenCalledWith('INQ-4', 'procurement-request')
+  })
+
+  it('a failed escalation keeps the page and re-enables the button', async () => {
+    api.apiCreateRateRequest.mockRejectedValue(new Error('Network down'))
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { user, onGoBack, onFlash } = renderRateCheck('cs-sales')
+    await screen.findByRole('checkbox', { name: 'Select schedule MSC TEST-AUDIT-FIX Vessel B / 610W' })
+    await user.click(screen.getByRole('button', { name: 'Escalate to Procurement' }))
+    await waitFor(() => expect(onFlash).toHaveBeenCalledWith('Could not escalate to Procurement: Network down'))
+    expect(onGoBack).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Escalate to Procurement' })).not.toBeDisabled()
+    consoleError.mockRestore()
+  })
+
+  it('a double click on Push to Sales patches the incoming request once and links the selected rates', async () => {
+    const pending = deferred<object>()
+    api.apiPatchRateRequestProc.mockReturnValue(pending.promise)
+    const { user, onGoToQuotations } = renderRateCheck('procurement')
+    await clickBox(user, 'Select Tariff rates for MSC TEST-AUDIT-FIX Vessel B / 610W')
+    await user.click(screen.getByRole('button', { name: /Review & Send/ }))
+    await user.dblClick(screen.getByRole('button', { name: 'Push to Sales (1 rate)' }))
+    expect(api.apiPatchRateRequestProc).toHaveBeenCalledTimes(1)
+    pending.resolve({})
+    await waitFor(() => expect(onGoToQuotations).toHaveBeenCalledTimes(1))
+    expect(api.apiPatchRateRequestProc.mock.calls[0][0]).toBe(951)
+    expect(api.apiAddRateRequestOption).toHaveBeenCalledExactlyOnceWith(951, { request_id: 951, rate_type: 'tariff_rates', rate_id: 511, schedule_id: 9102 })
+  })
+})
+

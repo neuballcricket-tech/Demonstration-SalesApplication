@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, Fragment, type ReactNode } from 'react'
-import { ArrowLeft, ChevronRight, FileDown, FileText, Loader2, PanelRight, Plus, Send, Ship, X, Filter } from 'lucide-react'
+import { ArrowLeft, ChevronRight, FileDown, FileText, PanelRight, Plus, Send, Ship, X, Filter } from 'lucide-react'
 import {
   RATE_SOURCE_COLORS, COMMODITY_TYPES, portOptions, CONTAINER_TYPE_LABELS,
   type Inquiry, type Customer, type ContainerLine, type UnifiedRate,
@@ -12,7 +12,7 @@ import { useRole } from '../../RoleContext'
 import { FIELD_LABEL, INPUT_STYLE } from './pageStyles'
 import { apiFetchAllRates, apiGetPorts, apiGetLiners, apiGetTradeLanes, apiGetEmployeesDb, apiGetAuthEmployees, apiCreateVesselRate, apiCreateFakRate, apiCreateSpecialRate, apiCreateRateRequest, apiPatchRateRequestProc, apiAddRateRequestOption, apiGetIncomingRateRequests, apiGetAggregateScheduleRates, apiGetEnrichedScheduleRates, BACKEND_ACTOR_ID } from '../../api'
 import { COLOR } from '../ui/tokens'
-import { Button, Checkbox, EmptyState, Tooltip } from '../ui'
+import { Badge, Button, Checkbox, EmptyState, Field, Input, LoadingState, Tooltip } from '../ui'
 import { cn } from '../../lib/cn'
 
 type ManualRateTab = 'vessel-spot' | 'fak' | 'special'
@@ -485,7 +485,7 @@ export function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleI
                       return (
                         <Fragment key={rt}>
                           {/* Checkbox cell */}
-                          <td className={cn(PIVOT_TD, 'w-7 border-l-2 border-l-line', checked && 'bg-primary-subtle')}>
+                          <td className={cn(PIVOT_TD, 'w-7 border-l-2 border-l-line')}>
                             {hasRates && (
                               <Checkbox
                                 checked={checked}
@@ -506,7 +506,7 @@ export function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleI
                               <td
                                 key={`${rt}-${ct}`}
                                 title={display ? cellTooltip(display) : undefined}
-                                className={cn(PIVOT_TD, 'text-center', checked && 'bg-primary-subtle')}
+                                className={cn(PIVOT_TD, 'text-center')}
                               >
                                 {display ? (
                                   <>
@@ -554,6 +554,138 @@ function BriefRow({ label, children }: { label: string; children: ReactNode }) {
     <div className="flex justify-between py-0.5 text-control">
       <span className="text-fg-muted">{label}</span>
       <strong className="font-semibold text-fg">{children}</strong>
+    </div>
+  )
+}
+
+// ---- Inquiry details panel (left column of the rate options and manual entry views) ----
+
+const DETAIL_LABEL = 'mb-0.5 text-label text-fg-muted'
+const DETAIL_VALUE = 'text-control font-semibold text-fg'
+const DETAIL_META = 'mt-px text-label text-fg-label'
+const NOTICE_BOX = 'rounded-card border border-line-soft bg-canvas p-3.5 text-center text-control text-fg-muted'
+const FALLBACK_GRID = 'grid grid-cols-[1fr_100px_80px_80px_70px_90px]'
+
+function InquiryDetailsPanel({ inquiry, container, custData, dest, allContainers, containerLabel }: {
+  inquiry: Inquiry
+  container?: ContainerLine
+  custData?: Customer
+  dest?: string
+  allContainers: { qty: number; type: string }[]
+  containerLabel: string
+}) {
+  return (
+    <div className="mr-6 flex w-[248px] shrink-0 flex-col gap-3.5 border-r border-line-soft pr-5">
+      <div className="text-label font-bold uppercase tracking-label text-fg-muted">
+        Inquiry · {inquiry.id}
+      </div>
+
+      <div>
+        <div className={DETAIL_LABEL}>Customer</div>
+        <div className="text-control font-bold text-fg">{inquiry.customer_name}</div>
+        {custData?.tier && <div className="mt-px text-label text-accent">{custData.tier}</div>}
+      </div>
+
+      <div>
+        <div className={DETAIL_LABEL}>Route</div>
+        <div className={DETAIL_VALUE}>{inquiry.origin}</div>
+        <div className="my-0.5 ml-0.5 text-label text-fg-muted">↓</div>
+        <div className={DETAIL_VALUE}>{dest}</div>
+      </div>
+
+      <div>
+        <div className={DETAIL_LABEL}>
+          {allContainers.length > 1 ? 'Containers' : 'Container'}
+        </div>
+        {inquiry.containers && inquiry.containers.length > 0 ? (
+          <div className="flex flex-col gap-1">
+            {inquiry.containers.map((c, ci) => (
+              <div key={ci}>
+                <div className={DETAIL_VALUE}>{c.quantity}x {c.containerType}</div>
+                {c.commodityType && <div className={DETAIL_META}>{c.commodityType}</div>}
+                {c.weight && <div className="mt-px text-label text-fg-muted">{c.weight} kg</div>}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className={DETAIL_VALUE}>{containerLabel || '-'}</div>
+            {(container?.commodityType || inquiry.commodity_type) && (
+              <div className={DETAIL_META}>{container?.commodityType || inquiry.commodity_type}</div>
+            )}
+            {(container?.weight || inquiry.cargo_weight) && (
+              <div className="mt-px text-label text-fg-muted">{container?.weight || inquiry.cargo_weight}</div>
+            )}
+          </>
+        )}
+      </div>
+
+      <div className="h-px bg-line-soft" />
+
+      <div>
+        <div className={DETAIL_LABEL}>Cargo Ready</div>
+        <div className={cn(DETAIL_VALUE, !inquiry.cargo_ready_date && 'text-fg-muted')}>
+          {inquiry.cargo_ready_date || 'Not set'}
+        </div>
+      </div>
+
+      <div>
+        <div className={DETAIL_LABEL}>Service Mode</div>
+        <div className="text-control text-fg">
+          {inquiry.delivery_type === 'door-to-door' ? 'Door-to-Door' : 'Port-to-Port'}
+        </div>
+      </div>
+
+      {inquiry.incoterm && (
+        <div>
+          <div className={DETAIL_LABEL}>Incoterm</div>
+          <div className="text-control text-fg">{inquiry.incoterm}</div>
+        </div>
+      )}
+
+      {inquiry.priority && (
+        <div>
+          <div className={DETAIL_LABEL}>Priority</div>
+          <div className="text-control text-fg">{inquiry.priority}</div>
+        </div>
+      )}
+
+      {inquiry.preferred_rate != null && (
+        <div>
+          <div className={DETAIL_LABEL}>Target Rate</div>
+          <div className="text-control font-bold text-success">USD {inquiry.preferred_rate.toLocaleString()}</div>
+        </div>
+      )}
+
+      {inquiry.preferred_liners && inquiry.preferred_liners.length > 0 && (
+        <div>
+          <div className="mb-1 text-label text-fg-muted">Preferred Liners</div>
+          <div className="flex flex-col gap-0.5">
+            {inquiry.preferred_liners.map(l => (
+              <span key={l} className="text-label font-semibold text-primary">{l}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {inquiry.request && (
+        <div>
+          <div className={DETAIL_LABEL}>Request</div>
+          <div className="text-label leading-normal text-fg-label">{inquiry.request}</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Thin rule with a centred section title, above the schedule rate tables. */
+function RateSectionDivider({ title, selectedCount }: { title: string; selectedCount: number }) {
+  return (
+    <div className="mt-0.5 flex items-center gap-2.5">
+      <div className="h-px flex-1 bg-line-soft" />
+      <span className="text-label font-bold uppercase tracking-label text-accent">{title}</span>
+      {selectedCount > 0 && <span className="text-label font-semibold text-success">{selectedCount} selected</span>}
+      <div className="h-px flex-1 bg-line-soft" />
     </div>
   )
 }
@@ -1535,70 +1667,76 @@ export default function RateCheck({
     )
   }
 
-  // ── Resolve review action label & color ──
+  // ── Resolve review action label & icon ──
   const getReviewAction = () => {
     const procTotalSelected = selectedAggregateRateIds.size + manualEntries.length
     if (isProcurement && procTotalSelected > 0) {
       return {
         label: `Push to Sales (${procTotalSelected} rate${procTotalSelected !== 1 ? 's' : ''})`,
-        color: '#d97706',
-        icon: <Send size={12} />,
+        icon: <Send size={14} aria-hidden="true" />,
       }
     }
     if (hasDbSelections) {
       return {
         label: `Go to Quotation (${selectedIds.size} rate${selectedIds.size !== 1 ? 's' : ''})`,
-        color: COLOR.primary,
-        icon: <ChevronRight size={12} />,
+        icon: <ChevronRight size={14} aria-hidden="true" />,
       }
     }
     if (!isProcurement && hasAggregateSelections) {
       return {
         label: `Go to Quotation (${selectedAggregateRateIds.size} rate${selectedAggregateRateIds.size !== 1 ? 's' : ''})`,
-        color: COLOR.primary,
-        icon: <ChevronRight size={12} />,
+        icon: <ChevronRight size={14} aria-hidden="true" />,
       }
     }
     if (!isProcurement && skipProcurement) {
-      return { label: 'Skip Procurement - Go to Quotation', color: '#d97706', icon: <ChevronRight size={12} /> }
+      return { label: 'Skip Procurement - Go to Quotation', icon: <ChevronRight size={14} aria-hidden="true" /> }
     }
     if (!isProcurement) {
-      return { label: 'Escalate to Procurement', color: '#d97706', icon: <ChevronRight size={12} /> }
+      return { label: 'Escalate to Procurement', icon: <ChevronRight size={14} aria-hidden="true" /> }
     }
     // Procurement fallback
-    return { label: 'Push to Sales', color: '#d97706', icon: <Send size={12} /> }
+    return { label: 'Push to Sales', icon: <Send size={14} aria-hidden="true" /> }
   }
 
   const reviewAction = getReviewAction()
 
   const sectionTitle: React.CSSProperties = { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#d97706', marginBottom: 10 }
 
+  const backLabel = mode === 'review' ? 'Back to Edit' : mode === 'manual-entry' ? 'Back to Rate Check' : 'Back to Workspace'
+  const inquiryPanel = (
+    <InquiryDetailsPanel
+      inquiry={inquiry}
+      container={container}
+      custData={custData}
+      dest={dest}
+      allContainers={allContainers}
+      containerLabel={containerLabel}
+    />
+  )
+
   return (
-    <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+    <div className="mx-auto max-w-[1280px]">
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <button
-          className="lt-icon-btn"
-          onClick={
-            mode === 'review' ? () => setMode(hasManualEntries ? 'manual-entry' : 'db-select')
-            : mode === 'manual-entry' ? () => { setMode('db-select'); setLinkedSchedule(null) }
-            : onGoBack
-          }
-          title={
-            mode === 'review' ? 'Back to Edit'
-            : mode === 'manual-entry' ? 'Back to Rate Check'
-            : 'Back to Workspace'
-          }
-          style={{ padding: 6 }}
-        >
-          <ArrowLeft size={18} />
-        </button>
+      <div className="mb-5 flex items-center gap-3">
+        <Tooltip content={backLabel}>
+          <Button
+            size="sm"
+            className="w-7 px-0"
+            icon={<ArrowLeft size={16} aria-hidden="true" />}
+            aria-label={backLabel}
+            onClick={
+              mode === 'review' ? () => setMode(hasManualEntries ? 'manual-entry' : 'db-select')
+              : mode === 'manual-entry' ? () => { setMode('db-select'); setLinkedSchedule(null) }
+              : onGoBack
+            }
+          />
+        </Tooltip>
         <div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <FileText size={18} />
+          <div className="flex items-center gap-2 text-title font-bold text-fg">
+            <FileText size={18} className="text-primary" aria-hidden="true" />
             {mode === 'manual-entry' ? (linkedSchedule ? 'Attach Rate to Schedule' : 'Manual Rate Entry') : mode === 'review' ? 'Review Rate Brief' : 'Rate Check'}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+          <div className="mt-0.5 text-control text-fg-muted">
             {inquiry.customer_name} · {inquiry.origin} → {dest}
             {containerLabel && ` · ${containerLabel}`}
           </div>
@@ -1606,181 +1744,42 @@ export default function RateCheck({
       </div>
 
       {/* Card body */}
-      <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
+      <div className="rounded-card border border-line-soft bg-surface p-6">
         {mode === 'db-select' ? (
           /* ════════════════ DB-SELECT SCREEN - two-column ════════════════ */
-          <div style={{ display: 'flex', gap: 0, alignItems: 'flex-start' }}>
+          <div className="flex items-start">
 
             {/* ── LEFT: Inquiry details ── */}
-            <div style={{
-              width: 248, flexShrink: 0,
-              borderRight: '1px solid var(--border)',
-              paddingRight: 20, marginRight: 24,
-              display: 'flex', flexDirection: 'column', gap: 14,
-            }}>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)' }}>
-                Inquiry · {inquiry.id}
-              </div>
-
-              {/* Customer */}
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Customer</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{inquiry.customer_name}</div>
-                {custData?.tier && <div style={{ fontSize: 11, color: 'var(--accent-light)', marginTop: 1 }}>{custData.tier}</div>}
-              </div>
-
-              {/* Route */}
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Route</div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{inquiry.origin}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 2px 2px' }}>↓</div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{dest}</div>
-              </div>
-
-              {/* Container(s) */}
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>
-                  {allContainers.length > 1 ? 'Containers' : 'Container'}
-                </div>
-                {inquiry.containers && inquiry.containers.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {inquiry.containers.map((c, ci) => (
-                      <div key={ci}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
-                          {c.quantity}x {c.containerType}
-                        </div>
-                        {c.commodityType && (
-                          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{c.commodityType}</div>
-                        )}
-                        {c.weight && (
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{c.weight} kg</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{containerLabel || '-'}</div>
-                    {(container?.commodityType || inquiry.commodity_type) && (
-                      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>
-                        {container?.commodityType || inquiry.commodity_type}
-                      </div>
-                    )}
-                    {(container?.weight || inquiry.cargo_weight) && (
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-                        {container?.weight || inquiry.cargo_weight}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-
-              <div style={{ height: 1, background: 'var(--border)' }} />
-
-              {/* Cargo Ready Date */}
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Cargo Ready</div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: inquiry.cargo_ready_date ? 'var(--text)' : 'var(--text-muted)' }}>
-                  {inquiry.cargo_ready_date || 'Not set'}
-                </div>
-              </div>
-
-              {/* Service mode */}
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Service Mode</div>
-                <div style={{ fontSize: 12, color: 'var(--text)' }}>
-                  {inquiry.delivery_type === 'door-to-door' ? 'Door-to-Door' : 'Port-to-Port'}
-                </div>
-              </div>
-
-              {/* Incoterm */}
-              {inquiry.incoterm && (
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Incoterm</div>
-                  <div style={{ fontSize: 12, color: 'var(--text)' }}>{inquiry.incoterm}</div>
-                </div>
-              )}
-
-              {/* Priority */}
-              {inquiry.priority && (
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Priority</div>
-                  <div style={{ fontSize: 12, color: 'var(--text)' }}>{inquiry.priority}</div>
-                </div>
-              )}
-
-              {/* Target rate */}
-              {inquiry.preferred_rate != null && (
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Target Rate</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#16a34a' }}>
-                    USD {inquiry.preferred_rate.toLocaleString()}
-                  </div>
-                </div>
-              )}
-
-              {/* Preferred liners */}
-              {inquiry.preferred_liners && inquiry.preferred_liners.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Preferred Liners</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {inquiry.preferred_liners.map(l => (
-                      <span key={l} style={{ fontSize: 11, fontWeight: 600, color: '#6366f1' }}>{l}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Request */}
-              {inquiry.request && (
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Request</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{inquiry.request}</div>
-                </div>
-              )}
-            </div>
+            {inquiryPanel}
 
             {/* ── RIGHT: Rate options ── */}
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="flex min-w-0 flex-1 flex-col gap-3">
               {/* ---- Banner ---- */}
-              <div style={{ padding: '10px 14px', background: isProcurement ? 'rgba(44,44,130,0.06)' : 'rgba(8,145,178,0.06)', border: `1px solid ${isProcurement ? 'rgba(44,44,130,0.18)' : 'rgba(8,145,178,0.18)'}`, borderRadius: 8, fontSize: 12, color: isProcurement ? COLOR.primary : '#0891b2', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <FileText size={14} />
+              <div className={cn(
+                'flex items-center gap-2 rounded-card border px-3.5 py-2.5 text-control',
+                isProcurement ? 'border-info-line bg-primary-subtle text-primary' : 'border-line-soft bg-canvas text-accent',
+              )}>
+                <FileText size={14} aria-hidden="true" />
                 {isProcurement
-                  ? <>Schedule rates for: <strong style={{ marginLeft: 4 }}>{inquiry.origin} → {dest}</strong>{containerLabel && <span style={{ color: '#6366f1' }}> · {containerLabel}</span>}</>
-                  : <>Multi-source rate check (AMS + Spot + INTTRA): <strong style={{ marginLeft: 4 }}>{inquiry.origin} → {dest}</strong>{containerLabel && <span style={{ marginLeft: 8, opacity: 0.8 }}>· {containerLabel}</span>}</>
+                  ? <>Schedule rates for: <strong className="ml-1">{inquiry.origin} → {dest}</strong>{containerLabel && <span className="text-fg-muted"> · {containerLabel}</span>}</>
+                  : <>Multi-source rate check (AMS + Spot + INTTRA): <strong className="ml-1">{inquiry.origin} → {dest}</strong>{containerLabel && <span className="ml-2 text-fg-muted">· {containerLabel}</span>}</>
                 }
               </div>
 
               {/* ---- Enriched Schedule + Rates (CS/Sales only) ---- */}
               {!isProcurement && (
                 <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
-                    <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-                    <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      SCHEDULES &amp; RATES
-                    </span>
-                    {selectedAggregateRateIds.size > 0 && (
-                      <span style={{ fontSize: 11, fontWeight: 600, color: '#16a34a' }}>{selectedAggregateRateIds.size} selected</span>
-                    )}
-                    <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-                  </div>
+                  <RateSectionDivider title="SCHEDULES & RATES" selectedCount={selectedAggregateRateIds.size} />
 
                   {/* Loading */}
-                  {enrichedLoading && (
-                    <div style={{ textAlign: 'center', padding: 16, color: 'var(--text-muted)' }}>
-                      <Loader2 size={18} className="spin" style={{ marginBottom: 6 }} />
-                      <div style={{ fontSize: 12 }}>Loading schedule rates...</div>
-                    </div>
-                  )}
+                  {enrichedLoading && <LoadingState label="Loading schedule rates..." />}
 
                   {/* No results */}
                   {!enrichedLoading && enrichedData && enrichedPivot.rows.length === 0 && (
-                    <div style={{ padding: 16, background: 'rgba(220,38,38,0.04)', border: '1px solid rgba(220,38,38,0.15)', borderRadius: 8 }}>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 14, fontWeight: 700, color: '#dc2626', marginBottom: 4 }}>No rates found</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                          No matching schedule rates found for this route. This inquiry will be escalated to Procurement for rate sourcing.
-                        </div>
+                    <div className="rounded-card border border-danger-line bg-danger-bg p-4 text-center">
+                      <div className="mb-1 text-body font-bold text-danger">No rates found</div>
+                      <div className="text-control text-fg-label">
+                        No matching schedule rates found for this route. This inquiry will be escalated to Procurement for rate sourcing.
                       </div>
                     </div>
                   )}
@@ -1788,7 +1787,7 @@ export default function RateCheck({
                   {/* Enriched pivot table */}
                   {!enrichedLoading && enrichedPivot.rows.length > 0 && (
                     <>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>
+                      <div className="text-control font-semibold text-fg-label">
                         {countPivotRates(enrichedPivot)} rate(s) across {enrichedPivot.rows.length} schedule(s) - select one or more to proceed to quotation
                       </div>
                       <SelectablePivotRateTable
@@ -1807,42 +1806,26 @@ export default function RateCheck({
               {/* ---- Aggregate Schedule + Rates table (procurement only) ---- */}
               {isProcurement && (
                 <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
-                    <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-                    <span style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      SCHEDULES &amp; RATES FROM CS
-                    </span>
-                    {selectedAggregateRateIds.size > 0 && (
-                      <span style={{ fontSize: 11, fontWeight: 600, color: '#16a34a' }}>{selectedAggregateRateIds.size} selected</span>
-                    )}
-                    <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-                  </div>
+                  <RateSectionDivider title="SCHEDULES & RATES FROM CS" selectedCount={selectedAggregateRateIds.size} />
 
                   {incomingRemark && (
-                    <div style={{ padding: '6px 10px', background: 'rgba(44,44,130,0.06)', border: '1px solid rgba(44,44,130,0.14)', borderRadius: 6, fontSize: 11, color: 'var(--text-secondary)' }}>
-                      <span style={{ fontWeight: 600 }}>CS Note:</span> {incomingRemark}
+                    <div className="rounded-card border border-info-line bg-primary-subtle px-2.5 py-1.5 text-label text-fg-label">
+                      <span className="font-semibold">CS Note:</span> {incomingRemark}
                     </div>
                   )}
 
                   {/* Loading state */}
-                  {aggregateLoading && (
-                    <div style={{ textAlign: 'center', padding: 16, color: 'var(--text-muted)' }}>
-                      <Loader2 size={18} className="spin" style={{ marginBottom: 6 }} />
-                      <div style={{ fontSize: 12 }}>Loading schedule rates...</div>
-                    </div>
-                  )}
+                  {aggregateLoading && <LoadingState label="Loading schedule rates..." />}
 
                   {/* No schedules */}
                   {!aggregateLoading && !aggregateData && incomingSchedules.length === 0 && (
-                    <div style={{ padding: '14px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, background: 'rgba(44,44,130,0.04)', border: '1px solid var(--border)', borderRadius: 8 }}>
-                      No vessel schedules attached by CS.
-                    </div>
+                    <div className={NOTICE_BOX}>No vessel schedules attached by CS.</div>
                   )}
 
                   {/* Aggregate pivot table */}
                   {!aggregateLoading && aggregatePivot.rows.length > 0 && (
                     <>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>
+                      <div className="text-control font-semibold text-fg-label">
                         {countPivotRates(aggregatePivot)} rate(s) across {aggregatePivot.rows.length} schedule(s) - select rates to include in brief
                       </div>
                       <SelectablePivotRateTable
@@ -1859,51 +1842,36 @@ export default function RateCheck({
 
                   {/* No rates found for loaded schedules */}
                   {!aggregateLoading && aggregateData && aggregatePivot.rows.length === 0 && (
-                    <div style={{ padding: '14px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12, background: 'rgba(44,44,130,0.04)', border: '1px solid var(--border)', borderRadius: 8 }}>
-                      No matching rates found for the attached schedules.
-                    </div>
+                    <div className={NOTICE_BOX}>No matching rates found for the attached schedules.</div>
                   )}
 
                   {/* Fallback: show flat schedule table if aggregate fetch failed but we have incoming schedules */}
                   {!aggregateLoading && !aggregateData && incomingSchedules.length > 0 && (
-                    <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                      <div style={{
-                        display: 'grid', gridTemplateColumns: '1fr 100px 80px 80px 70px 90px',
-                        background: 'var(--bg-card)', borderBottom: '1px solid var(--border)',
-                        fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.3,
-                      }}>
-                        <div style={{ padding: '6px 10px' }}>Carrier / Vessel</div>
-                        <div style={{ padding: '6px 8px' }}>Route</div>
-                        <div style={{ padding: '6px 8px' }}>ETD</div>
-                        <div style={{ padding: '6px 8px' }}>ETA</div>
-                        <div style={{ padding: '6px 8px' }}>Transit</div>
-                        <div style={{ padding: '6px 8px' }}>Type</div>
+                    <div className="overflow-hidden rounded-card border border-line-soft">
+                      <div className={cn(FALLBACK_GRID, 'border-b border-line-soft bg-canvas text-label font-bold uppercase tracking-label text-fg-muted')}>
+                        <div className="px-2.5 py-1.5">Carrier / Vessel</div>
+                        <div className="px-2 py-1.5">Route</div>
+                        <div className="px-2 py-1.5">ETD</div>
+                        <div className="px-2 py-1.5">ETA</div>
+                        <div className="px-2 py-1.5">Transit</div>
+                        <div className="px-2 py-1.5">Type</div>
                       </div>
                       {incomingSchedules.map(sch => {
                         const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '-'
                         const transitDays = sch.total_duration != null ? `${Math.round(sch.total_duration / 24)}d` : '-'
                         const isDirect = sch.schedule_type?.toUpperCase() === 'DIRECT'
                         return (
-                          <div key={sch.schedule_id} style={{
-                            display: 'grid', gridTemplateColumns: '1fr 100px 80px 80px 70px 90px',
-                            borderBottom: '1px solid var(--border)', fontSize: 11, alignItems: 'center',
-                          }}>
-                            <div style={{ padding: '6px 10px' }}>
-                              <div style={{ fontWeight: 600, color: 'var(--text)' }}>{sch.liner_name || sch.scac || '-'}</div>
-                              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{sch.vessel_name}{sch.voyage_number ? ` / ${sch.voyage_number}` : ''}</div>
+                          <div key={sch.schedule_id} className={cn(FALLBACK_GRID, 'items-center border-b border-line-soft text-label text-fg-label last:border-b-0')}>
+                            <div className="px-2.5 py-1.5">
+                              <div className="font-semibold text-fg">{sch.liner_name || sch.scac || '-'}</div>
+                              <div className="text-fg-muted">{sch.vessel_name}{sch.voyage_number ? ` / ${sch.voyage_number}` : ''}</div>
                             </div>
-                            <div style={{ padding: '6px 8px', color: 'var(--text-secondary)' }}>{sch.origin_unloc} → {sch.destination_unloc}</div>
-                            <div style={{ padding: '6px 8px', color: 'var(--text-secondary)' }}>{fmtDate(sch.origin_departure_date)}</div>
-                            <div style={{ padding: '6px 8px', color: 'var(--text-secondary)' }}>{fmtDate(sch.destination_arrival_date)}</div>
-                            <div style={{ padding: '6px 8px', color: 'var(--text-secondary)' }}>{transitDays}</div>
-                            <div style={{ padding: '6px 8px' }}>
-                              <span style={{
-                                fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
-                                background: isDirect ? 'rgba(22,163,74,0.1)' : 'rgba(217,119,6,0.1)',
-                                color: isDirect ? '#16a34a' : '#d97706',
-                              }}>
-                                {isDirect ? 'DIRECT' : 'T/S'}
-                              </span>
+                            <div className="px-2 py-1.5">{sch.origin_unloc} → {sch.destination_unloc}</div>
+                            <div className="px-2 py-1.5">{fmtDate(sch.origin_departure_date)}</div>
+                            <div className="px-2 py-1.5">{fmtDate(sch.destination_arrival_date)}</div>
+                            <div className="px-2 py-1.5">{transitDays}</div>
+                            <div className="px-2 py-1.5">
+                              <Badge tone={isDirect ? 'success' : 'warning'} className="font-bold">{isDirect ? 'DIRECT' : 'T/S'}</Badge>
                             </div>
                           </div>
                         )
@@ -1915,173 +1883,52 @@ export default function RateCheck({
 
               {/* ---- Notes ---- */}
               {(isProcurement || dbSearched) && (
-                <div>
-                  <label style={FIELD_LABEL}>Notes (optional)</label>
-                  <input style={INPUT_STYLE} value={formNote}
-                    onChange={e => setFormNote(e.target.value)}
-                    placeholder={isProcurement ? 'Any notes for Sales...' : 'Any notes for the next team...'} />
-                </div>
+                <Field label="Notes (optional)">
+                  {ids => (
+                    <Input {...ids} value={formNote}
+                      onChange={e => setFormNote(e.target.value)}
+                      placeholder={isProcurement ? 'Any notes for Sales...' : 'Any notes for the next team...'} />
+                  )}
+                </Field>
               )}
 
               {/* ---- Footer ---- */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 8 }}>
+              <div className="mt-2 flex justify-end gap-2 border-t border-line-soft pt-4">
                 {!isProcurement && (
-                  <button
-                    className="db-btn"
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 5, fontSize: 12,
-                      marginRight: 'auto',
-                      background: 'rgba(44,44,130,0.06)', borderColor: COLOR.primary, color: COLOR.primary,
-                    }}
+                  <Button
+                    className="mr-auto border-primary text-primary"
+                    icon={<ChevronRight size={14} aria-hidden="true" />}
+                    isPending={submitting}
                     onClick={handleEscalate}
-                    disabled={submitting}
                   >
-                    {submitting ? <Loader2 size={12} className="spin" /> : <ChevronRight size={12} />}
                     {hasScheduleSelections
                       ? `Request Rates (${selectedScheduleIds.size} schedule${selectedScheduleIds.size !== 1 ? 's' : ''})`
                       : 'Escalate to Procurement'}
-                  </button>
+                  </Button>
                 )}
-                <button className="db-btn" style={{ fontSize: 12 }} onClick={onGoBack}>Back to Workspace</button>
+                <Button onClick={onGoBack}>Back to Workspace</Button>
                 {isProcurement && (
-                  <button
-                    className="db-btn primary"
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 5, fontSize: 12,
-                      background: '#d97706', borderColor: '#d97706',
-                    }}
-                    onClick={() => setMode('manual-entry')}
-                  >
-                    <Plus size={12} /> Enter Rates Manually
-                  </button>
+                  <Button icon={<Plus size={14} aria-hidden="true" />} onClick={() => setMode('manual-entry')}>
+                    Enter Rates Manually
+                  </Button>
                 )}
-                <button
-                  className="db-btn primary"
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 5, fontSize: 12,
-                    background: '#d97706', borderColor: '#d97706',
-                    opacity: canReview ? 1 : 0.5,
-                    cursor: canReview ? 'pointer' : 'not-allowed',
-                  }}
+                <Button
+                  variant="primary"
+                  icon={<FileDown size={14} aria-hidden="true" />}
                   disabled={!canReview}
                   onClick={() => setMode('review')}
                 >
-                  <FileDown size={12} /> Review &amp; Send
-                </button>
+                  Review &amp; Send
+                </Button>
               </div>
             </div>
           </div>
         ) : mode === 'manual-entry' ? (
           /* ════════════════ MANUAL-ENTRY SCREEN ════════════════ */
-          <div style={{ display: 'flex', gap: 0 }}>
+          <div className="flex">
 
             {/* ── LEFT: Inquiry details (same panel as db-select) ── */}
-            <div style={{
-              width: 248, flexShrink: 0,
-              borderRight: '1px solid var(--border)',
-              paddingRight: 20, marginRight: 24,
-              display: 'flex', flexDirection: 'column', gap: 14,
-            }}>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)' }}>
-                Inquiry · {inquiry.id}
-              </div>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Customer</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{inquiry.customer_name}</div>
-                {custData?.tier && <div style={{ fontSize: 11, color: 'var(--accent-light)', marginTop: 1 }}>{custData.tier}</div>}
-              </div>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Route</div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{inquiry.origin}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', margin: '2px 0 2px 2px' }}>↓</div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{dest}</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>
-                  {allContainers.length > 1 ? 'Containers' : 'Container'}
-                </div>
-                {inquiry.containers && inquiry.containers.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {inquiry.containers.map((c, ci) => (
-                      <div key={ci}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
-                          {c.quantity}x {c.containerType}
-                        </div>
-                        {c.commodityType && (
-                          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>{c.commodityType}</div>
-                        )}
-                        {c.weight && (
-                          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{c.weight} kg</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{containerLabel || '-'}</div>
-                    {(container?.commodityType || inquiry.commodity_type) && (
-                      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>
-                        {container?.commodityType || inquiry.commodity_type}
-                      </div>
-                    )}
-                    {(container?.weight || inquiry.cargo_weight) && (
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-                        {container?.weight || inquiry.cargo_weight}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-              <div style={{ height: 1, background: 'var(--border)' }} />
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Cargo Ready</div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: inquiry.cargo_ready_date ? 'var(--text)' : 'var(--text-muted)' }}>
-                  {inquiry.cargo_ready_date || 'Not set'}
-                </div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Service Mode</div>
-                <div style={{ fontSize: 12, color: 'var(--text)' }}>
-                  {inquiry.delivery_type === 'door-to-door' ? 'Door-to-Door' : 'Port-to-Port'}
-                </div>
-              </div>
-              {inquiry.incoterm && (
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Incoterm</div>
-                  <div style={{ fontSize: 12, color: 'var(--text)' }}>{inquiry.incoterm}</div>
-                </div>
-              )}
-              {inquiry.priority && (
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Priority</div>
-                  <div style={{ fontSize: 12, color: 'var(--text)' }}>{inquiry.priority}</div>
-                </div>
-              )}
-              {inquiry.preferred_rate != null && (
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Target Rate</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#16a34a' }}>
-                    USD {inquiry.preferred_rate.toLocaleString()}
-                  </div>
-                </div>
-              )}
-              {inquiry.preferred_liners && inquiry.preferred_liners.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Preferred Liners</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {inquiry.preferred_liners.map(l => (
-                      <span key={l} style={{ fontSize: 11, fontWeight: 600, color: '#6366f1' }}>{l}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {inquiry.request && (
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Request</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{inquiry.request}</div>
-                </div>
-              )}
-            </div>
+            {inquiryPanel}
 
             {/* ── CENTER: Manual entry form ── */}
             <div style={{ flex: 1, minWidth: 0, paddingRight: sidebarOpen ? 24 : 0 }}>
@@ -2595,8 +2442,8 @@ export default function RateCheck({
           </div>
         ) : (
           /* ════════════════ REVIEW SCREEN ════════════════ */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ padding: '10px 14px', background: 'rgba(217,119,6,0.06)', border: '1px solid rgba(217,119,6,0.18)', borderRadius: 8, fontSize: 12, color: '#d97706' }}>
+          <div className="flex flex-col gap-4">
+            <div className="rounded-card border border-info-line bg-info-bg px-3.5 py-2.5 text-control text-info-fg">
               {(hasDbSelections || hasAggregateSelections)
                 ? <>Review the rate brief below. Click <strong>{reviewAction.label}</strong> to send, or go back to make changes.</>
                 : !isProcurement && skipProcurement
@@ -2611,11 +2458,11 @@ export default function RateCheck({
 
             {/* CS/Sales: escalation / skip info on review */}
             {!isProcurement && !hasDbSelections && !hasAggregateSelections && (
-              <div style={{ padding: '14px', background: skipProcurement ? 'rgba(217,119,6,0.06)' : 'rgba(44,44,130,0.06)', border: `1px solid ${skipProcurement ? 'rgba(217,119,6,0.18)' : 'rgba(44,44,130,0.18)'}`, borderRadius: 8 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: skipProcurement ? '#d97706' : COLOR.primary, marginBottom: 4 }}>
+              <div className={cn('rounded-card border p-3.5', skipProcurement ? 'border-warning-line bg-warning-bg' : 'border-info-line bg-primary-subtle')}>
+                <div className={cn('mb-1 text-control font-bold', skipProcurement ? 'text-warning' : 'text-primary')}>
                   {skipProcurement ? 'Skip Procurement' : 'Escalate to Procurement'}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                <div className="text-control text-fg-label">
                   {skipProcurement
                     ? `${inquiry.id} will be sent directly to Sales for quotation preparation without procurement sourcing.`
                     : `${inquiry.id} will be escalated to the Procurement team to source rates for ${inquiry.origin} → ${dest}.`
@@ -2625,26 +2472,18 @@ export default function RateCheck({
             )}
 
             {formNote && (
-              <div style={{ padding: '10px 14px', background: 'rgba(100,116,139,0.04)', border: '1px solid rgba(100,116,139,0.15)', borderRadius: 8, fontSize: 12 }}>
-                <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Notes:</span>{' '}
-                <span style={{ color: 'var(--text)' }}>{formNote}</span>
+              <div className="rounded-card border border-line-soft bg-canvas px-3.5 py-2.5 text-control">
+                <span className="font-semibold text-fg-label">Notes:</span>{' '}
+                <span className="text-fg">{formNote}</span>
               </div>
             )}
 
             {/* Footer */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, borderTop: '1px solid var(--border)', paddingTop: 16, marginTop: 4 }}>
-              <button className="db-btn" style={{ fontSize: 12 }} onClick={() => setMode(hasManualEntries ? 'manual-entry' : 'db-select')}>Back to Edit</button>
-              <button
-                className="db-btn primary"
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 5, fontSize: 12,
-                  background: reviewAction.color, borderColor: reviewAction.color,
-                }}
-                onClick={handleSubmit}
-                disabled={submitting}
-              >
-                {submitting ? <Loader2 size={12} className="spin" /> : reviewAction.icon} {reviewAction.label}
-              </button>
+            <div className="mt-1 flex justify-end gap-2 border-t border-line-soft pt-4">
+              <Button onClick={() => setMode(hasManualEntries ? 'manual-entry' : 'db-select')}>Back to Edit</Button>
+              <Button variant="primary" icon={reviewAction.icon} isPending={submitting} onClick={handleSubmit}>
+                {reviewAction.label}
+              </Button>
             </div>
           </div>
         )}
