@@ -1808,193 +1808,97 @@ export default function InlineStepForms({
   )
 })() : selectedItem.actionKind === 'submit-si' && actionModal ? (() => {
   const siBkg = actionModal.sourceData.booking as Booking
+  const siCutoffCell = 'flex-1 border-r border-line-soft px-3 py-1.5 last:border-r-0'
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      {/* Header */}
-      <div style={{ padding: '8px 14px', background: '#0891b2', borderRadius: '8px 8px 0 0', marginBottom: 1 }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>RECORD SHIPPING INSTRUCTIONS</span>
-      </div>
-      <div style={{ border: '1px solid var(--border)', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
-        {/* Booking summary */}
-        <div style={{ padding: '10px 14px', background: 'rgba(8,145,178,0.04)', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
-          <strong>{siBkg.customer_name}</strong> — {siBkg.origin} → {siBkg.destination}
-          <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>
-            {siBkg.quantity}x {siBkg.container_type} · {siBkg.shipping_line || 'No liner'}
-          </span>
-        </div>
+    <div className="flex flex-col gap-4">
+      <StepHeader title="RECORD SHIPPING INSTRUCTIONS" />
 
-        {/* Cutoff dates */}
-        {(siBkg.si_cutoff_date || siBkg.bl_cutoff_date || siBkg.vgm_cutoff_date) && (
-          <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border)' }}>
-            {siBkg.si_cutoff_date && (
-              <div style={{ flex: 1, padding: '6px 12px', background: 'rgba(8,145,178,0.04)', borderRight: '1px solid var(--border)', fontSize: 11 }}>
-                <span style={{ color: 'var(--text-muted)' }}>SI Cutoff:</span> <strong>{siBkg.si_cutoff_date}</strong>
-              </div>
-            )}
-            {siBkg.bl_cutoff_date && (
-              <div style={{ flex: 1, padding: '6px 12px', background: 'rgba(217,119,6,0.04)', borderRight: '1px solid var(--border)', fontSize: 11 }}>
-                <span style={{ color: 'var(--text-muted)' }}>BL Cutoff:</span> <strong>{siBkg.bl_cutoff_date}</strong>
-              </div>
-            )}
-            {siBkg.vgm_cutoff_date && (
-              <div style={{ flex: 1, padding: '6px 12px', background: 'rgba(168,85,247,0.04)', fontSize: 11 }}>
-                <span style={{ color: 'var(--text-muted)' }}>VGM Cutoff:</span> <strong>{siBkg.vgm_cutoff_date}</strong>
-              </div>
-            )}
-          </div>
+      {/* Booking summary */}
+      <div className="rounded-card border border-line-soft bg-primary-subtle px-3.5 py-2.5 text-control text-fg">
+        <strong>{siBkg.customer_name}</strong> — {siBkg.origin} → {siBkg.destination}
+        <span className="ml-2 text-fg-muted">
+          {siBkg.quantity}x {siBkg.container_type} · {siBkg.shipping_line || 'No liner'}
+        </span>
+      </div>
+
+      {/* Cutoff dates */}
+      {(siBkg.si_cutoff_date || siBkg.bl_cutoff_date || siBkg.vgm_cutoff_date) && (
+        <div className="flex overflow-hidden rounded-card border border-line-soft bg-canvas text-label text-fg">
+          {siBkg.si_cutoff_date && (
+            <div className={siCutoffCell}><span className="text-fg-muted">SI Cutoff:</span> <strong>{siBkg.si_cutoff_date}</strong></div>
+          )}
+          {siBkg.bl_cutoff_date && (
+            <div className={siCutoffCell}><span className="text-fg-muted">BL Cutoff:</span> <strong>{siBkg.bl_cutoff_date}</strong></div>
+          )}
+          {siBkg.vgm_cutoff_date && (
+            <div className={siCutoffCell}><span className="text-fg-muted">VGM Cutoff:</span> <strong>{siBkg.vgm_cutoff_date}</strong></div>
+          )}
+        </div>
+      )}
+
+      {/* Collapsible Release Order reference */}
+      {siBkg.release_order_fields && (
+        <ReleaseOrderReference ro={siBkg.release_order_fields} bkg={siBkg} collapsed={roRefCollapsed} onToggle={() => setRoRefCollapsed(!roRefCollapsed)} />
+      )}
+
+      {/* SI Document: Paste / Upload */}
+      <div className="flex flex-col gap-1">
+        <span id="ws-ssi-doc-label" className={labelClass}>SI Document</span>
+        <div role="group" aria-labelledby="ws-ssi-doc-label" className="mb-1 flex gap-2">
+          <Button aria-pressed={siMode === 'paste'} className={cn(siMode === 'paste' && SELECTED_TOGGLE)}
+            icon={<ClipboardPaste size={14} aria-hidden="true" />}
+            onClick={() => setSiMode('paste')}>
+            Paste
+          </Button>
+          <Button aria-pressed={siMode === 'upload'} className={cn(siMode === 'upload' && SELECTED_TOGGLE)}
+            icon={<Paperclip size={14} aria-hidden="true" />}
+            onClick={() => setSiMode('upload')}>
+            Upload
+          </Button>
+        </div>
+        {siMode === 'paste' && (
+          <Textarea aria-labelledby="ws-ssi-doc-label" className="min-h-[90px] resize-y font-mono text-label leading-normal"
+            value={siContent} onChange={e => setSiContent(e.target.value)}
+            placeholder="Paste shipping instructions here..." />
         )}
-
-        {/* Collapsible Release Order reference */}
-        {siBkg.release_order_fields && (() => {
-          const siRo = siBkg.release_order_fields!
-          return (
-            <div style={{ borderBottom: '1px solid var(--border)' }}>
-              <button type="button" onClick={() => setRoRefCollapsed(!roRefCollapsed)}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(124,58,237,0.06)', border: 'none', cursor: 'pointer', borderBottom: !roRefCollapsed ? '1px solid rgba(124,58,237,0.12)' : 'none' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <FileText size={12} style={{ color: '#7c3aed' }} />
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase' as const, letterSpacing: 0.4 }}>Release Order Reference</span>
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{siRo.reference_nbr}</span>
-                  <ChevronDown size={14} style={{ color: '#7c3aed', transform: roRefCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
-                </span>
-              </button>
-              {!roRefCollapsed && (
-                <div style={{ fontSize: 11 }}>
-                  {[
-                    ['Reference No.', siRo.reference_nbr],
-                    ['Pick Up Date', siRo.pickup_empty_date],
-                    ['Valid Until', siRo.validity_expiration_date],
-                    ['Depot', siRo.pickup_depot],
-                    ['Depot Address', siRo.pickup_depot_address],
-                    ['Vessel', siBkg.vessel_name],
-                    ['Voyage', siBkg.voyage_number],
-                    ['Cut-Off', siRo.cut_off_date],
-                    ['ETD', siRo.etd],
-                    ['ETA', siRo.eta],
-                    ['Container', `${siBkg.quantity}x ${siBkg.container_type}`],
-                    ['Cargo', siRo.cargo_description],
-                    ['Weight', siRo.cargo_weight ? `${siRo.cargo_weight} kg` : undefined],
-                  ].filter(([, v]) => v).map(([label, value]) => (
-                    <div key={label} style={{ display: 'grid', gridTemplateColumns: '120px 1fr', borderBottom: '1px solid rgba(124,58,237,0.08)' }}>
-                      <div style={{ padding: '4px 10px', background: 'rgba(124,58,237,0.04)', fontSize: 11, fontWeight: 600, color: '#7c3aed', display: 'flex', alignItems: 'center', borderRight: '1px solid rgba(124,58,237,0.08)' }}>{label}</div>
-                      <div style={{ padding: '4px 10px', fontSize: 11, color: 'var(--text)' }}>{value}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )
-        })()}
-
-        {/* SI Document section */}
-        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#0891b2', marginBottom: 6 }}>SI DOCUMENT</div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-            <button
-              className={`db-btn ${siMode === 'paste' ? 'primary' : ''}`}
-              style={siMode !== 'paste' ? { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: 11 } : { fontSize: 11 }}
-              onClick={() => setSiMode('paste')}
-            >
-              <ClipboardPaste size={12} style={{ marginRight: 4 }} /> Paste
-            </button>
-            <button
-              className={`db-btn ${siMode === 'upload' ? 'primary' : ''}`}
-              style={siMode !== 'upload' ? { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: 11 } : { fontSize: 11 }}
-              onClick={() => setSiMode('upload')}
-            >
-              <Paperclip size={12} style={{ marginRight: 4 }} /> Upload
-            </button>
-          </div>
-
-          {siMode === 'paste' && (
-            <textarea
-              className="lt-input"
-              style={{ width: '100%', minHeight: 90, fontFamily: 'monospace', fontSize: 11, lineHeight: 1.5, resize: 'vertical' }}
-              value={siContent}
-              onChange={e => setSiContent(e.target.value)}
-              placeholder="Paste shipping instructions here..."
-            />
-          )}
-
-          {siMode === 'upload' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <label className="db-btn"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer', background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
-                <Paperclip size={12} />
-                {siFileName ? 'Replace file' : 'Choose file'}
-                <input type="file" accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.txt,.doc,.docx" style={{ display: 'none' }}
-                  onChange={e => {
-                    const file = e.target.files?.[0]
-                    if (!file) return
-                    setSiFileName(file.name)
-                    const reader = new FileReader()
-                    reader.onload = () => setSiContent(reader.result as string)
-                    reader.readAsDataURL(file)
-                    e.target.value = ''
-                  }} />
-              </label>
-              {siFileName && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                  <FileText size={13} style={{ color: '#16a34a' }} />
-                  <span style={{ fontWeight: 600 }}>{siFileName}</span>
-                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--text-muted)' }}
-                    onClick={() => { setSiFileName(''); setSiContent('') }} title="Remove file"><X size={12} /></button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* VGM Document section */}
-        <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', marginBottom: 6 }}>VGM DOCUMENT <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <label className="db-btn"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer', background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}>
-              <Paperclip size={12} />
-              {vgmCertFileName ? 'Replace file' : 'Upload VGM'}
-              <input type="file" accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.doc,.docx" style={{ display: 'none' }}
-                onChange={e => {
-                  const f = e.target.files?.[0]
-                  if (!f) return
-                  setVgmCertFileName(f.name)
-                  const r = new FileReader()
-                  r.onload = () => setVgmCertContent(r.result as string)
-                  r.readAsDataURL(f)
-                  e.target.value = ''
-                }} />
-            </label>
-            {vgmCertFileName && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-                <FileText size={13} style={{ color: '#16a34a' }} />
-                <span style={{ fontWeight: 600 }}>{vgmCertFileName}</span>
-                <button style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--text-muted)' }}
-                  onClick={() => { setVgmCertFileName(''); setVgmCertContent('') }}><X size={12} /></button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Notes */}
-        <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr' }}>
-          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Notes</div>
-          <div style={{ padding: '4px 8px' }}>
-            <input className="lt-input" style={{ width: '100%', border: 'none', background: 'transparent', padding: '4px 0' }}
-              value={formNote} onChange={e => setFormNote(e.target.value)} placeholder="Any notes about the SI submission..." />
-          </div>
-        </div>
+        {siMode === 'upload' && (
+          <FileAttach accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.txt,.doc,.docx" label="Choose file" fileName={siFileName}
+            describedBy="ws-ssi-doc-label"
+            onFile={file => {
+              setSiFileName(file.name)
+              const reader = new FileReader()
+              reader.onload = () => setSiContent(reader.result as string)
+              reader.readAsDataURL(file)
+            }}
+            onRemove={() => { setSiFileName(''); setSiContent('') }} />
+        )}
       </div>
+
+      {/* VGM Document */}
+      <div className="flex flex-col gap-1">
+        <span id="ws-ssi-vgm-label" className={labelClass}>VGM Document (optional)</span>
+        <FileAttach accept=".pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.doc,.docx" label="Upload VGM" fileName={vgmCertFileName}
+          describedBy="ws-ssi-vgm-label"
+          onFile={f => {
+            setVgmCertFileName(f.name)
+            const r = new FileReader()
+            r.onload = () => setVgmCertContent(r.result as string)
+            r.readAsDataURL(f)
+          }}
+          onRemove={() => { setVgmCertFileName(''); setVgmCertContent('') }} />
+      </div>
+
+      <Field label="Notes">
+        {ids => <Input {...ids} value={formNote} onChange={e => setFormNote(e.target.value)}
+          placeholder="Any notes about the SI submission..." />}
+      </Field>
 
       {/* Submit */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-        <button className="db-btn primary"
-          disabled={!siContent.trim() || inttraSiLoading}
-          style={siContent.trim() ? { background: '#0891b2', borderColor: '#0891b2' } : { opacity: 0.4, cursor: 'not-allowed' }}
-          onClick={handleModalSubmit}>
-          <Globe size={12} /> Record SI{vgmCertFileName ? ' (VGM attached)' : ''}
-        </button>
+      <div className="flex justify-end">
+        <Button variant="primary" disabled={!siContent.trim() || inttraSiLoading}
+          icon={<Globe size={14} aria-hidden="true" />} onClick={handleModalSubmit}>
+          Record SI{vgmCertFileName ? ' (VGM attached)' : ''}
+        </Button>
       </div>
     </div>
   )

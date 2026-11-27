@@ -455,3 +455,62 @@ describe('InlineStepForms confirm-liner-booking', () => {
     expect(submit).toHaveClass('ui-button--danger')
   })
 })
+
+// ── Part 2b (SI, vessel, BL and booking request steps) ─────────────────────
+
+describe('InlineStepForms submit-si', () => {
+  const siProps = (over: Partial<InlineStepFormsProps> = {}): Partial<InlineStepFormsProps> => ({
+    siMode: 'paste', setSiMode: () => {}, siContent: '', setSiContent: () => {},
+    siFileName: '', setSiFileName: () => {}, inttraSiLoading: false,
+    vgmCertFileName: '', setVgmCertFileName: () => {}, setVgmCertContent: () => {},
+    ...over,
+  })
+
+  it('needs SI content and no running INTTRA call before Record SI is enabled', () => {
+    const { unmount } = renderStep('submit-si', booking(), siProps())
+    expect(screen.getByRole('button', { name: 'Record SI' })).toBeDisabled()
+    unmount()
+    const r2 = renderStep('submit-si', booking(), siProps({ siContent: 'SHIPPER: X', vgmCertFileName: 'vgm.pdf' }))
+    expect(screen.getByRole('button', { name: 'Record SI (VGM attached)' })).toBeEnabled()
+    r2.unmount()
+    renderStep('submit-si', booking(), siProps({ siContent: 'SHIPPER: X', inttraSiLoading: true }))
+    expect(screen.getByRole('button', { name: 'Record SI' })).toBeDisabled()
+  })
+
+  it('the Paste/Upload toggle is a pressed group, and typing pastes the SI text', async () => {
+    const user = userEvent.setup()
+    const setSiMode = vi.fn()
+    const setSiContent = vi.fn()
+    renderStep('submit-si', booking(), siProps({ setSiMode, setSiContent }))
+    const group = screen.getByRole('group', { name: 'SI Document' })
+    expect(within(group).getByRole('button', { name: 'Paste' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(group).getByRole('button', { name: 'Paste' })).toHaveClass('bg-primary')
+    await user.click(within(group).getByRole('button', { name: 'Upload' }))
+    expect(setSiMode).toHaveBeenCalledWith('upload')
+    await user.type(screen.getByRole('textbox', { name: 'SI Document' }), 'A')
+    expect(setSiContent).toHaveBeenCalledWith('A')
+  })
+
+  it('upload reads the SI and VGM files into name and data-URL content; remove clears them', async () => {
+    const user = userEvent.setup()
+    const setSiFileName = vi.fn(), setSiContent = vi.fn(), setVgmCertFileName = vi.fn(), setVgmCertContent = vi.fn()
+    const { container, unmount } = renderStep('submit-si', booking(), siProps({ siMode: 'upload', setSiFileName, setSiContent, setVgmCertFileName, setVgmCertContent }))
+    const inputs = container.querySelectorAll('input[type="file"]')
+    expect(inputs[0]).toHaveAttribute('accept', '.pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.txt,.doc,.docx')
+    expect(inputs[1]).toHaveAttribute('accept', '.pdf,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.doc,.docx')
+    await user.upload(inputs[0] as HTMLInputElement, new File(['si'], 'si.txt', { type: 'text/plain' }))
+    await user.upload(inputs[1] as HTMLInputElement, new File(['v'], 'vgm.pdf', { type: 'application/pdf' }))
+    expect(setSiFileName).toHaveBeenCalledWith('si.txt')
+    expect(setVgmCertFileName).toHaveBeenCalledWith('vgm.pdf')
+    await waitFor(() => expect(setSiContent).toHaveBeenCalledWith(expect.stringMatching(/^data:text\/plain;base64,/)))
+    await waitFor(() => expect(setVgmCertContent).toHaveBeenCalledWith(expect.stringMatching(/^data:application\/pdf;base64,/)))
+    unmount()
+    renderStep('submit-si', booking(), siProps({ siMode: 'upload', siFileName: 'si.txt', vgmCertFileName: 'vgm.pdf', setSiFileName, setSiContent, setVgmCertFileName, setVgmCertContent }))
+    await user.click(screen.getByRole('button', { name: 'Remove si.txt' }))
+    expect(setSiFileName).toHaveBeenLastCalledWith('')
+    expect(setSiContent).toHaveBeenLastCalledWith('')
+    await user.click(screen.getByRole('button', { name: 'Remove vgm.pdf' }))
+    expect(setVgmCertFileName).toHaveBeenLastCalledWith('')
+    expect(setVgmCertContent).toHaveBeenLastCalledWith('')
+  })
+})
