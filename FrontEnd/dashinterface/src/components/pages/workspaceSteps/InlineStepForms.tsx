@@ -1,5 +1,5 @@
 // InlineStepForms -- extracted from Workspace.tsx ternary chain
-import React from "react"
+import React, { type ReactNode } from "react"
 import {
   AlertTriangle, Check, Paperclip, ClipboardPaste,
   FileText, Ship, ShieldCheck, X, User, Mail, Loader2, MessageSquare,
@@ -17,6 +17,8 @@ import type { WorkspaceItem, BlContainerRow, MblContainerRow, QuotationOptionOve
 import { empName, openMailto, buildRateSection, generateQuotationPdf } from "./utils"
 import { lookupQuotationId } from "./useWorkspaceActions"
 import { COLOR } from "../../ui/tokens"
+import { Button, Checkbox, DatePicker, Field, Input, Select, type Option } from "../../ui"
+import { cn } from "../../../lib/cn"
 
 export interface InlineStepFormsProps {
   selectedItem: WorkspaceItem
@@ -154,6 +156,39 @@ export interface InlineStepFormsProps {
   setActiveStep: (v: string | null) => void
 }
 
+const KYC_CLIENT_TYPE_OPTIONS: Option[] = ['Shipper', 'Buyer', 'Agent', 'Trader'].map(v => ({ value: v, label: v }))
+const KYC_CURRENCY_OPTIONS: Option[] = ['USD', 'LKR', 'EUR', 'GBP'].map(v => ({ value: v, label: v }))
+
+/** Navy title bar at the top of a step form. */
+function StepHeader({ icon, title, subtitle, className }: { icon?: ReactNode; title: string; subtitle?: string; className?: string }) {
+  return (
+    <div className={cn('flex min-h-9 items-center gap-2 rounded-card bg-primary px-4 py-1 text-white', className)}>
+      {icon}
+      <h2 className="m-0 text-label font-bold uppercase tracking-label text-white">{title}</h2>
+      {subtitle && <span className="ml-1 text-label text-white opacity-80">{subtitle}</span>}
+    </div>
+  )
+}
+
+/** Sub-heading above a group of fields. */
+function SectionHead({ children }: { children: ReactNode }) {
+  return (
+    <h3 className="m-0 border-b border-line-soft pb-2 text-label font-bold uppercase tracking-label text-fg-muted">
+      {children}
+    </h3>
+  )
+}
+
+/** Read-only value from the client registry (KYC). */
+function RegistryValue({ label, strong, className, children }: { label: string; strong?: boolean; className?: string; children: ReactNode }) {
+  return (
+    <div className={className}>
+      <div className="mb-0.5 text-label text-fg-muted">{label}</div>
+      <div className={cn('text-control text-fg', strong && 'font-semibold')}>{children}</div>
+    </div>
+  )
+}
+
 export default function InlineStepForms({
   selectedItem, actionModal,
   kycBrNumber, setKycBrNumber, kycParentOrg, setKycParentOrg, kycDeadline, setKycDeadline,
@@ -266,107 +301,63 @@ export default function InlineStepForms({
 {selectedItem.actionKind === 'send-kyc' && actionModal ? (() => {
   const kycClient = actionModal.sourceData.kycClient as KycPendingClient | undefined
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Header */}
-      <div style={{ padding: '10px 14px', background: '#0891b2', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <ShieldCheck size={14} style={{ color: '#fff' }} />
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>KYC — CHECK DOCUMENTS</span>
-      </div>
+    <div className="flex flex-col gap-4">
+      <StepHeader icon={<ShieldCheck size={14} aria-hidden="true" />} title="KYC — CHECK DOCUMENTS" />
 
       {/* Pre-fetched client registry data */}
       {kycClient && (() => {
         const address = [kycClient.addr_street_ln, kycClient.addr_city, kycClient.addr_country].filter(Boolean).join(', ')
         return (
-          <div style={{ padding: '12px 14px', background: 'rgba(8,145,178,0.04)', border: '1px solid rgba(8,145,178,0.14)', borderLeft: '3px solid #0891b2', borderRadius: 8 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.07em', color: '#0891b2', marginBottom: 10 }}>From Client Registry</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px 16px' }}>
-              {kycClient.vat_no && (
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>VAT No.</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{kycClient.vat_no}</div>
-                </div>
-              )}
-              {kycClient.tin && (
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>TIN</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{kycClient.tin}</div>
-                </div>
-              )}
-              {kycClient.credit_limit != null && (
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Credit Limit</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{kycClient.credit_limit.toLocaleString()}</div>
-                </div>
-              )}
-              {address && (
-                <div style={{ gridColumn: '1 / -1' }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Address</div>
-                  <div style={{ fontSize: 13, color: 'var(--text)' }}>{address}</div>
-                </div>
-              )}
+          <div className="rounded-card border border-line-soft border-l-[3px] border-l-accent bg-canvas px-3.5 py-3">
+            <div className="mb-2.5 text-label font-bold uppercase tracking-label text-accent">From Client Registry</div>
+            <div className="grid grid-cols-3 gap-x-4 gap-y-1.5">
+              {kycClient.vat_no && <RegistryValue label="VAT No." strong>{kycClient.vat_no}</RegistryValue>}
+              {kycClient.tin && <RegistryValue label="TIN" strong>{kycClient.tin}</RegistryValue>}
+              {kycClient.credit_limit != null && <RegistryValue label="Credit Limit" strong>{kycClient.credit_limit.toLocaleString()}</RegistryValue>}
+              {address && <RegistryValue label="Address" className="col-span-full">{address}</RegistryValue>}
             </div>
           </div>
         )
       })()}
 
       {/* Client Information */}
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>Client Information</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 16px' }}>
-          <div>
-            <label className="lt-label">Customer</label>
-            <input className="lt-input" style={{ width: '100%', background: 'rgba(0,0,0,0.04)' }} value={actionModal.customerName} disabled />
-          </div>
-          <div>
-            <label className="lt-label">BR Number <span style={{ color: '#dc2626' }}>*</span></label>
-            <input className="lt-input" style={{ width: '100%' }} value={kycBrNumber} onChange={e => setKycBrNumber(e.target.value)} placeholder="e.g. PV 12345" autoFocus />
-          </div>
-          <div>
-            <label className="lt-label">Parent Organisation</label>
-            <input className="lt-input" style={{ width: '100%' }} value={kycParentOrg} onChange={e => setKycParentOrg(e.target.value)} placeholder="If subsidiary, enter parent name" />
-          </div>
-          <div>
-            <label className="lt-label">Client Type <span style={{ color: '#dc2626' }}>*</span></label>
-            <select className="lt-input" style={{ width: '100%' }} value={kycCliType} onChange={e => setKycCliType(e.target.value)}>
-              <option value="">Select type...</option>
-              <option value="Shipper">Shipper</option>
-              <option value="Buyer">Buyer</option>
-              <option value="Agent">Agent</option>
-              <option value="Trader">Trader</option>
-            </select>
-          </div>
-          <div>
-            <label className="lt-label">Currency <span style={{ color: '#dc2626' }}>*</span></label>
-            <select className="lt-input" style={{ width: '100%' }} value={kycCurrency} onChange={e => setKycCurrency(e.target.value)}>
-              <option value="USD">USD</option>
-              <option value="LKR">LKR</option>
-              <option value="EUR">EUR</option>
-              <option value="GBP">GBP</option>
-            </select>
-          </div>
-          <div>
-            <label className="lt-label">Document Submission Deadline <span style={{ color: '#dc2626' }}>*</span></label>
-            <input className="lt-input" style={{ width: '100%' }} type="date" value={kycDeadline} onChange={e => setKycDeadline(e.target.value)} />
-          </div>
-          <div>
-            <label className="lt-label">Website</label>
-            <input className="lt-input" style={{ width: '100%' }} value={kycWebsite} onChange={e => setKycWebsite(e.target.value)} placeholder="https://..." />
-          </div>
-          <div>
-            <label className="lt-label">SVAT No.</label>
-            <input className="lt-input" style={{ width: '100%' }} value={kycSvatNo} onChange={e => setKycSvatNo(e.target.value)} placeholder="SVAT registration number" />
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label className="lt-label">Tax Exemptions</label>
-            <input className="lt-input" style={{ width: '100%' }} value={kycTaxExemptions} onChange={e => setKycTaxExemptions(e.target.value)} placeholder="e.g. N/A, BOI exemption..." />
-          </div>
+      <section className="flex flex-col gap-3">
+        <SectionHead>Client Information</SectionHead>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+          <Field label="Customer">
+            {ids => <Input {...ids} value={actionModal.customerName} disabled />}
+          </Field>
+          <Field label="BR Number" required>
+            {ids => <Input {...ids} value={kycBrNumber} onChange={e => setKycBrNumber(e.target.value)} placeholder="e.g. PV 12345" autoFocus />}
+          </Field>
+          <Field label="Parent Organisation">
+            {ids => <Input {...ids} value={kycParentOrg} onChange={e => setKycParentOrg(e.target.value)} placeholder="If subsidiary, enter parent name" />}
+          </Field>
+          <Field label="Client Type" required>
+            {ids => <Select {...ids} value={kycCliType} onChange={setKycCliType} placeholder="Select type..." options={KYC_CLIENT_TYPE_OPTIONS} />}
+          </Field>
+          <Field label="Currency" required>
+            {ids => <Select {...ids} value={kycCurrency} onChange={setKycCurrency} options={KYC_CURRENCY_OPTIONS} />}
+          </Field>
+          <Field label="Document Submission Deadline" required>
+            {ids => <DatePicker {...ids} value={kycDeadline} onChange={setKycDeadline} />}
+          </Field>
+          <Field label="Website">
+            {ids => <Input {...ids} value={kycWebsite} onChange={e => setKycWebsite(e.target.value)} placeholder="https://..." />}
+          </Field>
+          <Field label="SVAT No.">
+            {ids => <Input {...ids} value={kycSvatNo} onChange={e => setKycSvatNo(e.target.value)} placeholder="SVAT registration number" />}
+          </Field>
+          <Field label="Tax Exemptions" className="col-span-full">
+            {ids => <Input {...ids} value={kycTaxExemptions} onChange={e => setKycTaxExemptions(e.target.value)} placeholder="e.g. N/A, BOI exemption..." />}
+          </Field>
         </div>
-      </div>
+      </section>
 
       {/* Services Required */}
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>Services Required</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px' }}>
+      <section className="flex flex-col gap-3">
+        <SectionHead>Services Required</SectionHead>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-2">
           {([
             ['Sea Imports', kycSeaImports, setKycSeaImports],
             ['Sea Exports', kycSeaExports, setKycSeaExports],
@@ -379,47 +370,44 @@ export default function InlineStepForms({
             ['Dangerous Goods', kycDangerousGoods, setKycDangerousGoods],
             ['Perishable Goods', kycPerishableGoods, setKycPerishableGoods],
           ] as [string, boolean, (v: boolean) => void][]).map(([label, val, setter]) => (
-            <label key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
-              <input type="checkbox" checked={val} onChange={e => setter(e.target.checked)} style={{ width: 14, height: 14, accentColor: '#0891b2', cursor: 'pointer' }} />
-              {label}
-            </label>
+            <Checkbox key={label} checked={val} onChange={setter}>{label}</Checkbox>
           ))}
         </div>
-      </div>
+      </section>
 
       {/* Document Checklist */}
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.07em', color: 'var(--text-muted)', marginBottom: 10 }}>Document Checklist</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', background: 'rgba(8,145,178,0.04)', borderRadius: 8, border: '1px solid rgba(8,145,178,0.12)' }}>
+      <section className="flex flex-col gap-3">
+        <SectionHead>Document Checklist</SectionHead>
+        <div className="flex flex-col gap-2 rounded-card border border-line-soft bg-canvas px-3.5 py-3">
           {([
             ['BR Form', kycDocBrForm, setKycDocBrForm],
             ['VAT Certificate', kycDocVatCert, setKycDocVatCert],
             ['SVAT Certificate', kycDocSvatCert, setKycDocSvatCert],
             ['TIN Certificate', kycDocTinCert, setKycDocTinCert],
             ['Form 20', kycDocForm20, setKycDocForm20],
-          ] as [string, string, (v: string) => void][]).map(([label, val, setter]) => (
-            <label key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
-              <input type="checkbox" checked={val === 'true'} onChange={e => setter(e.target.checked ? 'true' : 'false')} style={{ width: 15, height: 15, accentColor: '#16a34a', cursor: 'pointer' }} />
-              <span style={{ color: val === 'true' ? '#16a34a' : 'var(--text-secondary)', fontWeight: val === 'true' ? 600 : 400 }}>{label}</span>
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: val === 'true' ? '#16a34a' : 'var(--text-muted)', fontWeight: 600 }}>{val === 'true' ? 'Received' : 'Pending'}</span>
-            </label>
-          ))}
+          ] as [string, string, (v: string) => void][]).map(([label, val, setter]) => {
+            const received = val === 'true'
+            return (
+              <Checkbox key={label} checked={received} onChange={checked => setter(checked ? 'true' : 'false')} className="flex w-full">
+                <span className={cn(received && 'font-semibold text-success')}>{label}</span>
+                <span className={cn('ml-auto text-label font-semibold', received ? 'text-success' : 'text-fg-muted')}>{received ? 'Received' : 'Pending'}</span>
+              </Checkbox>
+            )
+          })}
         </div>
-      </div>
+      </section>
 
-      <div>
-        <label className="lt-label">Notes (optional)</label>
-        <input className="lt-input" style={{ width: '100%' }} value={formNote} onChange={e => setFormNote(e.target.value)} placeholder="Any additional notes..." />
-      </div>
+      <Field label="Notes (optional)">
+        {ids => <Input {...ids} value={formNote} onChange={e => setFormNote(e.target.value)} placeholder="Any additional notes..." />}
+      </Field>
 
       {/* Submit button */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button className="db-btn primary"
+      <div className="flex justify-end">
+        <Button variant="primary" icon={<ShieldCheck size={14} aria-hidden="true" />}
           disabled={!kycBrNumber.trim() || !kycCliType || !kycDeadline}
-          style={!kycBrNumber.trim() || !kycCliType || !kycDeadline ? { opacity: 0.4, cursor: 'not-allowed' } : { background: '#0891b2', borderColor: '#0891b2' }}
           onClick={handleModalSubmit}>
-          <ShieldCheck size={12} style={{ marginRight: 6 }} /> Submit KYC Request
-        </button>
+          Submit KYC Request
+        </Button>
       </div>
     </div>
   )
