@@ -22,7 +22,7 @@ export interface WorkspaceItem {
   urgencySortKey?: number
   /** True when the client's KYC is not yet completed for this inquiry. */
   kycIncomplete?: boolean
-  /** RFQ group number — present when this inquiry came from an uploaded tender. */
+  /** RFQ group number - present when this inquiry came from an uploaded tender. */
   rfqRef?: number
 }
 

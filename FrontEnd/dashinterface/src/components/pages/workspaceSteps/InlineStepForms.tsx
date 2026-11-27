@@ -495,7 +495,7 @@ export default function InlineStepForms({
   const kycClient = actionModal.sourceData.kycClient as KycPendingClient | undefined
   return (
     <div className="flex flex-col gap-4">
-      <StepHeader icon={<ShieldCheck size={14} aria-hidden="true" />} title="KYC — CHECK DOCUMENTS" />
+      <StepHeader icon={<ShieldCheck size={14} aria-hidden="true" />} title="KYC - CHECK DOCUMENTS" />
 
       {/* Pre-fetched client registry data */}
       {kycClient && (() => {
@@ -712,14 +712,14 @@ export default function InlineStepForms({
                 <span className="text-label text-fg-muted">{typeLabel}{opt.service_name ? ` · ${opt.service_name}` : ''}</span>
               </div>
 
-              {/* Schedule — ETD / ETA / Cutoff */}
+              {/* Schedule - ETD / ETA / Cutoff */}
               <div className="flex flex-col justify-center gap-px border-r border-line-soft px-2 py-1.5 text-label">
                 {(opt.etd_pol || opt.eta_pod) ? (<>
                   {opt.etd_pol && <div className="text-fg-label">ETD {fmtShort(opt.etd_pol)}</div>}
                   {opt.eta_pod && <div className="text-fg-label">ETA {fmtShort(opt.eta_pod)}</div>}
                   {opt.bk_cutoff && <div className="text-warning">Cut {fmtShort(opt.bk_cutoff)}</div>}
                 </>) : (
-                  <span className="text-fg-muted">{r.transit ? `${r.transit}d transit` : '—'}</span>
+                  <span className="text-fg-muted">{r.transit ? `${r.transit}d transit` : '-'}</span>
                 )}
               </div>
 
@@ -856,7 +856,7 @@ export default function InlineStepForms({
         </div>
       </div>
 
-      {/* Quotation option selection — shown only when accepted */}
+      {/* Quotation option selection - shown only when accepted */}
       {customerDecision === 'accepted' && (
         <div className="flex flex-col gap-1">
           <span id="ws-cr-option-label" className={labelClass}>Accepted Option</span>
@@ -889,7 +889,7 @@ export default function InlineStepForms({
                         {opt.vessel ? `${opt.vessel}${opt.voyage ? ` / ${opt.voyage}` : ''}` : `Option ${opt.option_id}`}
                       </span>
                       <span className="mt-0.5 block text-label text-fg-label">
-                        {opt.option_currency ?? 'USD'} {opt.final_amt != null ? Number(opt.final_amt).toLocaleString(undefined, { minimumFractionDigits: 2 }) : opt.amt != null ? Number(opt.amt).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '—'}
+                        {opt.option_currency ?? 'USD'} {opt.final_amt != null ? Number(opt.final_amt).toLocaleString(undefined, { minimumFractionDigits: 2 }) : opt.amt != null ? Number(opt.amt).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '-'}
                         {opt.rate_id != null && <span className="ml-2 text-fg-muted">Rate #{opt.rate_id}</span>}
                       </span>
                     </span>
@@ -916,8 +916,8 @@ export default function InlineStepForms({
           icon={customerDecision === 'accepted' ? <Check size={14} aria-hidden="true" /> : <X size={14} aria-hidden="true" />}
           onClick={handleModalSubmit}>
           {customerDecision === 'accepted'
-            ? 'Customer Accepted — Proceed to Booking'
-            : 'Customer Rejected — Close Inquiry'}
+            ? 'Customer Accepted - Proceed to Booking'
+            : 'Customer Rejected - Close Inquiry'}
         </Button>
       </div>
     </div>
@@ -933,7 +933,7 @@ export default function InlineStepForms({
     <div className="flex flex-col gap-4">
       {/* Booking summary */}
       <div className="rounded-card border border-line-soft bg-primary-subtle px-3.5 py-2.5 text-control text-fg">
-        <strong>{coBkg.customer_name}</strong> — {coBkg.origin} → {coBkg.destination}
+        <strong>{coBkg.customer_name}</strong> - {coBkg.origin} → {coBkg.destination}
         <div className="mt-0.5 text-fg-muted">
           {coBkg.quantity}x {coBkg.container_type} · {coBkg.shipping_line || 'No liner'}
         </div>
@@ -1083,7 +1083,7 @@ export default function InlineStepForms({
           {customerContactEmail.includes('@') && (
             <>
               <Button variant="primary" className="w-full justify-start" icon={<Mail size={14} aria-hidden="true" />}
-                onClick={() => openMailto(customerContactEmail, `SI/BL Cutoff Reminder — ${siBkg.id} — ${siBkg.customer_name}`, `Dear ${siBkg.customer_name},\n\nThis is a reminder that the SI/BL cutoff date is approaching${siblCutoff ? ` (${siblCutoff})` : ''}. Please submit your shipping instructions at your earliest convenience.\n\nBest regards,\n${activeEmployee.name}\nSynergy Shipping & Logistics`)}>
+                onClick={() => openMailto(customerContactEmail, `SI/BL Cutoff Reminder - ${siBkg.id} - ${siBkg.customer_name}`, `Dear ${siBkg.customer_name},\n\nThis is a reminder that the SI/BL cutoff date is approaching${siblCutoff ? ` (${siblCutoff})` : ''}. Please submit your shipping instructions at your earliest convenience.\n\nBest regards,\n${activeEmployee.name}\nSynergy Shipping & Logistics`)}>
                 Open in Outlook
               </Button>
               <ConfirmCheck tone="info" checked={emailConfirmed} onChange={setEmailConfirmed}
@@ -1103,7 +1103,7 @@ export default function InlineStepForms({
               placeholder="+94 7X XXX XXXX" />}
           </Field>
           <ConfirmCheck tone="success" checked={waConfirmed} onChange={setWaConfirmed}
-            hint="No WhatsApp integration — manual confirmation.">
+            hint="No WhatsApp integration - manual confirmation.">
             I confirm that I have sent the cutoff reminder to the customer via WhatsApp.
           </ConfirmCheck>
         </>
@@ -1232,7 +1232,7 @@ export default function InlineStepForms({
       {/* Generated Email Body */}
       {(() => {
         const emailBody = [
-          `Subject: PRE-ADVICE — ${paField('bl_number') || paBkg.id} — ${paField('vessel')} ${paField('voyage')} — ${paField('pol')} → ${paField('final_destination')}`,
+          `Subject: PRE-ADVICE - ${paField('bl_number') || paBkg.id} - ${paField('vessel')} ${paField('voyage')} - ${paField('pol')} → ${paField('final_destination')}`,
           ``,
           `Dear ${paField('door_agent') || '[Door Agent]'},`,
           ``,
@@ -1300,7 +1300,7 @@ export default function InlineStepForms({
           `Synergy Shipping & Logistics`,
         ].join('\n')
 
-        const paEmailSubject = `PRE-ADVICE — ${paField('bl_number') || paBkg.id} — ${paField('vessel')} ${paField('voyage')} — ${paField('pol')} → ${paField('final_destination')}`
+        const paEmailSubject = `PRE-ADVICE - ${paField('bl_number') || paBkg.id} - ${paField('vessel')} ${paField('voyage')} - ${paField('pol')} → ${paField('final_destination')}`
         const paEmailBodyOnly = emailBody.split('\n').slice(2).join('\n')
         const paDisabled =
           !paField('door_agent').trim() ||
@@ -1308,7 +1308,7 @@ export default function InlineStepForms({
           (sendMethod === 'whatsapp' && !waConfirmed)
         return (
           <>
-            {/* Generated Email — collapsible */}
+            {/* Generated Email - collapsible */}
             <DraftPanel title="Generated Email" collapsed={draftCollapsed} onToggle={() => setDraftCollapsed(c => !c)}
               action={
                 <Button variant="ghost" size="sm" className={cn(paCopied && 'border-success-line bg-success-bg text-success')}
@@ -1381,12 +1381,12 @@ export default function InlineStepForms({
   const praSelect = (label: string, key: string, options: string[]) => (
     <Field label={label}>
       {ids => <Select {...ids} value={paField(key)} onChange={v => setPaField(key, v)}
-        options={options.map(o => ({ value: o, label: o || '—' }))} />}
+        options={options.map(o => ({ value: o, label: o || '-' }))} />}
     </Field>
   )
 
   const praEmailBody = [
-    `Subject: Pre-Alert — ${paField('hbl_number') || paField('mbl_number') || 'N/A'} — ${paField('vessel')} ${paField('voyage')}`,
+    `Subject: Pre-Alert - ${paField('hbl_number') || paField('mbl_number') || 'N/A'} - ${paField('vessel')} ${paField('voyage')}`,
     '',
     'Dear Sir / Madam,',
     '',
@@ -1462,7 +1462,7 @@ export default function InlineStepForms({
         {praInput('Consignee', 'consignee', { readOnly: true })}
       </FormSection>
 
-      {/* Generated Email — collapsible */}
+      {/* Generated Email - collapsible */}
       <DraftPanel title="Generated Email" collapsed={draftCollapsed} onToggle={() => setDraftCollapsed(c => !c)}
         action={
           <Button variant="ghost" size="sm" className={cn(paCopied && 'border-success-line bg-success-bg text-success')}
@@ -1481,7 +1481,7 @@ export default function InlineStepForms({
           placeholder="Optional notes..." className="resize-y" />}
       </Field>
 
-      {/* Submit — auto-opens Outlook Web with pre-alert email */}
+      {/* Submit - auto-opens Outlook Web with pre-alert email */}
       <div className="flex justify-end">
         <Button variant="primary" disabled={praDisabled} icon={<Mail size={14} aria-hidden="true" />}
           onClick={() => handleModalSubmit()}>
@@ -1515,13 +1515,13 @@ export default function InlineStepForms({
       {/* ═══════ PHASE 1: REVIEW RELEASE ORDER ═══════ */}
       {releasePhase === 'review' && (
         <>
-          <StepHeader icon={<FileText size={14} aria-hidden="true" />} title="RELEASE ORDER — REVIEW" subtitle="Step 1 of 2" />
+          <StepHeader icon={<FileText size={14} aria-hidden="true" />} title="RELEASE ORDER - REVIEW" subtitle="Step 1 of 2" />
 
           {/* Booking summary */}
           <div className="rounded-card border border-line-soft bg-primary-subtle px-3.5 py-2.5 text-control text-fg">
-            <strong>{rbkg.customer_name}</strong> — {rbkg.origin} → {rbkg.destination}
+            <strong>{rbkg.customer_name}</strong> - {rbkg.origin} → {rbkg.destination}
             <div className="mt-0.5 text-fg-muted">
-              {rbkg.quantity}x {rbkg.container_type} · {rbkg.shipping_line || 'No liner'} · {rbkg.vessel_name || 'No vessel'} / {rbkg.voyage_number || '—'}
+              {rbkg.quantity}x {rbkg.container_type} · {rbkg.shipping_line || 'No liner'} · {rbkg.vessel_name || 'No vessel'} / {rbkg.voyage_number || '-'}
             </div>
           </div>
 
@@ -1624,7 +1624,7 @@ export default function InlineStepForms({
           {sendMethod === 'email' && customerContactEmail.includes('@') && (
             <>
               <Button variant="primary" className="w-full justify-start" icon={<Mail size={14} aria-hidden="true" />}
-                onClick={() => openMailto(customerContactEmail, `Release Order — ${rbkg.id} — ${rbkg.customer_name}`, releaseDraft)}>
+                onClick={() => openMailto(customerContactEmail, `Release Order - ${rbkg.id} - ${rbkg.customer_name}`, releaseDraft)}>
                 Open in Outlook
               </Button>
               <ConfirmCheck tone="info" checked={emailConfirmed} onChange={setEmailConfirmed}
@@ -1634,7 +1634,7 @@ export default function InlineStepForms({
             </>
           )}
 
-          {/* Draft message — collapsible */}
+          {/* Draft message - collapsible */}
           <DraftPanel title={draftTitle} collapsed={draftCollapsed} onToggle={() => setDraftCollapsed(c => !c)}
             action={
               <Tooltip content="Copy to clipboard">
@@ -1690,14 +1690,14 @@ export default function InlineStepForms({
     <div className="flex flex-col gap-4">
       <div>
         <StepHeader className="mb-px rounded-b-none" title="RELEASE ORDER" subtitle="Attach & send to CS" />
-        {/* Booking summary — read-only */}
+        {/* Booking summary - read-only */}
         <div className="overflow-hidden rounded-b-card border border-line-soft bg-surface">
           {[
             { label: 'Customer',   value: roBkg.customer_name },
-            { label: 'Carrier',    value: roBkg.shipping_line || '—' },
+            { label: 'Carrier',    value: roBkg.shipping_line || '-' },
             { label: 'Container',  value: `${roBkg.quantity}x ${roBkg.container_type}` },
-            { label: 'Vessel',     value: roBkg.vessel_name || '—' },
-            { label: 'Voyage',     value: roBkg.voyage_number || '—' },
+            { label: 'Vessel',     value: roBkg.vessel_name || '-' },
+            { label: 'Voyage',     value: roBkg.voyage_number || '-' },
             { label: 'Route',      value: `${roBkg.origin} → ${roBkg.destination}` },
           ].map(({ label, value }) => (
             <SummaryRow key={label} label={label} strong={false} className="last:border-b-0">{value}</SummaryRow>
@@ -1705,7 +1705,7 @@ export default function InlineStepForms({
         </div>
       </div>
 
-      {/* Release Order Fields — structured form matching liner release order format */}
+      {/* Release Order Fields - structured form matching liner release order format */}
       <section className="flex flex-col gap-4">
         <SectionHead>Release Order Details</SectionHead>
 
@@ -1770,7 +1770,7 @@ export default function InlineStepForms({
         <Field label="Next Port of Discharge (if transshipment)">
           {ids => <Input {...ids} value={roFields.next_port_of_discharge ?? ''}
             onChange={e => setRoFields(f => ({ ...f, next_port_of_discharge: e.target.value }))}
-            placeholder="Optional — leave blank for direct service" />}
+            placeholder="Optional - leave blank for direct service" />}
         </Field>
       </section>
 
@@ -1794,15 +1794,15 @@ export default function InlineStepForms({
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <StepHeader className="mb-px rounded-b-none" title="LINER BOOKING CONFIRMATION" subtitle={`RA# ${cbBkg.voyage_number || '—'}`} />
-        {/* Booking summary — read-only */}
+        <StepHeader className="mb-px rounded-b-none" title="LINER BOOKING CONFIRMATION" subtitle={`RA# ${cbBkg.voyage_number || '-'}`} />
+        {/* Booking summary - read-only */}
         <div className="overflow-hidden rounded-b-card border border-line-soft bg-surface">
           {[
             { label: 'Customer', value: cbBkg.customer_name },
-            { label: 'Carrier', value: cbBkg.shipping_line || '—' },
+            { label: 'Carrier', value: cbBkg.shipping_line || '-' },
             { label: 'Container', value: `${cbBkg.quantity}x ${cbBkg.container_type}` },
             { label: 'RA Number', value: cbBkg.voyage_number || 'Not assigned' },
-            { label: 'Vessel', value: cbBkg.vessel_name || '—' },
+            { label: 'Vessel', value: cbBkg.vessel_name || '-' },
             { label: 'Route', value: `${cbBkg.origin} → ${cbBkg.destination}` },
           ].map(({ label, value }) => (
             <SummaryRow key={label} label={label} strong={label === 'RA Number'} className="last:border-b-0">{value}</SummaryRow>
@@ -1823,7 +1823,7 @@ export default function InlineStepForms({
           ))}
         </div>
       </div>
-      {/* Reason — shown only when No */}
+      {/* Reason - shown only when No */}
       {linerBooked === 'no' && (
         <Field label="Reason (required)">
           {ids => <Textarea {...ids} rows={3} className="resize-y"
@@ -1850,7 +1850,7 @@ export default function InlineStepForms({
 
       {/* Booking summary */}
       <div className="rounded-card border border-line-soft bg-primary-subtle px-3.5 py-2.5 text-control text-fg">
-        <strong>{siBkg.customer_name}</strong> — {siBkg.origin} → {siBkg.destination}
+        <strong>{siBkg.customer_name}</strong> - {siBkg.origin} → {siBkg.destination}
         <span className="ml-2 text-fg-muted">
           {siBkg.quantity}x {siBkg.container_type} · {siBkg.shipping_line || 'No liner'}
         </span>
@@ -1965,7 +1965,7 @@ export default function InlineStepForms({
   const generateEmailDraft = (): string => {
     const liner = siField('to_liner') || gsBkg.shipping_line || 'Liner'
     const lines = [
-      `Subject: Shipping Instructions / Liner BL Instruction — ${siField('booking_ref')} — ${siField('pol')} → ${siField('pod')}`,
+      `Subject: Shipping Instructions / Liner BL Instruction - ${siField('booking_ref')} - ${siField('pol')} → ${siField('pod')}`,
       '',
       `Dear ${liner},`,
       '',
@@ -1997,7 +1997,7 @@ export default function InlineStepForms({
       `Container:         ${siField('container_no') || 'TBA'} (${siField('container_size')})`,
       siField('seal_no') ? `Seal No:           ${siField('seal_no')}` : '',
       `Description:       ${siField('description_of_goods')}`,
-      `Weight:            ${siField('weight_kgs') || '—'} KGS`,
+      `Weight:            ${siField('weight_kgs') || '-'} KGS`,
       siField('volume_m3') ? `Volume:            ${siField('volume_m3')} M3` : '',
       `Freight:           ${siField('freight')}`,
       `Total:             ${siField('total_containers')}`,
@@ -2020,7 +2020,7 @@ export default function InlineStepForms({
 
       {/* Booking summary */}
       <div className="rounded-card border border-line-soft bg-primary-subtle px-3.5 py-2.5 text-control text-fg">
-        <strong>{gsBkg.customer_name}</strong> — {gsBkg.origin} → {gsBkg.destination}
+        <strong>{gsBkg.customer_name}</strong> - {gsBkg.origin} → {gsBkg.destination}
         <div className="mt-0.5 text-fg-muted">
           {gsBkg.quantity}x {gsBkg.container_type} · {gsBkg.shipping_line || 'No liner'}
           {gsBkg.job_reference_number && <span className="ml-2">· Job Ref: <strong>{gsBkg.job_reference_number}</strong></span>}
@@ -2132,7 +2132,7 @@ export default function InlineStepForms({
               Open in Outlook
             </Button>
 
-            {/* Draft — collapsible, optional */}
+            {/* Draft - collapsible, optional */}
             {!siEmailShow ? (
               <Button className="w-full font-semibold text-primary" icon={<ChevronRight size={14} aria-hidden="true" />}
                 onClick={generateEmailDraft}>
@@ -2242,7 +2242,7 @@ export default function InlineStepForms({
         <Field label="Pre-fill from Release Order (optional)">
           {ids => <Select {...ids} value={selectedReleaseOrderId} onChange={applyReleaseOrder}
             options={[
-              { value: '', label: '— Select a release order —' },
+              { value: '', label: '- Select a release order -' },
               ...roBookings.map(b => ({ value: b.id, label: `${b.customer_name} · ${b.vessel_name} / ${b.voyage_number} (${b.origin} → ${b.destination})` })),
             ]} />}
         </Field>
@@ -2331,7 +2331,7 @@ export default function InlineStepForms({
   const formSelect = (label: string, key: string, options: string[]) => (
     <Field label={label}>
       {ids => <Select {...ids} value={bkgField(key)} onChange={v => setBkgField(key, v)}
-        options={options.map(o => ({ value: o, label: o || '—' }))} />}
+        options={options.map(o => ({ value: o, label: o || '-' }))} />}
     </Field>
   )
   const formTextarea = (label: string, key: string, placeholder?: string) => (
@@ -2419,7 +2419,7 @@ export default function InlineStepForms({
             placeholder="Search vessel name…" />}
         </Field>
 
-        {/* Voyage combobox — selecting a voyage auto-fills all vessel fields */}
+        {/* Voyage combobox - selecting a voyage auto-fills all vessel fields */}
         <Field label="Voyage">
           {ids => <ComboBox {...ids} value={formVoyage} items={cvbVoyageItems} filter={() => true} menuTrigger="focus"
             onChange={v => { voyagePickedRef.current = false; setFormVoyage(v); setVoyageDropOpen(true) }}
@@ -2581,7 +2581,7 @@ export default function InlineStepForms({
   const hSelect = (label: string, key: string, options: string[]) => (
     <Field label={label}>
       {ids => <Select {...ids} value={hblField(key)} onChange={v => setHblField(key, v)}
-        options={options.map(o => ({ value: o, label: o || '—' }))} />}
+        options={options.map(o => ({ value: o, label: o || '-' }))} />}
     </Field>
   )
   // Sits at the bottom of its grid cell, level with the inputs beside it.
@@ -2619,7 +2619,7 @@ export default function InlineStepForms({
 
       {/* Booking summary strip */}
       <div className="rounded-card border border-line-soft bg-primary-subtle px-3.5 py-2.5 text-control text-fg">
-        <strong>{chblBkg.customer_name}</strong> — {chblBkg.origin} → {chblBkg.destination}
+        <strong>{chblBkg.customer_name}</strong> - {chblBkg.origin} → {chblBkg.destination}
         <div className="mt-0.5 text-fg-muted">
           {chblBkg.quantity}x {chblBkg.container_type} · {chblBkg.shipping_line || 'No liner'} · Job Ref: {chblBkg.job_reference_number || 'N/A'}
         </div>
@@ -2858,7 +2858,7 @@ export default function InlineStepForms({
     <Field label={label}>
       {ids => <Select {...ids} value={form === 'mbl' ? mblField(key) : hblField(key)}
         onChange={v => form === 'mbl' ? setMblField(key, v) : setHblField(key, v)}
-        options={options.map(o => ({ value: o, label: o || '—' }))} />}
+        options={options.map(o => ({ value: o, label: o || '-' }))} />}
     </Field>
   )
   // Helper: accordion section heading
@@ -2940,7 +2940,7 @@ export default function InlineStepForms({
                 <Checkbox checked={isSelected} onChange={() => toggleHblSelection(hb.id)} className="flex w-full gap-2.5 px-3 py-2">
                   <span className="flex min-w-0 flex-1 flex-col gap-px">
                     <span className={cn('font-semibold', isSelected ? 'text-primary' : 'text-fg')}>
-                      {hb.house_bl_number || hb.id} — {hb.customer_name}
+                      {hb.house_bl_number || hb.id} - {hb.customer_name}
                     </span>
                     <span className="text-label text-fg-muted">
                       {hb.origin} → {hb.destination} · {hb.quantity}x {hb.container_type} · {hb.shipping_line || 'No liner'}
@@ -2958,7 +2958,7 @@ export default function InlineStepForms({
         )}
       </div>
 
-      {/* ===== MBL FORM — 3 Sections ===== */}
+      {/* ===== MBL FORM - 3 Sections ===== */}
 
       {/* Section 1: Job Header & Routing Information */}
       <section className="flex flex-col gap-3">
@@ -3007,9 +3007,9 @@ export default function InlineStepForms({
                   <div className={cbCell}>General</div>
                   <div className={cbCell}>{hb.quantity || 1}</div>
                   <div className={cbCell}>{hb.container_type}</div>
-                  <div className={cbCell}>—</div>
-                  <div className={cbCell}>—</div>
-                  <div className={cbCell}>—</div>
+                  <div className={cbCell}>-</div>
+                  <div className={cbCell}>-</div>
+                  <div className={cbCell}>-</div>
                 </div>
               ))}
             </div>
@@ -3071,7 +3071,7 @@ export default function InlineStepForms({
   const isReefer = bkContainers.some(c => c.type.includes('RF'))
   // Same entries as the old <select>; Select options are keyed by value, so repeated liner names are dropped.
   const brCarrierOptions: Option[] = [
-    { value: '', label: '— Select carrier —' },
+    { value: '', label: '- Select carrier -' },
     ...linerList
       .filter((l, i, all) => all.findIndex(x => x.name === l.name) === i)
       .map(l => ({ value: l.name, label: linerDisplay(l) })),
@@ -3090,7 +3090,7 @@ export default function InlineStepForms({
   )
   return (
     <div className="flex flex-col gap-4">
-      <StepHeader title="BOOKING FORMAT REQUEST" subtitle={!isCS ? 'Submitted by CS — review and add RA number' : undefined} />
+      <StepHeader title="BOOKING FORMAT REQUEST" subtitle={!isCS ? 'Submitted by CS - review and add RA number' : undefined} />
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
         <Field label="Carrier" required className="col-span-full">
@@ -3242,7 +3242,7 @@ export default function InlineStepForms({
     tmp.innerHTML = unsentQuote.body_html
     quotationText = (tmp.textContent || tmp.innerText || '').replace(/\n{3,}/g, '\n\n').trim()
   }
-  const emailSubject = `Quotation for ${stcInquiry.customer_name} — ${stcInquiry.id}`
+  const emailSubject = `Quotation for ${stcInquiry.customer_name} - ${stcInquiry.id}`
 
   // Resolve quote_id for fetching the saved PDF from S3
   const resolvedQuoteId = lastQuotationId ?? lookupQuotationId(stcInquiry.inq_id) ?? unsentQuote?.quote_id ?? (stcInquiry as Inquiry & { quotation_id?: number }).quotation_id ?? null
@@ -3273,7 +3273,7 @@ export default function InlineStepForms({
     <div className="flex flex-col gap-3">
       {ctx && <ContextCard ctx={ctx} />}
 
-      {/* Quotation preview — collapsible, plain text only */}
+      {/* Quotation preview - collapsible, plain text only */}
       {quotationText && (
         <div className="overflow-hidden rounded-card border border-line-soft">
           <button type="button" aria-expanded={!draftCollapsed} onClick={() => setDraftCollapsed(c => !c)}
@@ -3323,7 +3323,7 @@ export default function InlineStepForms({
                 <Button className={cn('w-full justify-start', pdfDownloaded && SELECTED_SUCCESS)}
                   icon={<FileText size={14} aria-hidden="true" />}
                   isPending={pdfDownloading} onClick={handleDownloadPdf}>
-                  {pdfDownloading ? 'Downloading...' : pdfDownloaded ? 'Downloaded — attach to email' : 'Download Quotation PDF'}
+                  {pdfDownloading ? 'Downloading...' : pdfDownloaded ? 'Downloaded - attach to email' : 'Download Quotation PDF'}
                 </Button>
               )}
               {/* Open Outlook compose with quotation text in body */}
@@ -3365,7 +3365,7 @@ export default function InlineStepForms({
                 <Button className={cn('w-full justify-start', pdfDownloaded && SELECTED_SUCCESS)}
                   icon={<FileText size={14} aria-hidden="true" />}
                   isPending={pdfDownloading} onClick={handleDownloadPdf}>
-                  {pdfDownloading ? 'Downloading...' : pdfDownloaded ? 'Downloaded — attach to WhatsApp' : 'Download Quotation PDF'}
+                  {pdfDownloading ? 'Downloading...' : pdfDownloaded ? 'Downloaded - attach to WhatsApp' : 'Download Quotation PDF'}
                 </Button>
               )}
               {/* Open WhatsApp with pre-filled message */}
@@ -3414,7 +3414,7 @@ export default function InlineStepForms({
     </div>
   )
 })() : (
-  // Default fallback — safety net for unknown/future action kinds.
+  // Default fallback - safety net for unknown/future action kinds.
   // For action kinds that already fire immediately when the card is clicked
   // (navigate-away, modal-open, or workflow-advance), skip the button entirely
   // so the right panel just shows item context without a redundant intermediary.

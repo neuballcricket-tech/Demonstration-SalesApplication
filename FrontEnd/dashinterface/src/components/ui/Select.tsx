@@ -22,7 +22,7 @@ export interface SelectProps {
   value: string
   onChange: (value: string) => void
   /**
-   * Include an option with `value: ''` (e.g. "All" or "— None —") to let users pick the empty value again.
+   * Include an option with `value: ''` (e.g. "All" or "- None -") to let users pick the empty value again.
    * Without one, `''` shows the `placeholder` and cannot be re-selected.
    */
   options: Array<Option | OptionGroup>

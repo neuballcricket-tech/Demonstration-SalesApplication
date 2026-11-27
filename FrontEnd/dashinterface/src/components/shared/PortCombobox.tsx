@@ -1,11 +1,11 @@
 /**
  * Two-tier port autocomplete.
  *
- * Tier 1 — curated list of ~40 frequent Colombo-export ports shown as a searchable dropdown.
+ * Tier 1 - curated list of ~40 frequent Colombo-export ports shown as a searchable dropdown.
  *   Matches on UNLOCODE code or city/country label. Always valid.
  *   Accepts "Port/Country" slash format as well as comma format while filtering.
  *
- * Tier 2 — full UN/LOCODE database (public/ports.json, 99k+ entries) used as a fallback
+ * Tier 2 - full UN/LOCODE database (public/ports.json, 99k+ entries) used as a fallback
  *   validator when the user types something not in the curated list.
  *   Accepted input formats:
  *     • UNLOCODE:    "NLRTM" → Rotterdam/Netherlands
@@ -65,7 +65,7 @@ const CURATED_PORTS: CuratedPort[] = [
   { code: 'JPTYO', label: 'Tokyo, Japan' },
   { code: 'JPOSA', label: 'Osaka, Japan' },
   { code: 'JPNGO', label: 'Nagoya, Japan' },
-  // USA (standard UN/LOCODEs — absent from ports.json but authoritative)
+  // USA (standard UN/LOCODEs - absent from ports.json but authoritative)
   { code: 'USLAX', label: 'Los Angeles, USA' },
   { code: 'USLGB', label: 'Long Beach, USA' },
   { code: 'USNYC', label: 'New York, USA' },
@@ -86,7 +86,7 @@ const CURATED_PORTS: CuratedPort[] = [
 ]
 
 // ---------------------------------------------------------------------------
-// Full ports.json — fetched lazily, cached in module scope
+// Full ports.json - fetched lazily, cached in module scope
 // ---------------------------------------------------------------------------
 
 let fullPortsCache: Record<string, string> | null = null
@@ -221,7 +221,7 @@ export default function PortCombobox({ value, onChange, placeholder, id, 'aria-l
     if (!raw || validation.status === 'valid') return
 
     // 1. Extract leading token as a potential UNLOCODE (letters/digits only)
-    const potentialCode = raw.split(/[\s—-]+/)[0].toUpperCase().replace(/[^A-Z0-9]/g, '')
+    const potentialCode = raw.split(/[\s\u2014-]+/)[0].toUpperCase().replace(/[^A-Z0-9]/g, '')
 
     // 2. Check curated list by code
     const curatedByCode = CURATED_PORTS.find(p => p.code === potentialCode)
@@ -263,7 +263,7 @@ export default function PortCombobox({ value, onChange, placeholder, id, 'aria-l
         return
       }
 
-      // 4c. Not found — show similar curated suggestions
+      // 4c. Not found - show similar curated suggestions
       const words = raw.toLowerCase().split(/[\s/,]+/).filter(w => w.length >= 2)
       const similar = CURATED_PORTS.filter(p =>
         words.some(w => p.code.toLowerCase().includes(w) || normPort(p.label).includes(w))
@@ -271,7 +271,7 @@ export default function PortCombobox({ value, onChange, placeholder, id, 'aria-l
       setValidation({ status: 'invalid', similar })
       onChange('')
     } catch {
-      // ports.json unavailable — pass a 5-char alphanumeric token through as-is
+      // ports.json unavailable - pass a 5-char alphanumeric token through as-is
       if (potentialCode.length === 5) onChange(potentialCode)
       setValidation({ status: 'idle' })
     }

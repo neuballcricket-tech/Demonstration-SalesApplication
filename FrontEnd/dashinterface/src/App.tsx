@@ -33,7 +33,7 @@ import {
   type BackendReleaseOrderPayload, type LinerRecord,
 } from './types'
 import { RoleContext, type RoleContextValue } from './RoleContext'
-// Mock data removed — all state is now driven by the backend API
+// Mock data removed - all state is now driven by the backend API
 import {
   apiCreateFollowup,
   apiCreateQuote, apiSetQuoteStatus,
@@ -63,7 +63,7 @@ const uuid = (): string =>
         return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
       })
 
-// Container type codes — frontend now uses the same codes as the backend, so this is identity.
+// Container type codes - frontend now uses the same codes as the backend, so this is identity.
 const BE_CONTAINER_TYPE: Record<string, string> = {
   '20GP': '20GP', '40GP': '40GP', '40HC': '40HC',
   '20RF': '20RF', '40RF': '40RF',
@@ -104,7 +104,7 @@ function mapInquiryRows(rows: InquiryRow[]): Inquiry[] {
       containerType: (BE_CONTAINER_TYPE[r.container_type ?? ''] ?? r.container_type ?? '20GP') as ContainerLine['containerType'],
       quantity: r.qty ?? 1,
       weight: r.commodity_weight ?? '',
-      commodityType: (BE_COM_TYPE[r.commodity_type ?? ''] ?? r.commodity_type ?? 'Miscellaneous manufactured articles — furniture, toys') as ContainerLine['commodityType'],
+      commodityType: (BE_COM_TYPE[r.commodity_type ?? ''] ?? r.commodity_type ?? 'Miscellaneous manufactured articles - furniture, toys') as ContainerLine['commodityType'],
       commodityName: r.commodity_name ?? '',
       destination: r.destination,
       isFcl: r.is_fully_loaded,
@@ -192,7 +192,7 @@ function mapBackendBooking(
     procurement_notified: feStatus !== 'Pending Liner',
     notes:                r.notes ?? '',
     delivery_type:        r.delivery_type ? BE_DELIVERY_TYPE[r.delivery_type] : undefined,
-    // backend IDs — stored for subsequent API calls, never displayed
+    // backend IDs - stored for subsequent API calls, never displayed
     booking_id:           r.booking_id,
     inq_id:               r.inq_id,
     cli_id:               r.cli_id,
@@ -241,7 +241,7 @@ function applyReleaseOrder(
 }
 
 export default function App() {
-  // Valid employee IDs the backend accepts — stale sessionStorage values must be rejected
+  // Valid employee IDs the backend accepts - stale sessionStorage values must be rejected
   const validEmpIds = EMPLOYEES.map(e => e.id)
 
   const [loggedInEmployeeId, setLoggedInEmployeeId] = useState<number | null>(
@@ -250,7 +250,7 @@ export default function App() {
       if (!stored) return null
       const id = Number(stored)
       if (!validEmpIds.includes(id)) {
-        // Stale session from old employee IDs — clear and force re-login
+        // Stale session from old employee IDs - clear and force re-login
         sessionStorage.removeItem('loggedInEmployeeId')
         return null
       }
@@ -366,7 +366,7 @@ export default function App() {
   // skipApi: set to true when the backend already auto-advanced the workflow
   // as a side effect of another API call (e.g. POST /rate-requests, POST .../options,
   // PATCH /quotations/.../send, PATCH .../response). In that case we only update
-  // local React state — no redundant PATCH to the workflow endpoint.
+  // local React state - no redundant PATCH to the workflow endpoint.
   // Either way, we re-fetch the inquiry from the backend after the update so the
   // displayed stage always reflects the backend's actual state.
   const advanceWorkflow = (inquiryId: string, nextStage: WorkflowStage, skipApi = false) => {
@@ -387,7 +387,7 @@ export default function App() {
           setInquiries(prev => prev.map(i =>
             i.id === inquiryId ? { ...i, workflow_stage: beStage } : i
           ))
-        }).catch(() => {/* silent — local optimistic state is acceptable fallback */})
+        }).catch(() => {/* silent - local optimistic state is acceptable fallback */})
       )
     }
     const stageLabel = WORKFLOW_STAGES.find(s => s.id === nextStage)?.label ?? nextStage
@@ -404,7 +404,7 @@ export default function App() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [vesselSchedules, setVesselSchedules] = useState<VesselSchedule[]>([])
   const [activityLog, setActivityLog] = useState<ActivityEntry[]>([])
-  // Reference data — fetched once at startup and cached for the session
+  // Reference data - fetched once at startup and cached for the session
   const [clientList, setClientList] = useState<ClientRecord[]>([])
   const contactPersonList: ContactPersonRecord[] = []  // disabled until backend provides bulk endpoint
   const [kycPendingClients, setKycPendingClients] = useState<KycPendingClient[]>([])
@@ -517,7 +517,7 @@ export default function App() {
       )
       flash(`Marked ${customerName} as completed`)
     } else if (completionFlag && !target) {
-      flash(`Logged follow-up — no pending inquiry found for "${customerName}"`)
+      flash(`Logged follow-up - no pending inquiry found for "${customerName}"`)
     } else {
       flash(`Follow-up logged for ${customerName}`)
     }
@@ -692,7 +692,7 @@ export default function App() {
     setBookings(prev => {
       const bkg = prev.find(b => b.id === bookingId)
       if (bkg?.booking_id) {
-        // No dedicated revert endpoint — clear fields via PATCH
+        // No dedicated revert endpoint - clear fields via PATCH
         apiPatchBookingRequest(bkg.booking_id, { ra_number: '', vessel: '' })
           .catch(err => console.error('[revertBookingRequest] API failed:', err))
       }
@@ -916,12 +916,12 @@ export default function App() {
     setBookings(prev => [newBooking, ...prev])
     flash(`Booking created for ${payload.customer_name}`)
 
-    // Background API call — requires inq_id, cli_id, lin_id from backend
+    // Background API call - requires inq_id, cli_id, lin_id from backend
     if (!payload.inq_id || !payload.cli_id || !payload.lin_id) {
-      console.error('[createBooking] POST skipped — missing required IDs:', {
+      console.error('[createBooking] POST skipped - missing required IDs:', {
         inq_id: payload.inq_id, cli_id: payload.cli_id, lin_id: payload.lin_id,
       })
-      flash('Warning: booking saved locally but not sent to backend — select a carrier from the list')
+      flash('Warning: booking saved locally but not sent to backend - select a carrier from the list')
     } else {
       const deliveryTypeMap: Record<string, string> = {
         'port-to-port': 'PORT_TO_PORT', 'door-to-door': 'DOOR_TO_DOOR',
@@ -1001,10 +1001,10 @@ export default function App() {
       containers:       data.containers,
     }
     const apiCall = (data.cli_id && data.cpid)
-      // Case 3 — existing client + existing contact
+      // Case 3 - existing client + existing contact
       ? apiCreateInquiryOldOld({ cli_id: data.cli_id, cp_id: data.cpid, ...sharedFields })
       : data.cli_id
-        // Case 2 — existing client + new contact
+        // Case 2 - existing client + new contact
         ? apiCreateInquiryOldNew({
             cli_id:              data.cli_id,
             channel:             data.channel,
@@ -1013,7 +1013,7 @@ export default function App() {
             contact_channel_id:  data.contact_channel_id,
             ...sharedFields,
           })
-        // Case 1 — new client + new contact (original path)
+        // Case 1 - new client + new contact (original path)
         : apiCreateInquiry({
             customer_name:       data.customer_name,
             request:             data.request,

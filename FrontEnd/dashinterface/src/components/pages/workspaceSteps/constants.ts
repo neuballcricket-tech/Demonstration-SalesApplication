@@ -12,7 +12,7 @@ export const TYPE_BADGE_CLASS: Record<ItemType, string> = {
 }
 
 // ---------------------------------------------------------------------------
-// Step-based navigation — per-role workflow steps
+// Step-based navigation - per-role workflow steps
 // ---------------------------------------------------------------------------
 
 export const CS_STEPS: StepDef[] = [
@@ -30,7 +30,7 @@ export const CS_STEPS: StepDef[] = [
 
   { key: 'cs-generate-si', label: 'Generate SI',       actionKinds: ['generate-si'],          stepNumber: 10, group: 'post-cutoff' },
 
-  // --- Steps 11–17: BL processing pipeline — reserved for future release ---
+  // --- Steps 11–17: BL processing pipeline - reserved for future release ---
   // { key: 'cs-bl-vessel',   label: 'Vessel',           actionKinds: ['save-vessel-schedule'],  stepNumber: 11 },
   // { key: 'cs-bl-booking',  label: 'Booking Creation', actionKinds: ['create-vessel-booking'], stepNumber: 12 },
   // { key: 'cs-draft-bl',    label: 'Draft BL',         actionKinds: ['save-draft-bl'],         stepNumber: 13 },
@@ -95,5 +95,5 @@ export const ROLE_STEP_MAP: Record<string, StepDef[]> = {
   Admin: ADMIN_STEPS,
 }
 
-// NVOCC shipping lines — SI generation + email drafting is available for these
+// NVOCC shipping lines - SI generation + email drafting is available for these
 export const NVOCC_LINES = new Set(['ECU Worldwide', 'Consolidators International', 'Sea Consortium'])

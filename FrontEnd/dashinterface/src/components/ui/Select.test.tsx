@@ -160,14 +160,14 @@ describe('Select', () => {
   })
 
   it("shows the placeholder for '' when there is no empty option", () => {
-    render(<Select aria-label="S" value="" onChange={() => {}} options={options} placeholder="— Select —" />)
-    expect(screen.getByRole('button')).toHaveTextContent('— Select —')
+    render(<Select aria-label="S" value="" onChange={() => {}} options={options} placeholder="- Select -" />)
+    expect(screen.getByRole('button')).toHaveTextContent('- Select -')
   })
 
   it('is named by Field label and described by its hint', () => {
     render(
       <Field label="Liner" hint="Pick one">
-        {(ids) => <Select {...ids} options={options} value="" onChange={() => {}} placeholder="— Select —" />}
+        {(ids) => <Select {...ids} options={options} value="" onChange={() => {}} placeholder="- Select -" />}
       </Field>,
     )
     const btn = screen.getByRole('button', { name: /liner/i })

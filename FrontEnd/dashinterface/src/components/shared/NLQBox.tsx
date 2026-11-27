@@ -32,7 +32,7 @@ const SUGGESTIONS = [
 
 function answer(query: string, inquiries: Inquiry[], tasks: Task[], missingItems: MissingItem[], followups: Followup[]): NLQResult {
   const q = query.toLowerCase().trim()
-  if (!q) return { summary: 'Ask a question — try one of the suggestions below.' }
+  if (!q) return { summary: 'Ask a question - try one of the suggestions below.' }
 
   const empName = (id: number) => EMPLOYEES.find(e => e.id === id)?.name ?? `EMP-${id}`
   const today = todayISO()
@@ -46,7 +46,7 @@ function answer(query: string, inquiries: Inquiry[], tasks: Task[], missingItems
     return {
       summary: `${matched.length} item${matched.length > 1 ? 's' : ''} missing for ${matched[0].customer_name}:`,
       columns: ['Item', 'Since', 'Cutoff', 'Owner'],
-      rows: matched.map(m => ({ cells: [m.missing_item, m.since, m.cutoff_date ?? '—', empName(m.employee_id)] })),
+      rows: matched.map(m => ({ cells: [m.missing_item, m.since, m.cutoff_date ?? '-', empName(m.employee_id)] })),
     }
   }
 

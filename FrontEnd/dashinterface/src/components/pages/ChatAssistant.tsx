@@ -96,7 +96,7 @@ export default function ChatAssistant({
     role: 'assistant',
     ts: nowStamp(),
     content:
-      "Hi — I'm an AI assistant for ABC Logistics. I can help you look up customers, inquiries, quotations, rates, and shipments. " +
+      "Hi - I'm an AI assistant for ABC Logistics. I can help you look up customers, inquiries, quotations, rates, and shipments. " +
       "I can also create records, update statuses, and help manage your sales workflow.\n\nAsk me anything, or use the quick commands on the right!",
   }])
   const [draft, setDraft] = useState('')
@@ -143,7 +143,7 @@ export default function ChatAssistant({
     }])
   }
 
-  // ------- Send handler — all messages go through WebSocket -------
+  // ------- Send handler - all messages go through WebSocket -------
   const send = (text?: string) => {
     const message = (text ?? draft).trim()
     if (!message) return
@@ -179,7 +179,7 @@ export default function ChatAssistant({
             ? { ...m, content: aiResponse, ts: nowStamp() }
             : m,
         ))
-        // AI tools may have mutated data — re-sync dashboard
+        // AI tools may have mutated data - re-sync dashboard
         onRefreshData?.()
       })
       .catch(() => {
@@ -309,7 +309,7 @@ export default function ChatAssistant({
                 <input className="qc-input" placeholder="Name of the person making the inquiry" value={inqForm.contactPerson} onChange={e => setInqForm(p => ({ ...p, contactPerson: e.target.value }))} />
               </FormField>
               <FormField label="Request / Description" required>
-                <input className="qc-input" placeholder="e.g. 2x 40 HC Colombo to Hamburg — garments" value={inqForm.request} onChange={e => setInqForm(p => ({ ...p, request: e.target.value }))} />
+                <input className="qc-input" placeholder="e.g. 2x 40 HC Colombo to Hamburg - garments" value={inqForm.request} onChange={e => setInqForm(p => ({ ...p, request: e.target.value }))} />
               </FormField>
               <div className="qc-form-row">
                 <FormField label="Origin">
@@ -433,7 +433,7 @@ export default function ChatAssistant({
                   style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer' }}
                   onClick={() => {
                     const first = inqForm.containers[0]
-                    setInqForm(p => ({ ...p, containers: [...p.containers, { ...emptyContainerLine(), commodityType: first?.commodityType ?? 'Miscellaneous manufactured articles — furniture, toys', commodityName: first?.commodityName ?? '', destination: first?.destination ?? '' }] }))
+                    setInqForm(p => ({ ...p, containers: [...p.containers, { ...emptyContainerLine(), commodityType: first?.commodityType ?? 'Miscellaneous manufactured articles - furniture, toys', commodityName: first?.commodityName ?? '', destination: first?.destination ?? '' }] }))
                   }}
                 >
                   <Plus size={11} /> Add Container
@@ -457,7 +457,7 @@ export default function ChatAssistant({
                   </div>
                   {dupes.slice(0, 3).map(d => (
                     <div key={d.customer.id} style={{ color: 'var(--text-secondary)', marginTop: 2 }}>
-                      <strong>{d.customer.name}</strong> ({d.customer.id}) — {d.reasons.join(', ')} · score {d.score}
+                      <strong>{d.customer.name}</strong> ({d.customer.id}) - {d.reasons.join(', ')} · score {d.score}
                     </div>
                   ))}
                 </div>
@@ -475,7 +475,7 @@ export default function ChatAssistant({
               <div className="qc-form-row">
                 <FormField label="Contact Channel">
                   <select className="qc-select" value={custForm.contactChannel} onChange={e => setCustForm(p => ({ ...p, contactChannel: e.target.value as NewCustomerForm['contactChannel'], contactChannelValue: '' }))}>
-                    <option value="">— None —</option>
+                    <option value="">- None -</option>
                     <option value="Email">Email</option>
                     <option value="WhatsApp">WhatsApp</option>
                     <option value="WeChat">WeChat</option>
@@ -625,7 +625,7 @@ export default function ChatAssistant({
               </div>
               <label className="qc-checkbox-label">
                 <input type="checkbox" checked={bookingForm.isUrgent} onChange={e => setBookingForm(p => ({ ...p, isUrgent: e.target.checked }))} />
-                <span>Urgent — book directly with liner (skip Procurement)</span>
+                <span>Urgent - book directly with liner (skip Procurement)</span>
               </label>
             </>
           )}
@@ -672,7 +672,7 @@ export default function ChatAssistant({
           <div>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Command Center</h2>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-              AI-powered assistant — ask questions, look up data, create records, and manage your sales workflow.
+              AI-powered assistant - ask questions, look up data, create records, and manage your sales workflow.
             </div>
           </div>
         </div>
@@ -689,7 +689,7 @@ export default function ChatAssistant({
             className="db-topbar-role-pill"
             style={{ background: roleColor + '12', color: roleColor, border: `1px solid ${roleColor}30` }}
           >
-            {activeEmployee.name} — {ROLE_LABELS[activeRole]}
+            {activeEmployee.name} - {ROLE_LABELS[activeRole]}
           </span>
         </div>
       </div>
@@ -711,7 +711,7 @@ export default function ChatAssistant({
               value={draft}
               onChange={e => setDraft(e.target.value)}
               onKeyDown={onKeyDown}
-              placeholder="Ask a question or give an instruction — or use a quick command on the right. Enter to send."
+              placeholder="Ask a question or give an instruction - or use a quick command on the right. Enter to send."
               rows={2}
               className="ca-textarea"
             />
@@ -740,7 +740,7 @@ export default function ChatAssistant({
                   key={cmd.id}
                   className={`qc-cmd-btn${activeCmd === cmd.id ? ' active' : ''}${!allowed ? ' restricted' : ''}`}
                   onClick={() => allowed && openCommand(cmd.id)}
-                  title={allowed ? cmd.description : `Restricted — requires different role`}
+                  title={allowed ? cmd.description : `Restricted - requires different role`}
                   disabled={!allowed}
                   style={{ opacity: allowed ? 1 : 0.35 }}
                 >

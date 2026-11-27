@@ -23,7 +23,7 @@ function parseTrackingDate(dt: TrackingEventDateTime | null): Date | null {
 
 function fmtDateShort(dt: TrackingEventDateTime | null): string {
   const d = parseTrackingDate(dt)
-  if (!d) return '—'
+  if (!d) return '-'
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) +
     ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
@@ -41,7 +41,7 @@ const EVENT_STYLE: Record<string, { color: string; bg: string }> = {
 const DEFAULT_EVENT_STYLE = { color: '#64748b', bg: 'rgba(100,116,139,0.1)' }
 
 // ---------------------------------------------------------------------------
-// EventTimeline — chronological list of events for a container
+// EventTimeline - chronological list of events for a container
 // ---------------------------------------------------------------------------
 
 function EventTimeline({ events }: { events: TrackingEvent[] }) {
@@ -172,7 +172,7 @@ function EventTimeline({ events }: { events: TrackingEvent[] }) {
 }
 
 // ---------------------------------------------------------------------------
-// ContainerCard — one card per tracked container
+// ContainerCard - one card per tracked container
 // ---------------------------------------------------------------------------
 
 function ContainerCard({ container, defaultExpanded }: { container: TrackingContainer; defaultExpanded: boolean }) {
@@ -434,7 +434,7 @@ export default function TrackAndTrace({ onFlash }: TrackAndTraceProps) {
         </>
       )}
 
-      {/* Initial state — not searched yet */}
+      {/* Initial state - not searched yet */}
       {!searched && !loading && (
         <div style={{ textAlign: 'center', padding: '40px 16px', color: 'var(--text-muted)' }}>
           <Radar size={28} style={{ marginBottom: 8, opacity: 0.3 }} />

@@ -88,7 +88,7 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
   // Multi-container state
   const [containers, setContainers] = useState<ContainerLine[]>([emptyContainerLine()])
 
-  // Reference data — liners fetched locally; clients/contacts come from app-level cache via props
+  // Reference data - liners fetched locally; clients/contacts come from app-level cache via props
   const [linerList, setLinerList] = useState<LinerRecord[]>([])
 
   useEffect(() => {
@@ -108,7 +108,7 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
     const first = containers[0]
     setContainers(prev => [...prev, {
       ...emptyContainerLine(),
-      commodityType: first?.commodityType ?? 'Miscellaneous manufactured articles — furniture, toys',
+      commodityType: first?.commodityType ?? 'Miscellaneous manufactured articles - furniture, toys',
       commodityName: first?.commodityName ?? '',
       destination: first?.destination ?? '',
     }])
@@ -151,7 +151,7 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
       firstContainer ? `${firstContainer.quantity}x ${firstContainer.containerType}` : '',
       niOrigin.trim() || '',
       firstContainer?.destination.trim() ? `to ${firstContainer.destination.trim()}` : '',
-      firstContainer?.commodityName.trim() ? `— ${firstContainer.commodityName.trim()}` : '',
+      firstContainer?.commodityName.trim() ? `- ${firstContainer.commodityName.trim()}` : '',
     ].filter(Boolean).join(' ') || `Inquiry from ${customerName}`
 
     setSaving(true)
@@ -178,7 +178,7 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
         cargo_weight: firstContainer?.weight === '' ? undefined : firstContainer?.weight,
         is_fcl: firstContainer?.isFcl ?? true,
         remark: niRemark.trim() || undefined,
-        // Contact fields omitted for case 3 (existing contact — backend already has them)
+        // Contact fields omitted for case 3 (existing contact - backend already has them)
         channel:             matchedCp ? undefined : niChannel,
         contact_person:      matchedCp ? undefined : (niContactPerson.trim() || undefined),
         contact_designation: matchedCp ? undefined : (niContactDesignation.trim() || undefined),
@@ -215,7 +215,7 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
             <Plus size={18} className="text-primary" aria-hidden="true" /> New Inquiry
           </div>
           <div className="mt-0.5 text-control text-fg-muted">
-            Log a new shipping inquiry — it enters the workflow at Rate Check immediately. Save to submit and add another.
+            Log a new shipping inquiry - it enters the workflow at Rate Check immediately. Save to submit and add another.
           </div>
         </div>
       </div>
@@ -263,7 +263,7 @@ export default function NewInquiry({ clientList, contactPersonList, activeEmploy
             </Field>
           )}
 
-          {/* Channel + Channel ID — hidden when matchedCp */}
+          {/* Channel + Channel ID - hidden when matchedCp */}
           {!matchedCp && (
             <>
               <Field label="Channel" required>

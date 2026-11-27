@@ -40,7 +40,7 @@ const MONO: React.CSSProperties = { ...TD, color: 'var(--text-muted)', fontFamil
 const MUTED: React.CSSProperties = { ...TD, color: 'var(--text-muted)', fontSize: 11 }
 const SEC: React.CSSProperties = { ...TD, color: 'var(--text-secondary)', fontSize: 11 }
 
-const dash = <span style={{ color: 'var(--text-muted)' }}>—</span>
+const dash = <span style={{ color: 'var(--text-muted)' }}>-</span>
 
 // Shared column builders
 const colId: ColDef = {
@@ -95,7 +95,7 @@ const colContainer: ColDef = {
 }
 const colRate: ColDef = {
   key: 'rate', label: 'Rate',
-  render: r => <td style={{ ...TD, fontWeight: 700, color: 'var(--text)', fontSize: 13 }}>{r.rate != null ? `$${r.rate.toLocaleString()}` : '—'}</td>,
+  render: r => <td style={{ ...TD, fontWeight: 700, color: 'var(--text)', fontSize: 13 }}>{r.rate != null ? `$${r.rate.toLocaleString()}` : '-'}</td>,
 }
 const colCurrency: ColDef = {
   key: 'currency', label: 'Currency',
@@ -107,11 +107,11 @@ const colTradeLane: ColDef = {
 }
 const colValidFrom: ColDef = {
   key: 'validFrom', label: 'Valid From',
-  render: r => <td style={MUTED}>{r.valid_from ?? '—'}</td>,
+  render: r => <td style={MUTED}>{r.valid_from ?? '-'}</td>,
 }
 const colValidTo: ColDef = {
   key: 'validTo', label: 'Valid To',
-  render: r => <td style={MUTED}>{r.valid_to ?? '—'}</td>,
+  render: r => <td style={MUTED}>{r.valid_to ?? '-'}</td>,
 }
 const colSoldStatus: ColDef = {
   key: 'sold', label: 'Sold',
@@ -119,7 +119,7 @@ const colSoldStatus: ColDef = {
     <td style={TD}>
       {r.is_sold === true && <span className="db-badge danger" style={{ fontSize: 11 }}>Sold</span>}
       {r.is_sold === false && <span className="db-badge accent" style={{ fontSize: 11 }}>Available</span>}
-      {r.is_sold == null && <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>}
+      {r.is_sold == null && <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>-</span>}
     </td>
   ),
 }
@@ -129,12 +129,12 @@ const colVessel: ColDef = {
 }
 const colDepartureDate: ColDef = {
   key: 'departure', label: 'Departure',
-  render: r => <td style={MUTED}>{r.departure_date ?? '—'}</td>,
+  render: r => <td style={MUTED}>{r.departure_date ?? '-'}</td>,
 }
 const colServiceScope: ColDef = {
   key: 'scope', label: 'Service Lane',
   render: r => {
-    if (!r.service_scope) return <td style={MUTED}>—</td>
+    if (!r.service_scope) return <td style={MUTED}>-</td>
     const scopeColor: Record<string, string> = { Import: '#2563eb', Export: '#059669', Within: '#d97706' }
     const c = scopeColor[r.service_scope] ?? 'var(--text-secondary)'
     return (
@@ -185,51 +185,51 @@ const COLUMNS_BY_TYPE: Record<SourceFilter, ColDef[]> = {
 // Detail fields per rate type (for the view modal)
 function detailFields(r: UnifiedRate): [string, string][] {
   const common: [string, string][] = [
-    ['Service Lane', r.service_scope ?? '—'],
-    ['Rate', r.rate != null ? `$${r.rate.toLocaleString()}` : '—'],
+    ['Service Lane', r.service_scope ?? '-'],
+    ['Rate', r.rate != null ? `$${r.rate.toLocaleString()}` : '-'],
     ['Currency', r.currency],
-    ['Valid From', r.valid_from ?? '—'],
-    ['Valid To', r.valid_to ?? '—'],
+    ['Valid From', r.valid_from ?? '-'],
+    ['Valid To', r.valid_to ?? '-'],
   ]
   switch (r.source_type) {
     case 'Contracted':
     case 'FAK':
       return [
-        ['Liner', r.liner_name ?? '—'],
-        ['Trade Lane', r.trade_lane ?? '—'],
-        ['Container Type', r.container_type ?? '—'],
+        ['Liner', r.liner_name ?? '-'],
+        ['Trade Lane', r.trade_lane ?? '-'],
+        ['Container Type', r.container_type ?? '-'],
         ...common,
       ]
     case 'Spot':
       return [
-        ['Liner', r.liner_name ?? '—'],
-        ['Trade Lane', r.trade_lane ?? '—'],
-        ['Container Type', r.container_type ?? '—'],
-        ['Vessel', r.vessel_name ?? '—'],
-        ['Departure Date', r.departure_date ?? '—'],
+        ['Liner', r.liner_name ?? '-'],
+        ['Trade Lane', r.trade_lane ?? '-'],
+        ['Container Type', r.container_type ?? '-'],
+        ['Vessel', r.vessel_name ?? '-'],
+        ['Departure Date', r.departure_date ?? '-'],
         ...common,
-        ['Sold', r.is_sold === true ? 'Yes' : r.is_sold === false ? 'No' : '—'],
+        ['Sold', r.is_sold === true ? 'Yes' : r.is_sold === false ? 'No' : '-'],
       ]
     case 'Tariff Rate':
       return [
-        ['Liner', r.liner_name ?? '—'],
-        ['Trade Lane', r.trade_lane ?? '—'],
-        ['Container Type', r.container_type ?? '—'],
+        ['Liner', r.liner_name ?? '-'],
+        ['Trade Lane', r.trade_lane ?? '-'],
+        ['Container Type', r.container_type ?? '-'],
         ...common,
       ]
     case 'NAC':
       return [
-        ['Customer', r.client_name ?? '—'],
-        ['Salesperson', r.employee_name ?? '—'],
-        ['Origin', r.origin || '—'],
-        ['Destination', r.destination || '—'],
-        ['Trade Lane', r.trade_lane ?? '—'],
+        ['Customer', r.client_name ?? '-'],
+        ['Salesperson', r.employee_name ?? '-'],
+        ['Origin', r.origin || '-'],
+        ['Destination', r.destination || '-'],
+        ['Trade Lane', r.trade_lane ?? '-'],
         ...common,
       ]
     case 'Special':
       return [
-        ['Commodity', r.commodity_name ?? '—'],
-        ['Commodity Type', r.commodity_type ?? '—'],
+        ['Commodity', r.commodity_name ?? '-'],
+        ['Commodity Type', r.commodity_type ?? '-'],
         ...common,
       ]
     default:
@@ -612,7 +612,7 @@ export default function RateList({ onFlash }: { onFlash: (msg: string) => void }
         </div>
       )}
 
-      {/* Edit modal — Procurement/Admin only */}
+      {/* Edit modal - Procurement/Admin only */}
       {editing && !isRestrictedRole && (
         <div className="lt-modal-backdrop" onClick={() => setEditing(null)}>
           <div className="lt-modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
@@ -650,7 +650,7 @@ export default function RateList({ onFlash }: { onFlash: (msg: string) => void }
                   placeholder="USD" />
               </div>
 
-              {/* Container Type — Contracted/FAK/Spot/Tariff Rate */}
+              {/* Container Type - Contracted/FAK/Spot/Tariff Rate */}
               {['Contracted', 'FAK', 'Spot', 'Tariff Rate'].includes(editing.source_type) && (
                 <div>
                   <label style={FIELD_LABEL}>Container Type</label>
@@ -660,7 +660,7 @@ export default function RateList({ onFlash }: { onFlash: (msg: string) => void }
                 </div>
               )}
 
-              {/* Sold — Spot only */}
+              {/* Sold - Spot only */}
               {editing.source_type === 'Spot' && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingTop: 22 }}>
                   <input type="checkbox" id="edit-is-sold"
@@ -671,7 +671,7 @@ export default function RateList({ onFlash }: { onFlash: (msg: string) => void }
                 </div>
               )}
 
-              {/* Departure Date — Spot only */}
+              {/* Departure Date - Spot only */}
               {editing.source_type === 'Spot' && (
                 <div>
                   <label style={FIELD_LABEL}>Departure Date</label>
@@ -680,7 +680,7 @@ export default function RateList({ onFlash }: { onFlash: (msg: string) => void }
                 </div>
               )}
 
-              {/* Origin / Destination — NAC only */}
+              {/* Origin / Destination - NAC only */}
               {editing.source_type === 'NAC' && (
                 <>
                   <div>
@@ -708,7 +708,7 @@ export default function RateList({ onFlash }: { onFlash: (msg: string) => void }
                   value={ef('valid_to')} onChange={e => setEf('valid_to', e.target.value)} />
               </div>
 
-              {/* Remark — full width */}
+              {/* Remark - full width */}
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={FIELD_LABEL}>Remark</label>
                 <textarea style={{ ...INPUT_STYLE, minHeight: 60, resize: 'vertical' }}

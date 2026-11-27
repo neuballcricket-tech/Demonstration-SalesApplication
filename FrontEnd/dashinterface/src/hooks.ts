@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-// Demo persistence — stash state under a namespaced localStorage key so it
+// Demo persistence - stash state under a namespaced localStorage key so it
 // survives page refresh. Used for inquiries, customers, quotes, shipments,
 // tasks, followups, and chat messages.
 const NAMESPACE = 'mvp-demo:'
@@ -12,7 +12,7 @@ export function usePersistentState<T>(key: string, initial: T): [T, React.Dispat
       const raw = localStorage.getItem(fullKey)
       if (raw) return JSON.parse(raw) as T
     } catch {
-      // Bad JSON / quota / etc. — fall through to seed.
+      // Bad JSON / quota / etc. - fall through to seed.
     }
     return initial
   })
@@ -21,7 +21,7 @@ export function usePersistentState<T>(key: string, initial: T): [T, React.Dispat
     try {
       localStorage.setItem(fullKey, JSON.stringify(value))
     } catch {
-      // Quota exceeded or storage disabled — silently skip.
+      // Quota exceeded or storage disabled - silently skip.
     }
   }, [fullKey, value])
 
@@ -38,6 +38,6 @@ export function resetPersistentDemo() {
     }
     keys.forEach(k => localStorage.removeItem(k))
   } catch {
-    // Ignore — best-effort.
+    // Ignore - best-effort.
   }
 }

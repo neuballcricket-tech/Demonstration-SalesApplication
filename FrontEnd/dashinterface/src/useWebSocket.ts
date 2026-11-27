@@ -63,7 +63,7 @@ export function useWebSocket() {
       }
 
       ws.onerror = () => {
-        // onclose will fire after onerror — reconnect is handled there
+        // onclose will fire after onerror - reconnect is handled there
         ws.close()
       }
     } catch {

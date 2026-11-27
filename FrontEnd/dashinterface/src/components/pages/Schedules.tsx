@@ -113,7 +113,7 @@ function pivotScheduleData(data: AggregateScheduleRatesResponse): PivotResult {
 }
 
 // ---------------------------------------------------------------------------
-// Pivot rate table — schedule cols + rate-type x container-type columns
+// Pivot rate table - schedule cols + rate-type x container-type columns
 // ---------------------------------------------------------------------------
 
 const RATE_COLORS: Record<string, string> = {
@@ -147,7 +147,7 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
     return () => document.removeEventListener('mousedown', handler)
   }, [openFilter])
 
-  const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—'
+  const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '-'
 
   const distinct = useMemo(() => {
     const carriers = new Map<string, number>()
@@ -155,10 +155,10 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
     const origins = new Map<string, number>()
     const destinations = new Map<string, number>()
     for (const r of rows) {
-      const c = r.linerName || '—'; carriers.set(c, (carriers.get(c) ?? 0) + 1)
+      const c = r.linerName || '-'; carriers.set(c, (carriers.get(c) ?? 0) + 1)
       const co = fmtDate(r.bkCutoff); cutoffs.set(co, (cutoffs.get(co) ?? 0) + 1)
-      const o = r.originCity || r.origin || '—'; origins.set(o, (origins.get(o) ?? 0) + 1)
-      const d = r.destinationCity || r.destination || '—'; destinations.set(d, (destinations.get(d) ?? 0) + 1)
+      const o = r.originCity || r.origin || '-'; origins.set(o, (origins.get(o) ?? 0) + 1)
+      const d = r.destinationCity || r.destination || '-'; destinations.set(d, (destinations.get(d) ?? 0) + 1)
     }
     return { carriers, cutoffs, origins, destinations }
   }, [rows]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -166,10 +166,10 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
   const filtered = useMemo(() => {
     if (!fCarrier.size && !fCutoff.size && !fOrigin.size && !fDest.size) return rows
     return rows.filter(r => {
-      if (fCarrier.size && !fCarrier.has(r.linerName || '—')) return false
+      if (fCarrier.size && !fCarrier.has(r.linerName || '-')) return false
       if (fCutoff.size && !fCutoff.has(fmtDate(r.bkCutoff))) return false
-      if (fOrigin.size && !fOrigin.has(r.originCity || r.origin || '—')) return false
-      if (fDest.size && !fDest.has(r.destinationCity || r.destination || '—')) return false
+      if (fOrigin.size && !fOrigin.has(r.originCity || r.origin || '-')) return false
+      if (fDest.size && !fDest.has(r.destinationCity || r.destination || '-')) return false
       return true
     })
   }, [rows, fCarrier, fCutoff, fOrigin, fDest]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -334,19 +334,19 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
                 const bg = rowIdx % 2 ? 'rgba(100,116,139,0.04)' : 'transparent'
                 return (
                   <tr key={row.scheduleId} style={{ background: bg }}>
-                    <td style={{ ...tdBase, borderLeft: 'none', fontWeight: 600 }}>{row.linerName || '—'}</td>
+                    <td style={{ ...tdBase, borderLeft: 'none', fontWeight: 600 }}>{row.linerName || '-'}</td>
                     <td style={tdBase}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                         <Ship size={9} style={{ opacity: 0.5, flexShrink: 0 }} />
-                        <span style={{ fontSize: 11 }}>{row.vesselName || '—'}{row.voyageNumber ? ` / ${row.voyageNumber}` : ''}</span>
+                        <span style={{ fontSize: 11 }}>{row.vesselName || '-'}{row.voyageNumber ? ` / ${row.voyageNumber}` : ''}</span>
                       </div>
                     </td>
-                    <td style={tdBase}>{row.originCity || row.origin || '—'}</td>
-                    <td style={tdBase}>{row.destinationCity || row.destination || '—'}</td>
+                    <td style={tdBase}>{row.originCity || row.origin || '-'}</td>
+                    <td style={tdBase}>{row.destinationCity || row.destination || '-'}</td>
                     <td style={{ ...tdBase, textAlign: 'center' }}>{fmtDate(row.etd)}</td>
                     <td style={{ ...tdBase, textAlign: 'center' }}>{fmtDate(row.eta)}</td>
                     <td style={{ ...tdBase, fontWeight: 600, textAlign: 'center' }}>
-                      {row.totalDuration != null ? `${row.totalDuration}d` : '—'}
+                      {row.totalDuration != null ? `${row.totalDuration}d` : '-'}
                     </td>
                     <td style={{ ...tdBase, fontSize: 11 }}>{fmtDate(row.bkCutoff)}</td>
                     {rateTypes.map(rt =>
@@ -379,7 +379,7 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
                                 )}
                               </>
                             ) : (
-                              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
+                              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>-</span>
                             )}
                           </td>
                         )
@@ -401,7 +401,7 @@ function PivotRateTable({ rows, rateTypes, containerTypes, emptyMessage }: {
 // ---------------------------------------------------------------------------
 
 function ScheduleSearchTable({ data }: { data: OceanSchedule[] }) {
-  const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—'
+  const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '-'
 
   const sorted = useMemo(() => [...data].sort((a, b) => {
     const da = a.originDepartureDate ?? '', db = b.originDepartureDate ?? ''
@@ -458,28 +458,28 @@ function ScheduleSearchTable({ data }: { data: OceanSchedule[] }) {
               {sorted.map((s, i) => (
                 <tr key={`${s.scac}-${s.vesselName}-${s.voyageNumber}-${i}`} style={{ background: i % 2 ? 'rgba(100,116,139,0.04)' : 'transparent' }}>
                   <td style={{ ...tdStyle, borderLeft: 'none', fontWeight: 600 }}>
-                    <div>{s.carrierName || s.scac || '—'}</div>
+                    <div>{s.carrierName || s.scac || '-'}</div>
                     {s.scac && s.carrierName && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.scac}</div>}
                   </td>
-                  <td style={{ ...tdStyle, fontSize: 11 }}>{s.serviceName || '—'}</td>
+                  <td style={{ ...tdStyle, fontSize: 11 }}>{s.serviceName || '-'}</td>
                   <td style={tdStyle}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                       <Ship size={9} style={{ opacity: 0.5, flexShrink: 0 }} />
-                      <span>{s.vesselName || '—'}{s.voyageNumber ? ` / ${s.voyageNumber}` : ''}</span>
+                      <span>{s.vesselName || '-'}{s.voyageNumber ? ` / ${s.voyageNumber}` : ''}</span>
                     </div>
                   </td>
                   <td style={tdStyle}>
-                    {s.originCityName || s.originUnloc || '—'}
+                    {s.originCityName || s.originUnloc || '-'}
                     {s.originUnloc && s.originCityName && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.originUnloc}</div>}
                   </td>
                   <td style={tdStyle}>
-                    {s.destinationCityName || s.destinationUnloc || '—'}
+                    {s.destinationCityName || s.destinationUnloc || '-'}
                     {s.destinationUnloc && s.destinationCityName && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{s.destinationUnloc}</div>}
                   </td>
                   <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{fmtDate(s.originDepartureDate)}</td>
                   <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{fmtDate(s.destinationArrivalDate)}</td>
                   <td style={{ ...tdStyle, fontWeight: 600, textAlign: 'center' }}>
-                    {s.totalDuration != null ? `${s.totalDuration}d` : '—'}
+                    {s.totalDuration != null ? `${s.totalDuration}d` : '-'}
                   </td>
                   <td style={tdStyle}>
                     {s.scheduleType ? (
@@ -488,7 +488,7 @@ function ScheduleSearchTable({ data }: { data: OceanSchedule[] }) {
                         background: s.scheduleType === 'direct' ? 'rgba(22,163,74,0.1)' : 'rgba(217,119,6,0.1)',
                         color: s.scheduleType === 'direct' ? '#16a34a' : '#d97706',
                       }}>{s.scheduleType === 'direct' ? 'Direct' : 'T/S'}</span>
-                    ) : '—'}
+                    ) : '-'}
                   </td>
                   <td style={{ ...tdStyle, fontSize: 11, whiteSpace: 'nowrap' }}>{fmtDate(s.bkCutoff)}</td>
                   {/* Special Rate checkbox */}
@@ -549,15 +549,15 @@ function ScheduleSearchTable({ data }: { data: OceanSchedule[] }) {
               </button>
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14 }}>
-              {sorted[modalIdx].carrierName || sorted[modalIdx].scac || '—'}
-              {' \u2014 '}
-              {sorted[modalIdx].vesselName || '—'}
+              {sorted[modalIdx].carrierName || sorted[modalIdx].scac || '-'}
+              {' - '}
+              {sorted[modalIdx].vesselName || '-'}
               {sorted[modalIdx].voyageNumber ? ` / ${sorted[modalIdx].voyageNumber}` : ''}
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14 }}>
-              {sorted[modalIdx].originCityName || sorted[modalIdx].originUnloc || '—'}
+              {sorted[modalIdx].originCityName || sorted[modalIdx].originUnloc || '-'}
               {' \u2192 '}
-              {sorted[modalIdx].destinationCityName || sorted[modalIdx].destinationUnloc || '—'}
+              {sorted[modalIdx].destinationCityName || sorted[modalIdx].destinationUnloc || '-'}
               {sorted[modalIdx].originDepartureDate ? ` \u00b7 ETD ${fmtDate(sorted[modalIdx].originDepartureDate)}` : ''}
             </div>
             <div style={{
@@ -584,7 +584,7 @@ function ScheduleSearchTable({ data }: { data: OceanSchedule[] }) {
 }
 
 // ---------------------------------------------------------------------------
-// Main Schedules page — tabbed: Schedule Rates | Search Schedules
+// Main Schedules page - tabbed: Schedule Rates | Search Schedules
 // ---------------------------------------------------------------------------
 
 interface SchedulesProps {
@@ -599,7 +599,7 @@ export default function Schedules({ onFlash }: SchedulesProps) {
   useEffect(() => { apiGetLiners().then(setLinerList).catch(() => {}) }, [])
 
   // ====================================================================
-  // TAB 1 — Schedule Rates (enriched)
+  // TAB 1 - Schedule Rates (enriched)
   // ====================================================================
   const [portPairs, setPortPairs] = useState<{ origin: string; destination: string }[]>([
     { origin: '', destination: '' },
@@ -642,7 +642,7 @@ export default function Schedules({ onFlash }: SchedulesProps) {
   }
 
   // ====================================================================
-  // TAB 2 — Search Schedules (INTTRA live search)
+  // TAB 2 - Search Schedules (INTTRA live search)
   // ====================================================================
   const [searchPairs, setSearchPairs] = useState<{ origin: string; destination: string }[]>([
     { origin: '', destination: '' },
@@ -725,7 +725,7 @@ export default function Schedules({ onFlash }: SchedulesProps) {
       </div>
 
       {/* ================================================================
-          TAB 1 — Schedule Rates
+          TAB 1 - Schedule Rates
           ================================================================ */}
       <div style={{ display: activeTab === 'rates' ? 'block' : 'none' }}>
         {/* Search form */}
@@ -823,7 +823,7 @@ export default function Schedules({ onFlash }: SchedulesProps) {
       </div>
 
       {/* ================================================================
-          TAB 2 — Search Schedules (INTTRA)
+          TAB 2 - Search Schedules (INTTRA)
           ================================================================ */}
       <div style={{ display: activeTab === 'search' ? 'block' : 'none' }}>
         {/* Search form */}

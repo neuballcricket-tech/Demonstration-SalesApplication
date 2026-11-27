@@ -77,7 +77,7 @@ export default function Customers({ inquiries, customers, onUpdateCustomer, onFl
         </span>
       </div>
 
-      {/* Phase 7.3 — Customer Portal placeholder. Per the meeting, low-volume customers
+      {/* Phase 7.3 - Customer Portal placeholder. Per the meeting, low-volume customers
           won't log in, so the system also auto-emails. The portal is Phase 2 in the
           meeting's roadmap; this banner just signals the planned integration. */}
       <div style={{
@@ -95,7 +95,7 @@ export default function Customers({ inquiries, customers, onUpdateCustomer, onFl
         <div>
           <div style={{ color: 'var(--accent)', fontWeight: 700, marginBottom: 2 }}>🌐 Customer Portal · Phase 2</div>
           <div style={{ color: 'var(--text-muted)' }}>
-            Tracking dashboard, document downloads, and quote management for customers — optional login;
+            Tracking dashboard, document downloads, and quote management for customers - optional login;
             non-portal customers receive the same updates by automated email.
           </div>
         </div>
@@ -147,7 +147,7 @@ export default function Customers({ inquiries, customers, onUpdateCustomer, onFl
                       )}
                     </td>
                     <td style={{ padding: '12px 8px' }}>
-                      {c.customer_type ? <span className={CTYPE_BADGE[c.customer_type]}>{c.customer_type}</span> : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                      {c.customer_type ? <span className={CTYPE_BADGE[c.customer_type]}>{c.customer_type}</span> : <span style={{ color: 'var(--text-muted)' }}>-</span>}
                     </td>
                     <td style={{ padding: '12px 8px', color: 'var(--text-secondary)', fontSize: 12, whiteSpace: 'nowrap' }}>
                       {c.location}
@@ -168,10 +168,10 @@ export default function Customers({ inquiries, customers, onUpdateCustomer, onFl
                           <AlertTriangle size={11} /> Credit Hold
                         </span>
                       )}
-                      {!blocked && !warned && <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                      {!blocked && !warned && <span style={{ color: 'var(--text-muted)' }}>-</span>}
                     </td>
                     <td style={{ padding: '12px 8px', color: 'var(--text-secondary)', fontSize: 11 }}>
-                      {c.assigned_salesperson_id ? (EMPLOYEES.find(e => e.id === c.assigned_salesperson_id)?.name ?? '—') : '—'}
+                      {c.assigned_salesperson_id ? (EMPLOYEES.find(e => e.id === c.assigned_salesperson_id)?.name ?? '-') : '-'}
                     </td>
                     <td style={{ padding: '12px 8px', color: 'var(--text-secondary)' }}>
                       {c.totalInquiries}
@@ -179,7 +179,7 @@ export default function Customers({ inquiries, customers, onUpdateCustomer, onFl
                         <span className="lt-pill pending" style={{ marginLeft: 6 }}>{c.pending} pending</span>
                       )}
                     </td>
-                    <td style={{ padding: '12px 8px', color: 'var(--text-muted)' }}>{c.lastContact || '—'}</td>
+                    <td style={{ padding: '12px 8px', color: 'var(--text-muted)' }}>{c.lastContact || '-'}</td>
                     <td style={{ padding: '12px 8px' }}>
                       <button
                         className="lt-icon-btn"

@@ -1,6 +1,6 @@
-# Workspace Step Interface — Style Guide
+# Workspace Step Interface - Style Guide
 
-Reference implementation: **Step 7 — Booking Request** (`InlineStepForms.tsx`, lines 3269–3488)
+Reference implementation: **Step 7 - Booking Request** (`InlineStepForms.tsx`, lines 3269–3488)
 
 All workspace step forms follow the same visual language: a coloured header bar, a bordered table-form body with label–value rows, optional section dividers, and a right-aligned submit button.
 
@@ -16,7 +16,7 @@ All workspace step forms follow the same visual language: a coloured header bar,
 </div>
 ```
 
-- `gap: 0` — the header and table body sit flush (1px gap via `marginBottom: 1` on the header).
+- `gap: 0` - the header and table body sit flush (1px gap via `marginBottom: 1` on the header).
 
 ---
 
@@ -25,7 +25,7 @@ All workspace step forms follow the same visual language: a coloured header bar,
 ```tsx
 <div style={{
   padding: '8px 14px',
-  background: 'var(--accent)',        // teal — #0f8fa8
+  background: 'var(--accent)',        // teal - #0f8fa8
   borderRadius: '8px 8px 0 0',       // rounded top corners only
   marginBottom: 1,
 }}>
@@ -50,7 +50,7 @@ All workspace step forms follow the same visual language: a coloured header bar,
 | Padding | `8px 14px` |
 | Border radius | `8px 8px 0 0` (top-left, top-right only) |
 
-For a **secondary subtitle** (e.g. "Submitted by CS — review and add RA number"):
+For a **secondary subtitle** (e.g. "Submitted by CS - review and add RA number"):
 
 ```tsx
 <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginLeft: 10 }}>
@@ -78,7 +78,7 @@ The table body is a single `<div>` with a 1px border and bottom-rounded corners.
 
 ## 4. Standard Field Row
 
-Every row uses `display: grid` with a fixed label column and a fluid value column. Rows are separated by `borderBottom: '1px solid var(--border)'` — the **last row omits** this border.
+Every row uses `display: grid` with a fixed label column and a fluid value column. Rows are separated by `borderBottom: '1px solid var(--border)'` - the **last row omits** this border.
 
 ### Single-value row (label + input)
 
@@ -136,7 +136,7 @@ Every row uses `display: grid` with a fixed label column and a fluid value colum
   <div style={{ padding: '4px 8px', borderRight: '1px solid var(--border)' }}>
     <input className="lt-input" style={{ width: '100%', border: 'none', background: 'transparent', padding: '4px 0' }} ... />
   </div>
-  {/* Second label — shorter column (90px) */}
+  {/* Second label - shorter column (90px) */}
   <div style={{ padding: '8px 8px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>
     Label B
   </div>
@@ -208,7 +208,7 @@ Same base styling as text inputs, used inside value cells:
   value={value}
   onChange={e => setValue(e.target.value)}
 >
-  <option value="">— Select —</option>
+  <option value="">- Select -</option>
   {items.map(i => <option key={i.id} value={i.value}>{i.label}</option>)}
 </select>
 ```
@@ -395,16 +395,16 @@ color: isReefer ? '#0ea5e9' : 'var(--text-muted)',
 | Element | Size | Weight | Spacing |
 |---------|------|--------|---------|
 | Header title | `12px` | `700` | `0.5px` |
-| Header subtitle | `11px` | normal | — |
-| Label cell | `11px` | `600` | — |
+| Header subtitle | `11px` | normal | - |
+| Label cell | `11px` | `600` | - |
 | Section divider | `11px` | `700` | `0.4px` |
-| Input / select | inherits from `lt-input` (~`12px`) | normal | — |
-| Radio label | `12px` | normal | — |
-| Read-only value | `12px` | `600` | — |
-| Dynamic list numeric input | inherits | normal | — |
-| Add-item button | `11px` | `600` | — |
-| Validation error | `11px` | `600` | — |
-| Counter badge | `9px` | normal | — |
+| Input / select | inherits from `lt-input` (~`12px`) | normal | - |
+| Radio label | `12px` | normal | - |
+| Read-only value | `12px` | `600` | - |
+| Dynamic list numeric input | inherits | normal | - |
+| Add-item button | `11px` | `600` | - |
+| Validation error | `11px` | `600` | - |
+| Counter badge | `9px` | normal | - |
 
 ---
 
@@ -439,7 +439,7 @@ Copy this skeleton for a new step form:
   {/* Fields */}
   <div style={{ border: '1px solid var(--border)', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
 
-    {/* Row — single value */}
+    {/* Row - single value */}
     <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', borderBottom: '1px solid var(--border)' }}>
       <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Label</div>
       <div style={{ padding: '4px 8px' }}>
@@ -452,7 +452,7 @@ Copy this skeleton for a new step form:
       <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: 0.4 }}>SECTION</span>
     </div>
 
-    {/* Last row — no borderBottom */}
+    {/* Last row - no borderBottom */}
     <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr' }}>
       <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Last Field</div>
       <div style={{ padding: '4px 8px' }}>

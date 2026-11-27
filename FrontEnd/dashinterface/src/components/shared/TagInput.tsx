@@ -8,7 +8,7 @@ interface TagInputProps {
   onChange: (values: string[]) => void
   suggestions: string[]
   placeholder?: string
-  /** Optional display formatter — shown in dropdown and tag chips while the
+  /** Optional display formatter - shown in dropdown and tag chips while the
    *  raw suggestion string is stored as the actual value. */
   formatLabel?: (value: string) => string
   /** Lands on the text input, so a `<label htmlFor>` (e.g. from `Field`) points at it. */

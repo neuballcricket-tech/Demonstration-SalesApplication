@@ -27,6 +27,12 @@ export default defineConfig([
         destructuredArrayIgnorePattern: '^_',
         caughtErrorsIgnorePattern: '^_',
       }],
+      // House style: plain hyphen "-" in all product text
+      'no-restricted-syntax': ['error',
+        { selector: 'Literal[value=/—/]', message: 'Use a plain hyphen "-" (house style).' },
+        { selector: 'TemplateElement[value.cooked=/—/]', message: 'Use a plain hyphen "-" (house style).' },
+        { selector: 'JSXText[value=/—/]', message: 'Use a plain hyphen "-" (house style).' },
+      ],
     },
   },
 ])

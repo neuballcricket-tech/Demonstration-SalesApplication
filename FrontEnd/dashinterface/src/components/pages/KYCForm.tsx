@@ -38,7 +38,7 @@ export default function KYCForm({ customers, onFlash }: KYCFormProps) {
         onFlash(`Failed to send KYC: ${res.message}`)
       }
     } catch {
-      onFlash('Failed to send KYC — check backend connection')
+      onFlash('Failed to send KYC - check backend connection')
     } finally {
       setSending(false)
     }
@@ -96,7 +96,7 @@ export default function KYCForm({ customers, onFlash }: KYCFormProps) {
             className="db-btn primary"
             onClick={() => canSendKyc && handleSendKyc()}
             disabled={!canSend || sending || !canSendKyc}
-            title={canSendKyc ? 'Send KYC form via email' : 'Restricted — requires CS role'}
+            title={canSendKyc ? 'Send KYC form via email' : 'Restricted - requires CS role'}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               opacity: canSend && !sending && canSendKyc ? 1 : 0.4,
@@ -110,7 +110,7 @@ export default function KYCForm({ customers, onFlash }: KYCFormProps) {
           {canVerifyKyc && (
             <button
               className="db-btn primary"
-              onClick={() => onFlash('KYC verified — customer cleared for quotation')}
+              onClick={() => onFlash('KYC verified - customer cleared for quotation')}
               style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 1, background: '#16a34a' }}
             >
               <ShieldCheck size={14} /> Verify KYC
@@ -145,9 +145,9 @@ export default function KYCForm({ customers, onFlash }: KYCFormProps) {
           Return the completed form to your designated Sales / Customer Service contact.
         </div>
 
-        {/* Section A — Company Information */}
+        {/* Section A - Company Information */}
         <div className="kyc-section">
-          <div className="kyc-section-title">Section A — Company Information</div>
+          <div className="kyc-section-title">Section A - Company Information</div>
 
           <div className="kyc-field-grid">
             <div className="kyc-field full">
@@ -195,9 +195,9 @@ export default function KYCForm({ customers, onFlash }: KYCFormProps) {
           </div>
         </div>
 
-        {/* Section B — Trade Details */}
+        {/* Section B - Trade Details */}
         <div className="kyc-section">
-          <div className="kyc-section-title">Section B — Trade Details</div>
+          <div className="kyc-section-title">Section B - Trade Details</div>
 
           <div className="kyc-field-grid">
             <div className="kyc-field full">
@@ -227,7 +227,7 @@ export default function KYCForm({ customers, onFlash }: KYCFormProps) {
             </div>
 
             <div className="kyc-field full">
-              <label className="kyc-label">Preferred Trade Lanes (Origin — Destination)</label>
+              <label className="kyc-label">Preferred Trade Lanes (Origin - Destination)</label>
               <div className="kyc-input-line" />
               <div className="kyc-input-line" style={{ marginTop: 8 }} />
             </div>
@@ -256,9 +256,9 @@ export default function KYCForm({ customers, onFlash }: KYCFormProps) {
           </div>
         </div>
 
-        {/* Section C — Documents Checklist */}
+        {/* Section C - Documents Checklist */}
         <div className="kyc-section">
-          <div className="kyc-section-title">Section C — Required Documents</div>
+          <div className="kyc-section-title">Section C - Required Documents</div>
           <div className="kyc-instructions" style={{ marginBottom: 12 }}>
             Please attach certified copies of the following documents:
           </div>
@@ -278,9 +278,9 @@ export default function KYCForm({ customers, onFlash }: KYCFormProps) {
           </div>
         </div>
 
-        {/* Section D — Declaration & Signature */}
+        {/* Section D - Declaration & Signature */}
         <div className="kyc-section">
-          <div className="kyc-section-title">Section D — Declaration &amp; Signature</div>
+          <div className="kyc-section-title">Section D - Declaration &amp; Signature</div>
 
           <div className="kyc-declaration">
             I hereby declare that the information provided in this form is true, complete, and accurate
@@ -310,7 +310,7 @@ export default function KYCForm({ customers, onFlash }: KYCFormProps) {
 
         {/* Footer */}
         <div className="kyc-footer">
-          <div>ABC Logistics (Pvt) Ltd — Confidential</div>
+          <div>ABC Logistics (Pvt) Ltd - Confidential</div>
           <div>For internal use: Received by ____________ Date ____________ Verified by ____________</div>
         </div>
 

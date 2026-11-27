@@ -93,7 +93,7 @@ export default function Login({ onLogin }: LoginProps) {
         {error && <div className="login-error" role="alert">{error}</div>}
 
         <p style={{ marginTop: 12, fontSize: 12, color: '#888', textAlign: 'center' }}>
-          Test branch — MS auth bypassed
+          Test branch - MS auth bypassed
         </p>
       </div>
     </div>

@@ -154,7 +154,7 @@ export const EMPLOYEE_ROLE_MAP: Record<number, UserRole> = {
 // ==================== WORKFLOW STAGES ====================
 
 // Stages match the backend WorkflowStage enum exactly (snake_case → kebab-case via BE_STAGE_TO_FE).
-// inquiry_received / customer_check_pending are NOT backend stages — they were removed.
+// inquiry_received / customer_check_pending are NOT backend stages - they were removed.
 export type WorkflowStage =
   | 'rate-check'
   | 'procurement-request'
@@ -174,17 +174,17 @@ export const WORKFLOW_STAGES: { id: WorkflowStage; label: string; roles: UserRol
   { id: 'completed',           label: 'Completed',             roles: ['CS', 'Sales'],  step: 7 },
 ]
 
-/** Display helper — join role labels for a stage (e.g. "CS / Sales") */
+/** Display helper - join role labels for a stage (e.g. "CS / Sales") */
 export function stageRoleLabel(stage: typeof WORKFLOW_STAGES[number]): string {
   return stage.roles.map(r => ROLE_LABELS[r]).join(' / ')
 }
 
-/** Color for a stage — uses the first role's color */
+/** Color for a stage - uses the first role's color */
 export function stageRoleColor(stage: typeof WORKFLOW_STAGES[number]): string {
   return ROLE_COLORS[stage.roles[0]]
 }
 
-// Heuristic for "this inquiry is time-critical" — used by Operations page urgency
+// Heuristic for "this inquiry is time-critical" - used by Operations page urgency
 // section. Spot rates have ~15-min validity windows (per the Friday meeting).
 export function isSpotInquiry(text: string): boolean {
   return /\b(?:spot|urgent|asap|right\s+now|immediately|same\s+day|same-day|critical)\b/i.test(text)
@@ -193,18 +193,18 @@ export function isSpotInquiry(text: string): boolean {
 // ==================== TYPES ====================
 export type InquiryStatus = 'pending' | 'completed'
 
-// Strategic Business Units — each runs its own P&L and target.
+// Strategic Business Units - each runs its own P&L and target.
 // Phase 1 covers ocean freight; air + domestic listed for future phases.
 export type SBU = 'Ocean Imports' | 'Ocean Exports' | 'Air Freight' | 'Domestic'
 export const SBUS: SBU[] = ['Ocean Imports', 'Ocean Exports', 'Air Freight', 'Domestic']
 
 export type DeliveryType = 'port-to-port' | 'door-to-door' | 'port-to-door' | 'door-to-port'
 
-// Priority levels — can be set at creation and changed mid-workflow by Sales or CS.
+// Priority levels - can be set at creation and changed mid-workflow by Sales or CS.
 export type InquiryPriority = 'Low' | 'Medium' | 'High' | 'Urgent'
 export const INQUIRY_PRIORITIES: InquiryPriority[] = ['Low', 'Medium', 'High', 'Urgent']
 
-// Commodity types — aligned with HS chapter groupings for accurate classification.
+// Commodity types - aligned with HS chapter groupings for accurate classification.
 export type CommodityType =
   | 'Live animals; animal products'
   | 'Vegetable products'
@@ -225,7 +225,7 @@ export type CommodityType =
   | 'Vehicles, aircraft, vessels, transport equipment'
   | 'Optical/medical/precision instruments, clocks'
   | 'Arms and ammunition'
-  | 'Miscellaneous manufactured articles — furniture, toys'
+  | 'Miscellaneous manufactured articles - furniture, toys'
   | 'Works of art, collectors\' pieces, antiques'
 
 export const COMMODITY_TYPES: CommodityType[] = [
@@ -248,11 +248,11 @@ export const COMMODITY_TYPES: CommodityType[] = [
   'Vehicles, aircraft, vessels, transport equipment',
   'Optical/medical/precision instruments, clocks',
   'Arms and ammunition',
-  'Miscellaneous manufactured articles — furniture, toys',
+  'Miscellaneous manufactured articles - furniture, toys',
   'Works of art, collectors\' pieces, antiques',
 ]
 
-// Container types — backend Literal codes.
+// Container types - backend Literal codes.
 export type ContainerType = '20GP' | '40GP' | '20OT' | '40OT' | '40HC' | '20RF' | '40RF' | '20FR' | '40FR' | 'TANKER'
 export const CONTAINER_TYPES: ContainerType[] = ['20GP', '40GP', '20OT', '40OT', '40HC', '20RF', '40RF', '20FR', '40FR', 'TANKER']
 /** Human-readable labels for container types (UI display only). */
@@ -264,7 +264,7 @@ export const CONTAINER_TYPE_LABELS: Record<ContainerType, string> = {
   'TANKER': 'Tanker',
 }
 
-// Container line — one entry per container in a multi-container inquiry.
+// Container line - one entry per container in a multi-container inquiry.
 export interface ContainerLine {
   containerType: ContainerType
   quantity: number
@@ -281,15 +281,15 @@ export interface ContainerLine {
   address?: string           // door-delivery address (distinct from zip code)
   hs_code?: string           // commodity HS tariff code (CommodityNew.hs_code)
   description?: string       // commodity description (CommodityNew.description)
-  com_id?: number            // backend commodity row PK — required for PATCH /commodities/{com_id}
-  cont_id?: number           // backend container row PK — required for PATCH /containers/{cont_id}
+  com_id?: number            // backend commodity row PK - required for PATCH /commodities/{com_id}
+  cont_id?: number           // backend container row PK - required for PATCH /containers/{cont_id}
 }
 
 export const emptyContainerLine = (): ContainerLine => ({
   containerType: '20GP',
   quantity: 1,
   weight: '',
-  commodityType: 'Miscellaneous manufactured articles — furniture, toys',
+  commodityType: 'Miscellaneous manufactured articles - furniture, toys',
   commodityName: '',
   destination: '',
   isFcl: true,
@@ -301,12 +301,12 @@ export const emptyContainerLine = (): ContainerLine => ({
 export interface Inquiry {
   id: string
   customer_name: string
-  inquiry_text?: string  // frontend-only — no backend column
-  request?: string       // frontend-only — auto-generated label
+  inquiry_text?: string  // frontend-only - no backend column
+  request?: string       // frontend-only - auto-generated label
   origin: string         // where cargo ships from (e.g. 'Colombo')
   destination: string    // where cargo ships to   (e.g. 'Hamburg')
   delivery_type: DeliveryType
-  channel?: 'WhatsApp' | 'Email' | 'Phone' | 'WeChat'  // frontend-only — stored in contact record
+  channel?: 'WhatsApp' | 'Email' | 'Phone' | 'WeChat'  // frontend-only - stored in contact record
   sbu: SBU
   employee_id: number
   status: InquiryStatus
@@ -327,14 +327,14 @@ export interface Inquiry {
   containers?: ContainerLine[]       // multi-container support
   preferred_liners?: string[]        // multiple preferred shipping lines
   recorded_by?: number               // employee_id of the person who created this inquiry
-  // Backend fields — populated after successful API create / fetch
+  // Backend fields - populated after successful API create / fetch
   inq_id?: number          // backend integer PK (inquiry table)
   cli_id?: number          // backend client ID
   cpid?: number            // backend contact-person ID
   rfq_ref?: number         // backend RFQ reference
   com_ids?: number[]       // backend commodity row IDs
   cont_ids?: number[]      // backend container row IDs
-  quotation_id?: number    // backend quotation PK — set when quotation is created in prepare-quotation
+  quotation_id?: number    // backend quotation PK - set when quotation is created in prepare-quotation
   kyc_completed?: boolean  // true when the client's KYC stage is 'kyc_completed' (from inquiry list response)
   incoterm?: string        // trade term: FOB / CIF / EXW / DDP …
   cargo_ready_date?: string // ISO date when cargo is ready to ship
@@ -350,7 +350,7 @@ export type PaymentTerms = 'Pay Upfront' | '30-Day Credit' | '60-Day Credit'
 
 export type KycStatus = 'not_started' | 'pending_customer' | 'approved'
 
-// Customer classification — shipper, buyer, agent, trader per the meeting requirement.
+// Customer classification - shipper, buyer, agent, trader per the meeting requirement.
 export type CustomerType = 'Shipper' | 'Buyer' | 'Agent' | 'Trader'
 export const CUSTOMER_TYPES: CustomerType[] = ['Shipper', 'Buyer', 'Agent', 'Trader']
 
@@ -364,7 +364,7 @@ export interface Customer {
   credit_hold: boolean
   min_margin_pct: number   // floor used by quote-builder margin checks
   notes?: string
-  kyc_status?: KycStatus   // onboarding KYC status — new customers start as 'not_started'
+  kyc_status?: KycStatus   // onboarding KYC status - new customers start as 'not_started'
   contact_email?: string
   contact_phone?: string
   contact_person?: string    // primary contact person name
@@ -444,7 +444,7 @@ export interface RateRecord {
 
 export type RateTableType = 'tariff_rates' | 'fak_rates' | 'special_rate' | 'vessel_by_vessel_rate' | 'contracted_rates' | 'nac'
 
-/** Rate detail row — union of fields across all 6 rate tables. */
+/** Rate detail row - union of fields across all 6 rate tables. */
 export interface RateOptionDetail {
   rate_id: number
   lin_id?: number | null
@@ -477,7 +477,7 @@ export interface CompletedRateOption {
   rate_type: RateTableType
   rate_id: number
   rate: RateOptionDetail | null
-  // Schedule fields — populated when the option was sourced from an aggregate schedule
+  // Schedule fields - populated when the option was sourced from an aggregate schedule
   service_name?: string | null
   vessel_name?: string | null
   voyage_number?: string | null
@@ -536,9 +536,9 @@ export interface OceanSchedule {
   scheduleSource: string | null
   createdDate: string | null
   legs: unknown[] | null
-  // Liner FK — present in search results when matched to a known liner
+  // Liner FK - present in search results when matched to a known liner
   linId?: number | null
-  // DB primary key — present when fetched from our DB (completed-for-quoting), absent from live search
+  // DB primary key - present when fetched from our DB (completed-for-quoting), absent from live search
   sch_id?: number
 }
 
@@ -667,7 +667,7 @@ export interface AggregateScheduleEntry {
   contracted_rates: AggregateRate[]
 }
 
-/** Response from GET /inquiries/schedules/aggregate-rates — keyed by schedule_id string. */
+/** Response from GET /inquiries/schedules/aggregate-rates - keyed by schedule_id string. */
 export type AggregateScheduleRatesResponse = Record<string, AggregateScheduleEntry>
 
 // ==================== UNIFIED RATE (from all DB rate tables) ====================
@@ -706,7 +706,7 @@ export interface PortRecord {
   country: string
 }
 
-/** UN/LOCODE lookup — keyed by port name (matches PortRecord.name) */
+/** UN/LOCODE lookup - keyed by port name (matches PortRecord.name) */
 export const PORT_UNLOCODES: Record<string, string> = {
   'Colombo': 'LKCMB',
   'Hamburg': 'DEHAM',
@@ -722,7 +722,7 @@ export const PORT_UNLOCODES: Record<string, string> = {
   'Chennai': 'INMAA',
 }
 
-/** Build datalist <option> elements for a port list — provides both Port/Country and UNLOCODE entries */
+/** Build datalist <option> elements for a port list - provides both Port/Country and UNLOCODE entries */
 export function portOptions(ports: PortRecord[]): { value: string; label?: string }[] {
   const opts: { value: string; label?: string }[] = []
   for (const p of ports) {
@@ -802,7 +802,7 @@ export interface InttraSchedule {
   vessel: string
   voyageNumber: string
   transitTimeInDays: number
-  bookingCutoffDate?: string  // not in INTTRA's published shape — see backend note
+  bookingCutoffDate?: string  // not in INTTRA's published shape - see backend note
   scheduleDetails: unknown[]
 }
 
@@ -853,7 +853,7 @@ export interface InttraSpotRate {
 
 // Flatten one INTTRA offer into the single row the demo card renders.
 // A real offer can carry multiple sailings (`scheduleRates[]`) and multiple
-// container-type prices per sailing — for the demo UI we pick the first of
+// container-type prices per sailing - for the demo UI we pick the first of
 // each. When a multi-sailing UI is needed later, replace this with a fuller
 // projection.
 export interface InttraSpotRateCard {
@@ -905,7 +905,7 @@ export interface QuoteLine {
 
 export interface Quote {
   id: string
-  inquiry_id?: string          // optional — quotes can exist without an inquiry
+  inquiry_id?: string          // optional - quotes can exist without an inquiry
   customer_name: string
   origin: string
   destination: string
@@ -948,7 +948,7 @@ export interface Shipment {
 // ==================== BOOKINGS ====================
 export type BookingStatus = 'Pending Liner' | 'RA Assigned' | 'Liner Confirmed' | 'Released' | 'Cancelled'
 
-// Backend booking status enum — matches the API exactly
+// Backend booking status enum - matches the API exactly
 export type BackendBookingStatus =
   | 'request_initiated'
   | 'request_reviewed'
@@ -1020,11 +1020,11 @@ export interface Booking {
   release_order_fields?: ReleaseOrderFields
   // --- Backend integration IDs (internal, never rendered in UI) ---
   booking_id?: number       // Backend PK from POST /booking-requests
-  inq_id?: number           // Inquiry PK — needed for booking & release-order API calls
-  cli_id?: number           // Client PK — needed for booking & release-order API calls
-  lin_id?: number           // Liner PK — resolved from LinerRecord by shipping_line name
-  ro_id?: number            // Release order PK — set after POST /booking-requests/release-orders
-  commodity_id?: number     // Commodity com_id — needed for POST /booking-requests
+  inq_id?: number           // Inquiry PK - needed for booking & release-order API calls
+  cli_id?: number           // Client PK - needed for booking & release-order API calls
+  lin_id?: number           // Liner PK - resolved from LinerRecord by shipping_line name
+  ro_id?: number            // Release order PK - set after POST /booking-requests/release-orders
+  commodity_id?: number     // Commodity com_id - needed for POST /booking-requests
   // --- Structured fields stored alongside notes for API payloads ---
   vessel_etd?: string
   agreed_rate?: number
@@ -1169,7 +1169,7 @@ export function parseInquiry(text: string): {
   if (reqMatch) request = reqMatch[1].trim()
   if (!request) request = 'See message'
 
-  // Origin: "from <Place>" — only matches when followed by " to <Place>" or end-of-route punctuation,
+  // Origin: "from <Place>" - only matches when followed by " to <Place>" or end-of-route punctuation,
   // so "from Customer ABC" (about a sender) is less likely to be misread as origin.
   let origin = ''
   const originMatch = text.match(/\bfrom\s+([A-Z][A-Za-z .-]{2,30}?)(?=\s+to\s+[A-Z]|[.,]|\s+by|\s+on|$)/)
@@ -1193,7 +1193,7 @@ export function nowStamp(): string {
   return `${now.toISOString().slice(0, 10)} ${now.toTimeString().slice(0, 5)}`
 }
 
-// ==================== CHAT — CUSTOMER MATCHING ====================
+// ==================== CHAT - CUSTOMER MATCHING ====================
 // Strip common business-name boilerplate + lowercase so "Customer ABC" ≈ "ABC Industries"
 function normaliseCustomer(name: string): string {
   return name
@@ -1227,7 +1227,7 @@ export function findCustomerInText(text: string, existing: string[]): string {
 }
 
 // Returns existing customer names that look similar to `name`, ranked best-first.
-// Exact match (case-insensitive) is returned alone — caller can skip disambiguation.
+// Exact match (case-insensitive) is returned alone - caller can skip disambiguation.
 export function findCustomerCandidates(name: string, existing: string[]): {
   exact: string | null
   candidates: string[]
@@ -1256,7 +1256,7 @@ export function findCustomerCandidates(name: string, existing: string[]): {
   return { exact: null, candidates: scored.slice(0, 4).map(s => s.name) }
 }
 
-// Enhanced duplicate detection — fuzzy match on name, email, phone, address, contact person.
+// Enhanced duplicate detection - fuzzy match on name, email, phone, address, contact person.
 // Returns potential duplicates with match reasons so the UI can warn before creation.
 export function findDuplicateCustomers(
   newCust: { name: string; email?: string; phone?: string; address?: string; contact_person?: string },
@@ -1320,7 +1320,7 @@ export function findDuplicateCustomers(
   return results.filter(r => r.score >= 15) // minimum threshold to be considered a potential duplicate
 }
 
-// ==================== CHAT — INTENT DETECTION ====================
+// ==================== CHAT - INTENT DETECTION ====================
 export type ChatIntent =
   | { kind: 'inquiry'; customer: string; request: string; origin: string; destination: string; channel: 'WhatsApp' | 'Email' | 'Phone'; raw: string }
   | { kind: 'followup'; customer: string; note: string; complete: boolean }
@@ -1337,8 +1337,8 @@ export type ChatIntent =
 // ("for X", "with X", "X:") before falling back to title-case capture.
 function extractCustomerFromCommand(text: string): string {
   const patterns: RegExp[] = [
-    /(?:for|with|of|to|on)\s+([A-Z][A-Za-z0-9 &.'-]{1,40}?)(?=[,:.\n]|\s+(?:said|asked|wants?|needs?|requested|by|on|—|-)|$)/,
-    /^([A-Z][A-Za-z0-9 &.'-]{1,40}?)\s*[:—-]/,
+    /(?:for|with|of|to|on)\s+([A-Z][A-Za-z0-9 &.'-]{1,40}?)(?=[,:.\n]|\s+(?:said|asked|wants?|needs?|requested|by|on|\u2014|-)|$)/,
+    /^([A-Z][A-Za-z0-9 &.'-]{1,40}?)\s*[:\u2014-]/,
     /customer\s+([A-Z][A-Za-z0-9 &.'-]{1,40}?)(?=[,:.\n]|$)/i,
   ]
   for (const re of patterns) {
@@ -1360,7 +1360,7 @@ export function detectIntent(text: string, existingCustomers: string[] = []): Ch
     return findCustomerInText(trimmed, existingCustomers)
   }
 
-  // ============= CUSTOMER MANAGEMENT INTENTS (checked first — explicit keywords) =============
+  // ============= CUSTOMER MANAGEMENT INTENTS (checked first - explicit keywords) =============
 
   // ---- Add new customer ----
   // "Add new customer Lanka Exports, Regular tier, in Negombo"
@@ -1392,7 +1392,7 @@ export function detectIntent(text: string, existingCustomers: string[] = []): Ch
     const customer = blOff[1].trim()
     if (customer && customer.length > 1) return { kind: 'customer-flag', customer, flag: 'blacklist', on: false }
   }
-  // ON: "blacklist X", "ban X" (block is too generic — skip to avoid false positives)
+  // ON: "blacklist X", "ban X" (block is too generic - skip to avoid false positives)
   const blOn = trimmed.match(/\b(?:blacklist|ban)\s+(.+?)(?=[,.!?\n]|$)/i)
   if (blOn && !/\bun\b/i.test(blOn[0])) {
     const customer = blOn[1].trim()
@@ -1470,7 +1470,7 @@ export function detectIntent(text: string, existingCustomers: string[] = []): Ch
 
   // ============= ORIGINAL INTENTS =============
 
-  // 1. Reopen / mark-as-pending — explicit "didn't actually do it" updates.
+  // 1. Reopen / mark-as-pending - explicit "didn't actually do it" updates.
   // Check before complete + before follow-up so phrases like "mark as pending"
   // and "didnt done … mark as pending" don't get misclassified.
   const reopenPattern = /\b(?:reopen|re-open|mark[a-z]*\s+(?:it\s+|that\s+|this\s+|inquiry\s+|deal\s+)?(?:back\s+)?as\s+pending|set\s+(?:back\s+)?(?:to\s+)?pending|still\s+pending|not\s+(?:yet\s+)?(?:done|complete[d]?|finished|confirmed)|(?:didn'?t|didnt|haven'?t|have\s+not)\s+(?:yet\s+|actually\s+)?(?:do(?:ne)?|complete[d]?|finish(?:ed)?|confirm(?:ed)?))\b/i
@@ -1479,10 +1479,10 @@ export function detectIntent(text: string, existingCustomers: string[] = []): Ch
     if (customer) return { kind: 'reopen', customer, note: trimmed }
   }
 
-  // 2. Mark complete / close — capture customer name between the verb and the modifier
+  // 2. Mark complete / close - capture customer name between the verb and the modifier
   // Matches: "mark MAS Holdings completed", "mark Hayleys as done", "close Brandix", "close inquiry for Hela"
   const closeMatch = trimmed.match(
-    /\b(?:mark(?:ed)?(?:\s+as)?|close[d]?)\s+(?:the\s+)?(?:inquiry\s+(?:for\s+)?|deal\s+(?:for\s+)?)?([A-Za-z][A-Za-z0-9 &.'-]{1,50}?)(?:\s+(?:as\s+)?(?:complete[d]?|done|closed))?(?=[,.:!?\n—-]|\s+(?:by|booking|—)|$)/i,
+    /\b(?:mark(?:ed)?(?:\s+as)?|close[d]?)\s+(?:the\s+)?(?:inquiry\s+(?:for\s+)?|deal\s+(?:for\s+)?)?([A-Za-z][A-Za-z0-9 &.'-]{1,50}?)(?:\s+(?:as\s+)?(?:complete[d]?|done|closed))?(?=[,.:!?\n\u2014-]|\s+(?:by|booking|\u2014)|$)/i,
   )
   if (closeMatch && /\b(?:mark(?:ed)?|close[d]?|done|complete[d]?|deal\s+done|booking\s+confirmed)\b/.test(lower) && !/\bpending\b/.test(lower)) {
     const customer = closeMatch[1].trim()
@@ -1507,7 +1507,7 @@ export function detectIntent(text: string, existingCustomers: string[] = []): Ch
     return { kind: 'task', customer, task: task || 'Task', due }
   }
 
-  // 4. Follow-up (check before inquiry — these messages often look conversational)
+  // 4. Follow-up (check before inquiry - these messages often look conversational)
   if (/\b(follow(?:ed)?[\s-]?up|f\/u|spoke\s+(?:to|with)|called|rang|messaged|texted|emailed|update[d]?\s+(?:on|with)|chased)\b/.test(lower)) {
     const customer = findCust()
     if (customer) {
@@ -1516,7 +1516,7 @@ export function detectIntent(text: string, existingCustomers: string[] = []): Ch
     }
   }
 
-  // 5. Inquiry — falls through to the existing parser, but if the parser couldn't
+  // 5. Inquiry - falls through to the existing parser, but if the parser couldn't
   // find a customer and the message mentions an existing one, treat it as a free-form
   // follow-up note instead of saving an "Unknown Customer" inquiry.
   const parsed = parseInquiry(trimmed)

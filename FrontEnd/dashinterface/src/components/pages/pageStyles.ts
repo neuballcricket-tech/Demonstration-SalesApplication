@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react'
 import { COLOR } from '../ui/tokens'
 
 // ---------------------------------------------------------------------------
-// General Style Guide — shared inline-style constants
+// General Style Guide - shared inline-style constants
 // Reference: GENERAL_STYLE_GUIDE.md  /  TrackAndTrace.tsx
 // ---------------------------------------------------------------------------
 

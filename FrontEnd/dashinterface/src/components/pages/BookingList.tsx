@@ -21,7 +21,7 @@ const STATUS_BADGE: Record<string, { bg: string; color: string }> = {
 }
 
 const empName = (id: number | null) => {
-  if (!id) return '—'
+  if (!id) return '-'
   return EMPLOYEES.find(e => e.id === id)?.name ?? `EMP-${id}`
 }
 
@@ -160,7 +160,7 @@ export default function BookingList({ bookings, activityLog }: BookingListProps)
                     <span>{b.destination}</span>
                   </td>
                   <td style={{ padding: '12px 8px' }}>{b.quantity}x {b.container_type}</td>
-                  <td style={{ padding: '12px 8px' }}>{b.shipping_line || <span style={{ color: 'var(--text-muted)' }}>—</span>}</td>
+                  <td style={{ padding: '12px 8px' }}>{b.shipping_line || <span style={{ color: 'var(--text-muted)' }}>-</span>}</td>
                   <td style={{ padding: '12px 8px', fontSize: 11 }}>
                     {b.vessel_name ? (
                       <>{b.vessel_name}{b.voyage_number ? ` / ${b.voyage_number}` : ''}</>
@@ -183,7 +183,7 @@ export default function BookingList({ bookings, activityLog }: BookingListProps)
                           </span>
                         )}
                       </span>
-                    ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                    ) : <span style={{ color: 'var(--text-muted)' }}>-</span>}
                   </td>
                   <td style={{ padding: '12px 8px', fontSize: 11, color: 'var(--text-muted)' }}>{b.created_at.slice(0, 10)}</td>
                   <td style={{ padding: '12px 8px' }}>
@@ -220,16 +220,16 @@ export default function BookingList({ bookings, activityLog }: BookingListProps)
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px 24px', fontSize: 13 }}>
               <div><span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Customer</span><div style={{ fontWeight: 600, marginTop: 2 }}>{viewing.customer_name}</div></div>
               <div><span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Route</span><div style={{ marginTop: 2 }}>{viewing.origin} → {viewing.destination}</div></div>
-              <div><span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Shipping Line</span><div style={{ marginTop: 2 }}>{viewing.shipping_line || '—'}</div></div>
+              <div><span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Shipping Line</span><div style={{ marginTop: 2 }}>{viewing.shipping_line || '-'}</div></div>
               <div><span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Container</span><div style={{ marginTop: 2 }}>{viewing.quantity}x {viewing.container_type}</div></div>
               <div><span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Vessel</span><div style={{ marginTop: 2 }}>{viewing.vessel_name || 'TBD'}</div></div>
               <div><span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Voyage</span><div style={{ marginTop: 2 }}>{viewing.voyage_number || 'TBD'}</div></div>
-              <div><span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Delivery Type</span><div style={{ marginTop: 2 }}>{viewing.delivery_type || '—'}</div></div>
-              <div><span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Quote Ref</span><div style={{ marginTop: 2, fontFamily: 'monospace', fontSize: 11 }}>{viewing.quote_id || '—'}</div></div>
+              <div><span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Delivery Type</span><div style={{ marginTop: 2 }}>{viewing.delivery_type || '-'}</div></div>
+              <div><span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Quote Ref</span><div style={{ marginTop: 2, fontFamily: 'monospace', fontSize: 11 }}>{viewing.quote_id || '-'}</div></div>
               <div><span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Booked By</span><div style={{ marginTop: 2 }}>{empName(viewing.booked_by)}</div></div>
               <div><span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Confirmed By</span><div style={{ marginTop: 2 }}>{empName(viewing.confirmed_by)}</div></div>
               <div><span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Created</span><div style={{ marginTop: 2 }}>{viewing.created_at}</div></div>
-              <div><span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Confirmed At</span><div style={{ marginTop: 2 }}>{viewing.confirmed_at || '—'}</div></div>
+              <div><span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Confirmed At</span><div style={{ marginTop: 2 }}>{viewing.confirmed_at || '-'}</div></div>
             </div>
 
             {/* Cutoff dates */}

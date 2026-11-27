@@ -231,7 +231,7 @@ function countPivotRates(pivot: SelectablePivotResult): number {
 }
 
 // ---------------------------------------------------------------------------
-// SelectablePivotRateTable — rate types as columns, container types as sub-cols
+// SelectablePivotRateTable - rate types as columns, container types as sub-cols
 // ---------------------------------------------------------------------------
 
 function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onToggleGroup, onToggleSchedule, onAttachManualRate, emptyMessage }: {
@@ -264,16 +264,16 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
     return () => document.removeEventListener('mousedown', handler)
   }, [openFilter])
 
-  const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—'
+  const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '-'
 
   const distinct = useMemo(() => {
     const carriers = new Map<string, number>()
     const origins = new Map<string, number>()
     const destinations = new Map<string, number>()
     for (const r of rows) {
-      const c = r.linerName || '—'; carriers.set(c, (carriers.get(c) ?? 0) + 1)
-      const o = r.originCity || r.origin || '—'; origins.set(o, (origins.get(o) ?? 0) + 1)
-      const d = r.destinationCity || r.destination || '—'; destinations.set(d, (destinations.get(d) ?? 0) + 1)
+      const c = r.linerName || '-'; carriers.set(c, (carriers.get(c) ?? 0) + 1)
+      const o = r.originCity || r.origin || '-'; origins.set(o, (origins.get(o) ?? 0) + 1)
+      const d = r.destinationCity || r.destination || '-'; destinations.set(d, (destinations.get(d) ?? 0) + 1)
     }
     return { carriers, origins, destinations }
   }, [rows]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -281,9 +281,9 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
   const filtered = useMemo(() => {
     if (!fCarrier.size && !fOrigin.size && !fDest.size) return rows
     return rows.filter(r => {
-      if (fCarrier.size && !fCarrier.has(r.linerName || '—')) return false
-      if (fOrigin.size && !fOrigin.has(r.originCity || r.origin || '—')) return false
-      if (fDest.size && !fDest.has(r.destinationCity || r.destination || '—')) return false
+      if (fCarrier.size && !fCarrier.has(r.linerName || '-')) return false
+      if (fOrigin.size && !fOrigin.has(r.originCity || r.origin || '-')) return false
+      if (fDest.size && !fDest.has(r.destinationCity || r.destination || '-')) return false
       return true
     })
   }, [rows, fCarrier, fOrigin, fDest])
@@ -483,19 +483,19 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
                         style={{ cursor: 'pointer', accentColor: COLOR.primary }}
                       />
                     </td>
-                    <td style={{ ...tdBase, fontWeight: 600 }}>{row.linerName || '—'}</td>
+                    <td style={{ ...tdBase, fontWeight: 600 }}>{row.linerName || '-'}</td>
                     <td style={tdBase}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                         <Ship size={9} style={{ opacity: 0.5, flexShrink: 0 }} />
-                        <span style={{ fontSize: 11 }}>{row.vesselName || '—'}{row.voyageNumber ? ` / ${row.voyageNumber}` : ''}</span>
+                        <span style={{ fontSize: 11 }}>{row.vesselName || '-'}{row.voyageNumber ? ` / ${row.voyageNumber}` : ''}</span>
                       </div>
                     </td>
-                    <td style={tdBase}>{row.originCity || row.origin || '—'}</td>
-                    <td style={tdBase}>{row.destinationCity || row.destination || '—'}</td>
+                    <td style={tdBase}>{row.originCity || row.origin || '-'}</td>
+                    <td style={tdBase}>{row.destinationCity || row.destination || '-'}</td>
                     <td style={{ ...tdBase, textAlign: 'center' }}>{fmtDate(row.etd)}</td>
                     <td style={{ ...tdBase, textAlign: 'center' }}>{fmtDate(row.eta)}</td>
                     <td style={{ ...tdBase, fontWeight: 600, textAlign: 'center' }}>
-                      {row.totalDuration != null ? `${row.totalDuration}d` : '—'}
+                      {row.totalDuration != null ? `${row.totalDuration}d` : '-'}
                     </td>
                     <td style={{ ...tdBase, fontSize: 11 }}>{fmtDate(row.bkCutoff)}</td>
                     {onAttachManualRate && (
@@ -572,7 +572,7 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
                                     )}
                                   </>
                                 ) : (
-                                  <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>—</span>
+                                  <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>-</span>
                                 )}
                               </td>
                             )
@@ -624,7 +624,7 @@ export default function RateCheck({
   // Skip procurement flag (cs-sales only)
   const [skipProcurement] = useState(false)
 
-  // ID of the rate request created on mount — used to PATCH it on submit
+  // ID of the rate request created on mount - used to PATCH it on submit
   const [rateRequestId, setRateRequestId] = useState<number | null>(null)
 
   // Reference data
@@ -692,14 +692,14 @@ export default function RateCheck({
   const createdRequestIdRef = useRef<number | null>(null)
   const linkedOptionKeysRef = useRef<Set<string>>(new Set())
 
-  // Path 3: schedule-linked manual rate entry — holds the schedule row the user wants to attach a rate to
+  // Path 3: schedule-linked manual rate entry - holds the schedule row the user wants to attach a rate to
   const [linkedSchedule, setLinkedSchedule] = useState<SelectablePivotRow | null>(null)
 
   // Enriched schedule+rates data (CS/Sales only)
   const [enrichedData, setEnrichedData] = useState<AggregateScheduleRatesResponse | null>(null)
   const [enrichedLoading, setEnrichedLoading] = useState(false)
 
-  // Incoming schedule details from CS (Procurement view — read-only)
+  // Incoming schedule details from CS (Procurement view - read-only)
   const [incomingSchedules, setIncomingSchedules] = useState<IncomingScheduleDetail[]>([])
   const [incomingRemark, setIncomingRemark] = useState<string | null>(null)
 
@@ -707,9 +707,9 @@ export default function RateCheck({
   const [aggregateData, setAggregateData] = useState<AggregateScheduleRatesResponse | null>(null)
   const [aggregateLoading, setAggregateLoading] = useState(false)
   const [, setOpenScheduleCards] = useState<Set<string>>(new Set())
-  // Aggregate rate selections — keys are "schedule_id:rate_type:rate_id" e.g. "3:tariff_rates:42"
+  // Aggregate rate selections - keys are "schedule_id:rate_type:rate_id" e.g. "3:tariff_rates:42"
   const [selectedAggregateRateIds, setSelectedAggregateRateIds] = useState<Set<string>>(new Set())
-  // Schedule-level selections (independent of rate keys — works for rate-less schedules too)
+  // Schedule-level selections (independent of rate keys - works for rate-less schedules too)
   const [selectedScheduleIds, setSelectedScheduleIds] = useState<Set<number>>(new Set())
 
   // Notes
@@ -761,7 +761,7 @@ export default function RateCheck({
   }
 
   const handleToggleRow = (row: SelectablePivotRow) => {
-    // Use whichever pivot's rateTypes are relevant — enriched for CS/Sales, aggregate for Procurement
+    // Use whichever pivot's rateTypes are relevant - enriched for CS/Sales, aggregate for Procurement
     const rt = isProcurement ? aggregatePivot.rateTypes : enrichedPivot.rateTypes
     setSelectedAggregateRateIds(prev => toggleRow(row, rt, prev))
     // Also mark the schedule as selected
@@ -779,12 +779,12 @@ export default function RateCheck({
 
   // Path 3: Attach manual rate to a specific schedule
   const handleAttachManualRate = (row: SelectablePivotRow) => {
-    console.log('[RateCheck] handleAttachManualRate — row:', JSON.stringify({ scheduleId: row.scheduleId, origin: row.origin, destination: row.destination, originCity: row.originCity, destinationCity: row.destinationCity, linerName: row.linerName, vesselName: row.vesselName }))
-    console.log('[RateCheck] handleAttachManualRate — inquiry.origin:', inquiry.origin, 'inquiry.destination:', inquiry.destination)
+    console.log('[RateCheck] handleAttachManualRate - row:', JSON.stringify({ scheduleId: row.scheduleId, origin: row.origin, destination: row.destination, originCity: row.originCity, destinationCity: row.destinationCity, linerName: row.linerName, vesselName: row.vesselName }))
+    console.log('[RateCheck] handleAttachManualRate - inquiry.origin:', inquiry.origin, 'inquiry.destination:', inquiry.destination)
     setLinkedSchedule(row)
     // Pre-fill form fields from the schedule
     if (row.linerName) setMrLiner(row.linerName)
-    // Use schedule UNLOCODEs (row.origin / row.destination) — not inquiry city names
+    // Use schedule UNLOCODEs (row.origin / row.destination) - not inquiry city names
     setMrOrigin(row.origin || inquiry.origin || '')
     setMrDestination(row.destination || prefillDest || '')
     setMrVesselName(row.vesselName || '')
@@ -799,7 +799,7 @@ export default function RateCheck({
     ? (hasManualEntries || hasAggregateSelections)
     : (hasAggregateSelections || skipProcurement || enrichedEmpty)
 
-  // Auto-fetch DB rates on mount — fan-out fetch then filter client-side by route / container
+  // Auto-fetch DB rates on mount - fan-out fetch then filter client-side by route / container
   useEffect(() => {
     setDbLoading(true)
     apiFetchAllRates()
@@ -818,7 +818,7 @@ export default function RateCheck({
           if (d  && rd  && !rd.includes(d)  && !d.includes(rd))   return false
           // 3. Container type match
           if (ct && rct && !rct.includes(ct) && !ct.includes(rct)) return false
-          // Rates that expire before cargo ready date are still shown — marked with a warning
+          // Rates that expire before cargo ready date are still shown - marked with a warning
           return true
         })
 
@@ -916,7 +916,7 @@ export default function RateCheck({
       id: `mr-${Date.now()}`,
       scheduleId: currentLinkedSchedule?.scheduleId ?? null,
       scheduleSummary: currentLinkedSchedule
-        ? `${currentLinkedSchedule.linerName || '—'} / ${currentLinkedSchedule.vesselName || '—'}${currentLinkedSchedule.voyageNumber ? ` V.${currentLinkedSchedule.voyageNumber}` : ''}`
+        ? `${currentLinkedSchedule.linerName || '-'} / ${currentLinkedSchedule.vesselName || '-'}${currentLinkedSchedule.voyageNumber ? ` V.${currentLinkedSchedule.voyageNumber}` : ''}`
         : null,
       tab: mrTab, liner: mrLiner, tradeLane: mrTradeLane,
       origin: mrOrigin, destination: mrDestination,
@@ -935,13 +935,13 @@ export default function RateCheck({
       surcharges: [...mrSurcharges],
     }])
 
-    // Persist to backend — one POST per filled container row
+    // Persist to backend - one POST per filled container row
     const linId  = linerList.find(l => l.name === mrLiner)?.lin_id
     const inqId  = inquiry.inq_id
     const filledContainers = mrContainers.filter(c => c.rate.trim())
 
     // Map frontend surcharges to backend SurchargeNew format.
-    // rate_id is a placeholder — backend overrides it with the newly created rate's ID.
+    // rate_id is a placeholder - backend overrides it with the newly created rate's ID.
     const surchargePayload = mrSurcharges
       .filter(s => s.type && s.amount)
       .map(s => ({ rate_id: 0, type: s.type, amt: Number(s.amount), currency: s.currency }))
@@ -1081,7 +1081,7 @@ export default function RateCheck({
     const fromRateKeys = [...selectedAggregateRateIds].map(k => Number(k.split(':')[0]))
     const wantedIds = new Set([...selectedScheduleIds, ...fromRateKeys])
     if (wantedIds.size === 0) return undefined
-    // enrichedData keys are array indices (0,1,2…), NOT schedule_ids — match by schedule.schedule_id
+    // enrichedData keys are array indices (0,1,2…), NOT schedule_ids - match by schedule.schedule_id
     const payloads: SchedulePayload[] = []
     for (const entry of Object.values(enrichedData)) {
       const s = entry.schedule
@@ -1172,12 +1172,12 @@ export default function RateCheck({
       onLogActivity({
         actor_role: activeRole,
         actor_id: activeEmployee.id,
-        action: `Rate check completed. Procurement escalation skipped — sent directly to Sales for quotation.`,
+        action: `Rate check completed. Procurement escalation skipped - sent directly to Sales for quotation.`,
         ref_type: 'inquiry',
         ref_id: inquiry.id,
         customer_name: inquiry.customer_name,
         pushed_to: 'Sales',
-        notes: formNote || `${inquiry.origin} → ${dest} — procurement escalation skipped`,
+        notes: formNote || `${inquiry.origin} → ${dest} - procurement escalation skipped`,
       })
       onFlash(`${inquiry.id} → Skipped Procurement, sent to Sales`)
       ;(onGoToQuotations ?? onGoBack)()
@@ -1203,7 +1203,7 @@ export default function RateCheck({
         ref_id: inquiry.id,
         customer_name: inquiry.customer_name,
         pushed_to: 'Procurement',
-        notes: formNote || `${inquiry.origin} → ${dest} — escalated to procurement`,
+        notes: formNote || `${inquiry.origin} → ${dest} - escalated to procurement`,
       })
       onFlash(`${inquiry.id} → Escalated to Procurement`)
       onGoBack()
@@ -1323,7 +1323,7 @@ export default function RateCheck({
       }
     }
 
-    // Advance local state (backend may already have auto-advanced via options above — idempotent)
+    // Advance local state (backend may already have auto-advanced via options above - idempotent)
     onAdvanceWorkflow(inquiry.id, 'quotation-prep')
 
     const notesParts = [`Customer: ${inquiry.customer_name} (${custData?.tier ?? 'N/A'})`, `Route: ${inquiry.origin} → ${dest}`]
@@ -1344,7 +1344,7 @@ export default function RateCheck({
     })
     onFlash(isProcurement
       ? `${inquiry.id} → Rate brief sent to Sales (${actionParts.join(' + ')})`
-      : `${inquiry.id} → ${totalCount} rate(s) — proceeding to quotation`
+      : `${inquiry.id} → ${totalCount} rate(s) - proceeding to quotation`
     )
     ;(onGoToQuotations ?? onGoBack)()
   })
@@ -1376,7 +1376,7 @@ export default function RateCheck({
       ref_id: inquiry.id,
       customer_name: inquiry.customer_name,
       pushed_to: 'Procurement',
-      notes: formNote || `${inquiry.origin} → ${dest} — escalated to procurement${schedCount > 0 ? ` (${schedCount} schedules)` : ''}`,
+      notes: formNote || `${inquiry.origin} → ${dest} - escalated to procurement${schedCount > 0 ? ` (${schedCount} schedules)` : ''}`,
     })
     onFlash(`${inquiry.id} → Escalated to Procurement${schedCount > 0 ? ` (${schedCount} schedules)` : ''}`)
     onGoBack()
@@ -1450,7 +1450,7 @@ export default function RateCheck({
         )}
         {e.tab === 'special' && (e.commodityType || e.commodityName) && (
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-            Commodity: {e.commodityType || '?'}{e.commodityName ? ` — ${e.commodityName}` : ''}
+            Commodity: {e.commodityType || '?'}{e.commodityName ? ` - ${e.commodityName}` : ''}
           </div>
         )}
         <div style={{ fontSize: 11, marginTop: 2, display: 'flex', gap: 6 }}>
@@ -1474,7 +1474,7 @@ export default function RateCheck({
     const briefDataSource = isProcurement ? aggregateData : enrichedData
     if (hasAggregateSelections && briefDataSource) {
       for (const [schId, entry] of Object.entries(briefDataSource)) {
-        const schLabel = entry.schedule.liner_name || entry.schedule.scac || '—'
+        const schLabel = entry.schedule.liner_name || entry.schedule.scac || '-'
         const groups = [
           { rateType: 'Tariff', rates: entry.tariff_rates, key: 'tariff_rates' },
           { rateType: 'FAK', rates: entry.fak_rates, key: 'fak_rates' },
@@ -1593,7 +1593,7 @@ export default function RateCheck({
       }
     }
     if (!isProcurement && skipProcurement) {
-      return { label: 'Skip Procurement — Go to Quotation', color: '#d97706', icon: <ChevronRight size={12} /> }
+      return { label: 'Skip Procurement - Go to Quotation', color: '#d97706', icon: <ChevronRight size={12} /> }
     }
     if (!isProcurement) {
       return { label: 'Escalate to Procurement', color: '#d97706', icon: <ChevronRight size={12} /> }
@@ -1641,7 +1641,7 @@ export default function RateCheck({
       {/* Card body */}
       <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, padding: 24 }}>
         {mode === 'db-select' ? (
-          /* ════════════════ DB-SELECT SCREEN — two-column ════════════════ */
+          /* ════════════════ DB-SELECT SCREEN - two-column ════════════════ */
           <div style={{ display: 'flex', gap: 0, alignItems: 'flex-start' }}>
 
             {/* ── LEFT: Inquiry details ── */}
@@ -1693,7 +1693,7 @@ export default function RateCheck({
                   </div>
                 ) : (
                   <>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{containerLabel || '—'}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{containerLabel || '-'}</div>
                     {(container?.commodityType || inquiry.commodity_type) && (
                       <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>
                         {container?.commodityType || inquiry.commodity_type}
@@ -1822,7 +1822,7 @@ export default function RateCheck({
                   {!enrichedLoading && enrichedPivot.rows.length > 0 && (
                     <>
                       <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>
-                        {countPivotRates(enrichedPivot)} rate(s) across {enrichedPivot.rows.length} schedule(s) — select one or more to proceed to quotation
+                        {countPivotRates(enrichedPivot)} rate(s) across {enrichedPivot.rows.length} schedule(s) - select one or more to proceed to quotation
                       </div>
                       <SelectablePivotRateTable
                         pivot={enrichedPivot}
@@ -1876,7 +1876,7 @@ export default function RateCheck({
                   {!aggregateLoading && aggregatePivot.rows.length > 0 && (
                     <>
                       <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>
-                        {countPivotRates(aggregatePivot)} rate(s) across {aggregatePivot.rows.length} schedule(s) — select rates to include in brief
+                        {countPivotRates(aggregatePivot)} rate(s) across {aggregatePivot.rows.length} schedule(s) - select rates to include in brief
                       </div>
                       <SelectablePivotRateTable
                         pivot={aggregatePivot}
@@ -1913,8 +1913,8 @@ export default function RateCheck({
                         <div style={{ padding: '6px 8px' }}>Type</div>
                       </div>
                       {incomingSchedules.map(sch => {
-                        const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—'
-                        const transitDays = sch.total_duration != null ? `${Math.round(sch.total_duration / 24)}d` : '—'
+                        const fmtDate = (d: string | null) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '-'
+                        const transitDays = sch.total_duration != null ? `${Math.round(sch.total_duration / 24)}d` : '-'
                         const isDirect = sch.schedule_type?.toUpperCase() === 'DIRECT'
                         return (
                           <div key={sch.schedule_id} style={{
@@ -1922,7 +1922,7 @@ export default function RateCheck({
                             borderBottom: '1px solid var(--border)', fontSize: 11, alignItems: 'center',
                           }}>
                             <div style={{ padding: '6px 10px' }}>
-                              <div style={{ fontWeight: 600, color: 'var(--text)' }}>{sch.liner_name || sch.scac || '—'}</div>
+                              <div style={{ fontWeight: 600, color: 'var(--text)' }}>{sch.liner_name || sch.scac || '-'}</div>
                               <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{sch.vessel_name}{sch.voyage_number ? ` / ${sch.voyage_number}` : ''}</div>
                             </div>
                             <div style={{ padding: '6px 8px', color: 'var(--text-secondary)' }}>{sch.origin_unloc} → {sch.destination_unloc}</div>
@@ -2051,7 +2051,7 @@ export default function RateCheck({
                   </div>
                 ) : (
                   <>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{containerLabel || '—'}</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{containerLabel || '-'}</div>
                     {(container?.commodityType || inquiry.commodity_type) && (
                       <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>
                         {container?.commodityType || inquiry.commodity_type}
@@ -2132,10 +2132,10 @@ export default function RateCheck({
                     <div style={{ fontSize: 12, color: COLOR.primary, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <Ship size={13} />
                       <strong>Linked to Schedule:</strong>{' '}
-                      {linkedSchedule.linerName || '—'} / {linkedSchedule.vesselName || '—'}
+                      {linkedSchedule.linerName || '-'} / {linkedSchedule.vesselName || '-'}
                       {linkedSchedule.voyageNumber ? ` V.${linkedSchedule.voyageNumber}` : ''}
-                      {' · '}ETD: {linkedSchedule.etd ? new Date(linkedSchedule.etd).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—'}
-                      {' · '}ETA: {linkedSchedule.eta ? new Date(linkedSchedule.eta).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—'}
+                      {' · '}ETD: {linkedSchedule.etd ? new Date(linkedSchedule.etd).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '-'}
+                      {' · '}ETA: {linkedSchedule.eta ? new Date(linkedSchedule.eta).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '-'}
                     </div>
                     <button
                       onClick={() => setLinkedSchedule(null)}
@@ -2146,7 +2146,7 @@ export default function RateCheck({
                   </div>
                 )}
 
-                {/* Rate type tabs — pill style */}
+                {/* Rate type tabs - pill style */}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {(['vessel-spot', 'fak', 'special'] as ManualRateTab[]).map(tab => (
                     <button

@@ -102,16 +102,16 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
   const [, setRrContractedVolume] = useState('')
   const [rrNote, setRrNote] = useState('')
   const [rrSpecialRemark, setRrSpecialRemark] = useState('')
-  // Tariff — per-container rates
+  // Tariff - per-container rates
   const [rrTariffContainers, setRrTariffContainers] = useState<TariffContainerRate[]>([emptyTariffContainer()])
-  // Contracted — per-container rates
+  // Contracted - per-container rates
   const [rrContractedContainers, setRrContractedContainers] = useState<ContractedContainerRate[]>([emptyContractedContainer()])
-  // NAC — per-container rates (same shape as Contracted)
+  // NAC - per-container rates (same shape as Contracted)
   const [rrNacContainers, setRrNacContainers] = useState<ContractedContainerRate[]>([emptyContractedContainer()])
   // NAC extras
   const [rrNacRefNo, setRrNacRefNo] = useState('')
   const [rrNacCustomerName, setRrNacCustomerName] = useState('')
-  // Contracted — applicable customers
+  // Contracted - applicable customers
   const [rrApplicableCustomers, setRrApplicableCustomers] = useState<string[]>([])
 
   // Bulk upload state
@@ -160,9 +160,9 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
   }
 
   // Name resolution helpers for review
-  const linerName = linerList.find(l => l.lin_id === rrLinerId)?.name ?? '—'
-  const laneName = tradeLaneList.find(t => t.trln_id === rrTradeLaneId)?.trln_name ?? '—'
-  const salesName = dbEmployeeList.find(e => e.emp_id === rrSalesPersonId)?.name ?? '—'
+  const linerName = linerList.find(l => l.lin_id === rrLinerId)?.name ?? '-'
+  const laneName = tradeLaneList.find(t => t.trln_id === rrTradeLaneId)?.trln_name ?? '-'
+  const salesName = dbEmployeeList.find(e => e.emp_id === rrSalesPersonId)?.name ?? '-'
 
   // Tariff container helpers
   const updateTariffContainer = (idx: number, patch: Partial<TariffContainerRate>) =>
@@ -359,7 +359,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
   const tradeLaneOptions: Option[] = tradeLaneList.map(t => ({ value: String(t.trln_id), label: t.trln_name }))
   const salesOptions: Option[] = dbEmployeeList.map(e => ({ value: String(e.emp_id), label: `${e.name}${e.desig ? ` (${e.desig})` : ''}` }))
   // Optional salesperson: the empty choice stays selectable
-  const optionalSalesOptions: Option[] = [{ value: '', label: '— Select salesperson —' }, ...salesOptions]
+  const optionalSalesOptions: Option[] = [{ value: '', label: '- Select salesperson -' }, ...salesOptions]
   const yearOptions: Option[] = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 1 + i).map(y => ({ value: String(y), label: String(y) }))
   const portItems = useMemo(() => uniqueItems(portOptions(portList).map(o => ({ value: o.value, description: o.label }))), [portList])
   const serviceLaneItems = uniqueItems(tradeLaneList.map(t => ({ value: t.trln_name })))
@@ -386,7 +386,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
           <div className="mt-0.5 text-control text-fg-muted">
             {mode === 'review'
               ? 'Verify the details below. Click Back to make changes, or Confirm to save.'
-              : 'Add a new rate to the database — select rate type and fill in the details.'}
+              : 'Add a new rate to the database - select rate type and fill in the details.'}
           </div>
         </div>
       </div>
@@ -414,7 +414,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
           </div>
         </div>
 
-        {/* Entry mode toggle — only for Tariff Rate */}
+        {/* Entry mode toggle - only for Tariff Rate */}
         {rrType === 'Tariff Rate' && (
           <div className="mb-4 flex flex-col gap-1">
             <span id="rr-entry-mode-label" className={labelClass}>Entry Mode</span>
@@ -441,13 +441,13 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             {/* Liner, Month, Year selectors */}
             <div className="mb-4 grid grid-cols-3 gap-4">
               <Field label="Liner" required>
-                {ids => <Select {...ids} value={String(bulkLinerId)} onChange={v => setBulkLinerId(toId(v))} placeholder="— Select liner —" options={bulkLinerOptions} />}
+                {ids => <Select {...ids} value={String(bulkLinerId)} onChange={v => setBulkLinerId(toId(v))} placeholder="- Select liner -" options={bulkLinerOptions} />}
               </Field>
               <Field label="Month" required>
-                {ids => <Select {...ids} value={String(bulkMonth)} onChange={v => setBulkMonth(Number(v))} placeholder="— Select —" options={MONTH_OPTIONS} />}
+                {ids => <Select {...ids} value={String(bulkMonth)} onChange={v => setBulkMonth(Number(v))} placeholder="- Select -" options={MONTH_OPTIONS} />}
               </Field>
               <Field label="Year" required>
-                {ids => <Select {...ids} value={String(bulkYear)} onChange={v => setBulkYear(Number(v))} placeholder="— Select —" options={yearOptions} />}
+                {ids => <Select {...ids} value={String(bulkYear)} onChange={v => setBulkYear(Number(v))} placeholder="- Select -" options={yearOptions} />}
               </Field>
             </div>
 
@@ -506,9 +506,9 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
                           <td className="px-2 py-1">{r.currency}</td>
                           <td className="px-2 py-1">{r.valid_from}</td>
                           <td className="px-2 py-1">{r.valid_to}</td>
-                          <td className="px-2 py-1">{r.free_time || '—'}</td>
-                          <td className="px-2 py-1">{r.max_weight || '—'}</td>
-                          <td className="max-w-[120px] truncate px-2 py-1">{r.note || '—'}</td>
+                          <td className="px-2 py-1">{r.free_time || '-'}</td>
+                          <td className="px-2 py-1">{r.max_weight || '-'}</td>
+                          <td className="max-w-[120px] truncate px-2 py-1">{r.note || '-'}</td>
                           <td className="px-2 py-1">
                             <RemoveButton size="sm" label={`Remove row ${i + 1}`} onClick={() => removeBulkRow(i)} />
                           </td>
@@ -539,19 +539,19 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
         {/* ---- Tariff Rate fields (manual) ---- */}
         {rrType === 'Tariff Rate' && entryMode === 'manual' && (
           <div className="mb-3 grid grid-cols-2 gap-x-4 gap-y-3">
-            {/* — Carrier & Service — */}
+            {/* - Carrier & Service - */}
             <SectionHead color={RATE_SOURCE_COLORS['Tariff Rate']}>Carrier & Service</SectionHead>
             <Field label="Liner" required>
-              {ids => <Select {...ids} value={String(rrLinerId)} onChange={v => setRrLinerId(toId(v))} placeholder="— Select liner —" options={linerOptions} />}
+              {ids => <Select {...ids} value={String(rrLinerId)} onChange={v => setRrLinerId(toId(v))} placeholder="- Select liner -" options={linerOptions} />}
             </Field>
             <Field label="Trade Lane" required>
-              {ids => <Select {...ids} value={String(rrTradeLaneId)} onChange={v => setRrTradeLaneId(toId(v))} placeholder="— Select trade lane —" options={tradeLaneOptions} />}
+              {ids => <Select {...ids} value={String(rrTradeLaneId)} onChange={v => setRrTradeLaneId(toId(v))} placeholder="- Select trade lane -" options={tradeLaneOptions} />}
             </Field>
             <Field label="Salesperson">
               {ids => <Select {...ids} value={String(rrSalesPersonId)} onChange={v => setRrSalesPersonId(toId(v))} options={optionalSalesOptions} />}
             </Field>
 
-            {/* — Route — */}
+            {/* - Route - */}
             <SectionHead color={RATE_SOURCE_COLORS['Tariff Rate']}>Route</SectionHead>
             <Field label="Origin" required>
               {ids => <ComboBox {...ids} value={rrOrigin} onChange={setRrOrigin} items={portItems} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />}
@@ -565,7 +565,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             <Field label="Service Lane">
               {ids => <ComboBox {...ids} value={rrServiceLane} onChange={setRrServiceLane} items={serviceLaneItems} placeholder="Type to filter..." />}
             </Field>
-            {/* — Validity — */}
+            {/* - Validity - */}
             <SectionHead color={RATE_SOURCE_COLORS['Tariff Rate']}>Validity</SectionHead>
             <Field label="Valid From" required>
               {ids => <DatePicker {...ids} value={rrValidFrom} onChange={setRrValidFrom} />}
@@ -574,7 +574,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
               {ids => <DatePicker {...ids} value={rrValidTo} onChange={setRrValidTo} />}
             </Field>
 
-            {/* — Container Rates — */}
+            {/* - Container Rates - */}
             <SectionHead color={RATE_SOURCE_COLORS['Tariff Rate']} action={<Button size="sm" icon={<Plus size={14} aria-hidden="true" />} onClick={addTariffContainer}>Add</Button>}>Container Rates</SectionHead>
             <div className="col-span-full flex flex-col gap-2">
               <div className="grid grid-cols-[1.2fr_0.8fr_1fr_0.65fr_32px] gap-2">
@@ -586,16 +586,16 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
               </div>
               {rrTariffContainers.map((ct, idx) => (
                 <div key={idx} className="grid grid-cols-[1.2fr_0.8fr_1fr_0.65fr_32px] items-center gap-2">
-                  <Select aria-label={`Container type, row ${idx + 1}`} value={ct.containerType} onChange={v => updateTariffContainer(idx, { containerType: v })} placeholder="— Select —" options={TARIFF_CONTAINER_OPTIONS} />
+                  <Select aria-label={`Container type, row ${idx + 1}`} value={ct.containerType} onChange={v => updateTariffContainer(idx, { containerType: v })} placeholder="- Select -" options={TARIFF_CONTAINER_OPTIONS} />
                   <Input aria-label={`Max weight, row ${idx + 1}`} value={ct.weight} onChange={e => updateTariffContainer(idx, { weight: e.target.value })} placeholder="e.g. 28000 kg" />
                   <NumberInput aria-label={`Rate, row ${idx + 1}`} value={ct.rate} onChange={e => updateTariffContainer(idx, { rate: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 2100.00" />
-                  <Select aria-label={`Currency, row ${idx + 1}`} value={ct.currency} onChange={v => updateTariffContainer(idx, { currency: v })} placeholder="— Select —" options={CURRENCY_OPTIONS} />
+                  <Select aria-label={`Currency, row ${idx + 1}`} value={ct.currency} onChange={v => updateTariffContainer(idx, { currency: v })} placeholder="- Select -" options={CURRENCY_OPTIONS} />
                   <RemoveButton label={`Remove row ${idx + 1}`} disabled={rrTariffContainers.length === 1} onClick={() => removeTariffContainer(idx)} />
                 </div>
               ))}
             </div>
 
-            {/* — Additional Information — */}
+            {/* - Additional Information - */}
             <SectionHead color={RATE_SOURCE_COLORS['Tariff Rate']}>Additional Information</SectionHead>
             <Field label="Note" className="col-span-full">
               {ids => <Input {...ids} value={rrNote} onChange={e => setRrNote(e.target.value)} placeholder="Any notes..." />}
@@ -609,13 +609,13 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
         {/* ---- Contracted fields ---- */}
         {rrType === 'Contracted' && (
           <div className="mb-3 grid grid-cols-2 gap-x-4 gap-y-3">
-            {/* — Contract & Assignment — */}
+            {/* - Contract & Assignment - */}
             <SectionHead color={RATE_SOURCE_COLORS['Contracted']}>Contract & Assignment</SectionHead>
             <Field label="Contract Reference" required>
               {ids => <Input {...ids} value={rrContractId} onChange={e => setRrContractId(e.target.value)} placeholder="Sent by the liner" />}
             </Field>
             <Field label="Liner" required>
-              {ids => <Select {...ids} value={String(rrLinerId)} onChange={v => setRrLinerId(toId(v))} placeholder="— Select liner —" options={linerOptions} />}
+              {ids => <Select {...ids} value={String(rrLinerId)} onChange={v => setRrLinerId(toId(v))} placeholder="- Select liner -" options={linerOptions} />}
             </Field>
             <Field label="Sales Person">
               {ids => <Select {...ids} value={String(rrSalesPersonId)} onChange={v => setRrSalesPersonId(toId(v))} options={optionalSalesOptions} />}
@@ -630,7 +630,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
               />
             </div>
 
-            {/* — Route — */}
+            {/* - Route - */}
             <SectionHead color={RATE_SOURCE_COLORS['Contracted']}>Route</SectionHead>
             <Field label="Origin" required>
               {ids => <ComboBox {...ids} value={rrOrigin} onChange={setRrOrigin} items={portItems} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />}
@@ -644,7 +644,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
             <Field label="Service Lane">
               {ids => <ComboBox {...ids} value={rrServiceLane} onChange={setRrServiceLane} items={serviceLaneItems} placeholder="Type to filter..." />}
             </Field>
-            {/* — Validity — */}
+            {/* - Validity - */}
             <SectionHead color={RATE_SOURCE_COLORS['Contracted']}>Validity</SectionHead>
             <Field label="Valid From" required>
               {ids => <DatePicker {...ids} value={rrValidFrom} onChange={setRrValidFrom} />}
@@ -653,7 +653,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
               {ids => <DatePicker {...ids} value={rrValidTo} onChange={setRrValidTo} />}
             </Field>
 
-            {/* — Container Rates — */}
+            {/* - Container Rates - */}
             <SectionHead color={RATE_SOURCE_COLORS['Contracted']} action={<Button size="sm" icon={<Plus size={14} aria-hidden="true" />} onClick={addContractedContainer}>Add</Button>}>Container Rates</SectionHead>
             <div className="col-span-full flex flex-col gap-2">
               <div className="grid grid-cols-[1.1fr_0.65fr_0.75fr_0.85fr_0.6fr_32px] gap-2">
@@ -666,17 +666,17 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
               </div>
               {rrContractedContainers.map((cc, idx) => (
                 <div key={idx} className="grid grid-cols-[1.1fr_0.65fr_0.75fr_0.85fr_0.6fr_32px] items-center gap-2">
-                  <Select aria-label={`Container type, row ${idx + 1}`} value={cc.containerType} onChange={v => updateContractedContainer(idx, { containerType: v })} placeholder="— Select —" options={CONTRACTED_CONTAINER_OPTIONS} />
+                  <Select aria-label={`Container type, row ${idx + 1}`} value={cc.containerType} onChange={v => updateContractedContainer(idx, { containerType: v })} placeholder="- Select -" options={CONTRACTED_CONTAINER_OPTIONS} />
                   <NumberInput aria-label={`Contracted TUs, row ${idx + 1}`} value={cc.contractedVolume} onChange={e => updateContractedContainer(idx, { contractedVolume: e.target.value })} min={0} placeholder="e.g. 500" />
                   <Input aria-label={`Max weight, row ${idx + 1}`} value={cc.weight} onChange={e => updateContractedContainer(idx, { weight: e.target.value })} placeholder="e.g. 28000 kg" />
                   <NumberInput aria-label={`Rate, row ${idx + 1}`} value={cc.rate} onChange={e => updateContractedContainer(idx, { rate: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 2450.00" />
-                  <Select aria-label={`Currency, row ${idx + 1}`} value={cc.currency} onChange={v => updateContractedContainer(idx, { currency: v })} placeholder="— Select —" options={CURRENCY_OPTIONS} />
+                  <Select aria-label={`Currency, row ${idx + 1}`} value={cc.currency} onChange={v => updateContractedContainer(idx, { currency: v })} placeholder="- Select -" options={CURRENCY_OPTIONS} />
                   <RemoveButton label={`Remove row ${idx + 1}`} disabled={rrContractedContainers.length === 1} onClick={() => removeContractedContainer(idx)} />
                 </div>
               ))}
             </div>
 
-            {/* — Additional Information — */}
+            {/* - Additional Information - */}
             <SectionHead color={RATE_SOURCE_COLORS['Contracted']}>Additional Information</SectionHead>
             <Field label="Note" className="col-span-full">
               {ids => <Input {...ids} value={rrNote} onChange={e => setRrNote(e.target.value)} placeholder="Any notes..." />}
@@ -690,7 +690,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
         {/* ---- NAC fields ---- */}
         {rrType === 'NAC' && (
           <div className="mb-3 grid grid-cols-2 gap-x-4 gap-y-3">
-            {/* — Customer & Reference — */}
+            {/* - Customer & Reference - */}
             <SectionHead color={RATE_SOURCE_COLORS['NAC']}>Customer & Reference</SectionHead>
             <Field label="NAC Reference No">
               {ids => <Input {...ids} value={rrNacRefNo} onChange={e => setRrNacRefNo(e.target.value)} placeholder="e.g. NAC-2026-001" />}
@@ -699,13 +699,13 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
               {ids => <ComboBox {...ids} value={rrNacCustomerName} onChange={setRrNacCustomerName} items={clientItems} placeholder="Type to filter..." />}
             </Field>
             <Field label="Sales Person" required>
-              {ids => <Select {...ids} value={String(rrSalesPersonId)} onChange={v => setRrSalesPersonId(toId(v))} placeholder="— Select salesperson —" options={salesOptions} />}
+              {ids => <Select {...ids} value={String(rrSalesPersonId)} onChange={v => setRrSalesPersonId(toId(v))} placeholder="- Select salesperson -" options={salesOptions} />}
             </Field>
 
-            {/* — Carrier & Route — */}
+            {/* - Carrier & Route - */}
             <SectionHead color={RATE_SOURCE_COLORS['NAC']}>Carrier & Route</SectionHead>
             <Field label="Liner" required>
-              {ids => <Select {...ids} value={String(rrLinerId)} onChange={v => setRrLinerId(toId(v))} placeholder="— Select liner —" options={linerOptions} />}
+              {ids => <Select {...ids} value={String(rrLinerId)} onChange={v => setRrLinerId(toId(v))} placeholder="- Select liner -" options={linerOptions} />}
             </Field>
             <Field label="Origin" required>
               {ids => <ComboBox {...ids} value={rrOrigin} onChange={setRrOrigin} items={portItems} placeholder="e.g. Colombo/Sri Lanka or LKCMB" />}
@@ -717,7 +717,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
               {ids => <NumberInput {...ids} value={rrFreeTime} onChange={e => setRrFreeTime(e.target.value)} min={0} placeholder="e.g. 14" />}
             </Field>
 
-            {/* — Validity — */}
+            {/* - Validity - */}
             <SectionHead color={RATE_SOURCE_COLORS['NAC']}>Validity</SectionHead>
             <Field label="Valid From" required>
               {ids => <DatePicker {...ids} value={rrValidFrom} onChange={setRrValidFrom} />}
@@ -726,7 +726,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
               {ids => <DatePicker {...ids} value={rrValidTo} onChange={setRrValidTo} />}
             </Field>
 
-            {/* — Container Rates — */}
+            {/* - Container Rates - */}
             <SectionHead color={RATE_SOURCE_COLORS['NAC']} action={<Button size="sm" icon={<Plus size={14} aria-hidden="true" />} onClick={addNacContainer}>Add</Button>}>Container Rates</SectionHead>
             <div className="col-span-full flex flex-col gap-2">
               <div className="grid grid-cols-[1.1fr_0.65fr_0.75fr_0.85fr_0.6fr_32px] gap-2">
@@ -739,17 +739,17 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
               </div>
               {rrNacContainers.map((nc, idx) => (
                 <div key={idx} className="grid grid-cols-[1.1fr_0.65fr_0.75fr_0.85fr_0.6fr_32px] items-center gap-2">
-                  <Select aria-label={`Container type, row ${idx + 1}`} value={nc.containerType} onChange={v => updateNacContainer(idx, { containerType: v })} placeholder="— Select —" options={CONTRACTED_CONTAINER_OPTIONS} />
+                  <Select aria-label={`Container type, row ${idx + 1}`} value={nc.containerType} onChange={v => updateNacContainer(idx, { containerType: v })} placeholder="- Select -" options={CONTRACTED_CONTAINER_OPTIONS} />
                   <NumberInput aria-label={`Contracted TUs, row ${idx + 1}`} value={nc.contractedVolume} onChange={e => updateNacContainer(idx, { contractedVolume: e.target.value })} min={0} placeholder="e.g. 500" />
                   <Input aria-label={`Max weight, row ${idx + 1}`} value={nc.weight} onChange={e => updateNacContainer(idx, { weight: e.target.value })} placeholder="e.g. 28000 kg" />
                   <NumberInput aria-label={`Rate, row ${idx + 1}`} value={nc.rate} onChange={e => updateNacContainer(idx, { rate: e.target.value === '' ? '' : Number(e.target.value) })} min={0} placeholder="e.g. 3200.00" />
-                  <Select aria-label={`Currency, row ${idx + 1}`} value={nc.currency} onChange={v => updateNacContainer(idx, { currency: v })} placeholder="— Select —" options={CURRENCY_OPTIONS} />
+                  <Select aria-label={`Currency, row ${idx + 1}`} value={nc.currency} onChange={v => updateNacContainer(idx, { currency: v })} placeholder="- Select -" options={CURRENCY_OPTIONS} />
                   <RemoveButton label={`Remove row ${idx + 1}`} disabled={rrNacContainers.length === 1} onClick={() => removeNacContainer(idx)} />
                 </div>
               ))}
             </div>
 
-            {/* — Additional Information — */}
+            {/* - Additional Information - */}
             <SectionHead color={RATE_SOURCE_COLORS['NAC']}>Additional Information</SectionHead>
             <Field label="Note" className="col-span-full">
               {ids => <Input {...ids} value={rrNote} onChange={e => setRrNote(e.target.value)} placeholder="Any notes..." />}
@@ -783,7 +783,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
           const row = (label: string, value: string) => (
             <div className="flex justify-between border-b border-line-soft py-1 text-control">
               <span className="text-fg-muted">{label}</span>
-              <strong className="font-bold text-fg">{value || '—'}</strong>
+              <strong className="font-bold text-fg">{value || '-'}</strong>
             </div>
           )
           const containerRows = (arr: (TariffContainerRate | ContractedContainerRate)[]) =>
@@ -791,7 +791,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
               <div key={i} className={cn('rounded-card border border-line-soft bg-canvas p-3', i > 0 && 'mt-2')}>
                 <div className="mb-1 text-label font-bold uppercase text-fg-muted">Container {i + 1}</div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-control text-fg">
-                  <span className="text-fg-muted">Type</span><strong>{c.containerType || '—'}</strong>
+                  <span className="text-fg-muted">Type</span><strong>{c.containerType || '-'}</strong>
                   {'contractedVolume' in c && c.contractedVolume && <><span className="text-fg-muted">Contracted TUs</span><strong>{c.contractedVolume}</strong></>}
                   {c.weight && <><span className="text-fg-muted">Max Weight</span><strong>{c.weight}</strong></>}
                   <span className="text-fg-muted">Rate</span><strong>{c.rate} {c.currency}</strong>
@@ -839,7 +839,7 @@ export default function RecordRate({ onFlash, onGoBack }: RecordRateProps) {
               <SectionHead color={accent}>Route</SectionHead>
               {row('Origin', rrOrigin)}
               {row('Destination', rrDestination)}
-              {row('Free Time', rrFreeTime ? `${rrFreeTime} days` : '—')}
+              {row('Free Time', rrFreeTime ? `${rrFreeTime} days` : '-')}
             </div>
 
             {/* Validity */}

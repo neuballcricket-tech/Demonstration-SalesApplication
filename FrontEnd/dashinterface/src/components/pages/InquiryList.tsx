@@ -61,7 +61,7 @@ const BE_PRIORITY_REV: Record<string, string> = {
   Low: 'LOW', Medium: 'MEDIUM', High: 'HIGH', Urgent: 'URGENT',
 }
 
-// Frontend container type codes now match backend directly — this map is identity for safety.
+// Frontend container type codes now match backend directly - this map is identity for safety.
 const BE_CONTAINER_TYPE_REV: Record<string, string> = {
   '20GP': '20GP', '40GP': '40GP', '40HC': '40HC',
   '20RF': '20RF', '40RF': '40RF',
@@ -73,11 +73,11 @@ const BE_CONTAINER_TYPE_REV: Record<string, string> = {
 type ContainerDraft = {
   com_id?: number
   cont_id?: number
-  // Commodity fields — apiPatchCommodity
+  // Commodity fields - apiPatchCommodity
   com_type: string
   hs_code: string
   weight: string
-  // Container fields — apiPatchContainer
+  // Container fields - apiPatchContainer
   container_type: string
   qty: string
   destination: string
@@ -149,14 +149,14 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
       if (inq.containers && inq.containers.length > 0) {
         inq.containers.forEach((c, ci) => rows.push({ inquiry: inq, container: c, containerIdx: ci }))
       } else {
-        // Legacy inquiry without containers array — create a synthetic container row
+        // Legacy inquiry without containers array - create a synthetic container row
         rows.push({
           inquiry: inq,
           container: {
             containerType: inq.container_type ?? '20GP',
             quantity: inq.container_qty ?? 1,
             weight: inq.cargo_weight ?? '',
-            commodityType: inq.commodity_type ?? 'Miscellaneous manufactured articles — furniture, toys',
+            commodityType: inq.commodity_type ?? 'Miscellaneous manufactured articles - furniture, toys',
             commodityName: '',
             destination: inq.destination,
             isFcl: inq.is_fcl ?? true,
@@ -424,10 +424,10 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
                           <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{c.isFcl ? 'FCL' : 'LCL'}{c.weight !== '' && c.weight !== 0 ? ` · ${c.weight} kg` : ''}</div>
                         </td>
                         <td style={{ padding: '12px 8px', color: 'var(--text-secondary)', fontSize: 11 }}>
-                          {c.commodityType}{c.commodityName ? ` — ${c.commodityName}` : ''}
+                          {c.commodityType}{c.commodityName ? ` - ${c.commodityName}` : ''}
                         </td>
                         <td style={{ padding: '12px 8px', color: 'var(--text-secondary)', fontSize: 11 }}>
-                          {c.freeTime !== '' && c.freeTime !== 0 ? `${c.freeTime} days` : '—'}
+                          {c.freeTime !== '' && c.freeTime !== 0 ? `${c.freeTime} days` : '-'}
                         </td>
                         <td style={{ padding: '12px 8px', color: 'var(--text-secondary)', fontSize: 11 }}>{i.sbu}</td>
                         <td style={{ padding: '12px 8px' }}>
@@ -571,7 +571,7 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
                           </button>
                           <button
                             className="lt-icon-btn"
-                            title={canComplete ? 'Mark Complete' : 'Restricted — requires CS or Sales role'}
+                            title={canComplete ? 'Mark Complete' : 'Restricted - requires CS or Sales role'}
                             onClick={() => canComplete && onCompleteById(i.id)}
                             disabled={!isPending || !canComplete}
                             style={{ opacity: isPending && canComplete ? 1 : 0.4, cursor: isPending && canComplete ? 'pointer' : 'not-allowed' }}
@@ -580,7 +580,7 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
                           </button>
                           <button
                             className="lt-icon-btn"
-                            title={canFollowup ? 'Add Follow-up' : 'Restricted — requires CS, Sales, or Procurement role'}
+                            title={canFollowup ? 'Add Follow-up' : 'Restricted - requires CS, Sales, or Procurement role'}
                             onClick={() => { if (canFollowup) { setViewing(i); setFollowupFocused(true) } }}
                             disabled={!canFollowup}
                             style={{ opacity: canFollowup ? 1 : 0.4, cursor: canFollowup ? 'pointer' : 'not-allowed' }}
@@ -677,7 +677,7 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
                         {c.destination && <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>→ {c.destination}</span>}
                       </div>
                       <div style={{ display: 'flex', gap: 16, color: 'var(--text-secondary)', fontSize: 11, flexWrap: 'wrap' }}>
-                        <span><strong>Commodity:</strong> {c.commodityType}{c.commodityName ? ` — ${c.commodityName}` : ''}</span>
+                        <span><strong>Commodity:</strong> {c.commodityType}{c.commodityName ? ` - ${c.commodityName}` : ''}</span>
                         {c.hs_code && <span><strong>HS Code:</strong> {c.hs_code}</span>}
                         {c.weight !== '' && c.weight !== 0 && <span><strong>Weight:</strong> {c.weight} kg</span>}
                         <span><strong>{c.isFcl ? 'FCL' : 'LCL'}</strong></span>
@@ -731,7 +731,7 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
                       return (
                         <div
                           key={s.id}
-                          title={`${s.label} — ${stageRoleLabel(s)}`}
+                          title={`${s.label} - ${stageRoleLabel(s)}`}
                           style={{
                             flex: 1,
                             height: 5,
@@ -773,7 +773,7 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
                     <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-muted)' }}>
                       Next: <span style={{ color: 'var(--text-secondary)' }}>{stages[currentIdx + 1].label}</span>
                       <span style={{ color: stageRoleColor(stages[currentIdx + 1]), marginLeft: 4 }}>
-                        — {stageRoleLabel(stages[currentIdx + 1])}
+                        - {stageRoleLabel(stages[currentIdx + 1])}
                       </span>
                     </div>
                   )}
@@ -886,7 +886,7 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
                   value={editDraft.sbu}
                   onChange={e => setEditDraft(d => d && ({ ...d, sbu: e.target.value }))}
                 >
-                  <option value="">— select —</option>
+                  <option value="">- select -</option>
                   {SBUS.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
@@ -897,7 +897,7 @@ export default function InquiryList({ inquiries, followups, customers, quotes, o
                   value={editDraft.priority}
                   onChange={e => setEditDraft(d => d && ({ ...d, priority: e.target.value }))}
                 >
-                  <option value="">— select —</option>
+                  <option value="">- select -</option>
                   {INQUIRY_PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
               </div>

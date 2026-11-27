@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// mockData.ts — Demo seed data for booking-onwards workflow
+// mockData.ts - Demo seed data for booking-onwards workflow
 //
 // These records are merged into App state at startup so every workflow step
 // from CS Booking through Admin House BL / BL Approval has items to work
@@ -38,7 +38,7 @@ const mkContainer = (
 // ---------------------------------------------------------------------------
 export const MOCK_INQUIRIES: Inquiry[] = [
   // ---------------------------------------------------------------------------
-  // Completed inquiries — linked to mock bookings in the Draft BL / Pre-Advice
+  // Completed inquiries - linked to mock bookings in the Draft BL / Pre-Advice
   // steps. status:'completed' means they are invisible in the workspace pending
   // list but can be looked up for prefilling the booking form.
   // ---------------------------------------------------------------------------
@@ -46,7 +46,7 @@ export const MOCK_INQUIRIES: Inquiry[] = [
     id: 'INQ-MOCK-C01',
     customer_name: 'Aitken Spence Shipping',       // → BKG-MOCK-008 (Draft BL)
     request: 'FCL Export',
-    inquiry_text: 'FCL Export — Colombo → Singapore',
+    inquiry_text: 'FCL Export - Colombo → Singapore',
     origin: 'Colombo',
     destination: 'Singapore',
     delivery_type: 'port-to-port',
@@ -58,7 +58,7 @@ export const MOCK_INQUIRIES: Inquiry[] = [
     container_qty: 2,
     cargo_weight: 18500,
     incoterm: 'FOB',
-    remark: 'Handle with care — fragile glassware. Marks: ASS/SIN/2024',
+    remark: 'Handle with care - fragile glassware. Marks: ASS/SIN/2024',
     containers: [
       mkContainer('20GP', 2, 'Stone, plaster, cement, ceramic, glass', 'Industrial Glassware & Components', 'Singapore'),
     ],
@@ -68,7 +68,7 @@ export const MOCK_INQUIRIES: Inquiry[] = [
     id: 'INQ-MOCK-C02',
     customer_name: 'CL Synergy Limited',           // → BKG-MOCK-013 (Pre-Advice)
     request: 'FCL Import',
-    inquiry_text: 'FCL Import — Montreal → Colombo',
+    inquiry_text: 'FCL Import - Montreal → Colombo',
     origin: 'Montreal',
     destination: 'Colombo',
     delivery_type: 'door-to-door',
@@ -90,7 +90,7 @@ export const MOCK_INQUIRIES: Inquiry[] = [
     id: 'INQ-MOCK-C03',
     customer_name: 'Delmege Forsyth & Co.',        // → BKG-MOCK-014 (Pre-Advice)
     request: 'FCL Export',
-    inquiry_text: 'FCL Export — Colombo → Toronto',
+    inquiry_text: 'FCL Export - Colombo → Toronto',
     origin: 'Colombo',
     destination: 'Toronto',
     delivery_type: 'port-to-door',
@@ -102,7 +102,7 @@ export const MOCK_INQUIRIES: Inquiry[] = [
     container_qty: 2,
     cargo_weight: 11200,
     incoterm: 'FOB',
-    remark: 'Ceylon tea — temperature sensitive. Store above 15°C. Marks: DEL/TOR/TEA/2024',
+    remark: 'Ceylon tea - temperature sensitive. Store above 15°C. Marks: DEL/TOR/TEA/2024',
     containers: [
       mkContainer('20GP', 2, 'Prepared foodstuffs; beverages, spirits, tobacco', 'Ceylon Tea (Orthodox & CTC)', 'Toronto'),
     ],
@@ -112,7 +112,7 @@ export const MOCK_INQUIRIES: Inquiry[] = [
     id: 'INQ-MOCK-C04',
     customer_name: 'Ceylon Biscuits Limited',    // → BKG-MOCK-015 (Create BL)
     request: 'FCL Export',
-    inquiry_text: 'FCL Export — Colombo → Melbourne',
+    inquiry_text: 'FCL Export - Colombo → Melbourne',
     origin: 'Colombo',
     destination: 'Melbourne',
     delivery_type: 'port-to-port',
@@ -124,7 +124,7 @@ export const MOCK_INQUIRIES: Inquiry[] = [
     container_qty: 2,
     cargo_weight: 22000,
     incoterm: 'FOB',
-    remark: 'Biscuits & confectionery — keep dry. Marks: CBL/MEL/2024',
+    remark: 'Biscuits & confectionery - keep dry. Marks: CBL/MEL/2024',
     containers: [
       mkContainer('40HC', 2, 'Prepared foodstuffs; beverages, spirits, tobacco', 'Biscuits & Confectionery', 'Melbourne'),
     ],
@@ -134,7 +134,7 @@ export const MOCK_INQUIRIES: Inquiry[] = [
     id: 'INQ-MOCK-C05',
     customer_name: 'Hayleys Advantis',           // → BKG-MOCK-016 (Create BL)
     request: 'FCL Export',
-    inquiry_text: 'FCL Export — Colombo → Jeddah',
+    inquiry_text: 'FCL Export - Colombo → Jeddah',
     origin: 'Colombo',
     destination: 'Jeddah',
     delivery_type: 'door-to-door',
@@ -146,7 +146,7 @@ export const MOCK_INQUIRIES: Inquiry[] = [
     container_qty: 3,
     cargo_weight: 14500,
     incoterm: 'CIF',
-    remark: 'Rubber products — ambient temperature. Marks: HAY/JED/RBR/2024',
+    remark: 'Rubber products - ambient temperature. Marks: HAY/JED/RBR/2024',
     containers: [
       mkContainer('20GP', 3, 'Plastics and rubber', 'Industrial Rubber Products', 'Jeddah'),
     ],
@@ -156,7 +156,7 @@ export const MOCK_INQUIRIES: Inquiry[] = [
     id: 'INQ-MOCK-C06',
     customer_name: 'Loadstar Pvt Ltd',           // → BKG-MOCK-017 (Create BL)
     request: 'FCL Export',
-    inquiry_text: 'FCL Export — Colombo → Felixstowe',
+    inquiry_text: 'FCL Export - Colombo → Felixstowe',
     origin: 'Colombo',
     destination: 'Felixstowe',
     delivery_type: 'door-to-door',
@@ -168,7 +168,7 @@ export const MOCK_INQUIRIES: Inquiry[] = [
     container_qty: 1,
     cargo_weight: 8500,
     incoterm: 'FOB',
-    remark: 'Electronics & home appliances — handle with care, fragile. HS: 8528.72',
+    remark: 'Electronics & home appliances - handle with care, fragile. HS: 8528.72',
     containers: [
       mkContainer('40GP', 1, 'Machinery and electrical equipment', 'Electronics & Home Appliances', 'Felixstowe'),
     ],
@@ -181,7 +181,7 @@ export const MOCK_INQUIRIES: Inquiry[] = [
     id: 'INQ-MOCK-001',
     customer_name: 'Maliban Biscuits',
     request: 'FCL Export',
-    inquiry_text: 'FCL Export — Colombo → Rotterdam',
+    inquiry_text: 'FCL Export - Colombo → Rotterdam',
     origin: 'Colombo',
     destination: 'Rotterdam',
     delivery_type: 'port-to-port',
@@ -201,7 +201,7 @@ export const MOCK_INQUIRIES: Inquiry[] = [
     id: 'INQ-MOCK-002',
     customer_name: 'Brandix Apparel',
     request: 'FCL Export',
-    inquiry_text: 'FCL Export — Colombo → Hamburg',
+    inquiry_text: 'FCL Export - Colombo → Hamburg',
     origin: 'Colombo',
     destination: 'Hamburg',
     delivery_type: 'port-to-port',
@@ -220,7 +220,7 @@ export const MOCK_INQUIRIES: Inquiry[] = [
 ]
 
 // ---------------------------------------------------------------------------
-// Bookings — one per downstream workflow step
+// Bookings - one per downstream workflow step
 // ---------------------------------------------------------------------------
 export const MOCK_BOOKINGS: Booking[] = [
 
@@ -268,7 +268,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     confirmed_at: null,
     released_at: null,
     procurement_notified: false,
-    notes: 'Urgent — customer needs ETB confirmed by end of month.',
+    notes: 'Urgent - customer needs ETB confirmed by end of month.',
     delivery_type: 'port-to-port',
   },
 
@@ -353,7 +353,7 @@ export const MOCK_BOOKINGS: Booking[] = [
       validity_expiration_date: future(8),
       pickup_depot: 'SOUTH ASIA GATEWAY TERMINALS (SAGT)',
       pickup_depot_address: 'Port of Colombo, Jaya Container Terminal, Colombo 15, Sri Lanka',
-      cargo_description: 'Fabric Rolls — Apparel Raw Material',
+      cargo_description: 'Fabric Rolls - Apparel Raw Material',
       cargo_weight: '24,000',
       cut_off_date: future(4),
       etd: future(6),
@@ -400,7 +400,7 @@ export const MOCK_BOOKINGS: Booking[] = [
       validity_expiration_date: future(7),
       pickup_depot: 'CICT COLOMBO INTERNATIONAL CONTAINER TERMINAL',
       pickup_depot_address: 'Port of Colombo, South Terminal, Colombo 15, Sri Lanka',
-      cargo_description: 'Rubber Compound — Industrial Grade',
+      cargo_description: 'Rubber Compound - Industrial Grade',
       cargo_weight: '18,500',
       cut_off_date: future(5),
       etd: future(8),
@@ -446,7 +446,7 @@ export const MOCK_BOOKINGS: Booking[] = [
       validity_expiration_date: future(6),
       pickup_depot: 'SPECTRA INTEGRATED LOGISTICS PVT LTD',
       pickup_depot_address: 'No. 300 1/MU 125, Muthurajawela Industrial Zone, Wattala, Sri Lanka',
-      cargo_description: 'Electronics — Consumer Appliances',
+      cargo_description: 'Electronics - Consumer Appliances',
       cargo_weight: '8,200',
       cut_off_date: future(3),
       etd: future(5),
@@ -457,7 +457,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     } satisfies ReleaseOrderFields,
   },
 
-  // ── Admin › Draft BL (send-draft-bl) — port-to-port ────────────────────
+  // ── Admin › Draft BL (send-draft-bl) - port-to-port ────────────────────
   // SI submitted, Draft BL not yet sent
   {
     id: 'BKG-MOCK-008',
@@ -486,7 +486,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     draft_bl_sent: false,
   },
 
-  // ── Admin › BL Approval (bl-approval) — port-to-port ───────────────────
+  // ── Admin › BL Approval (bl-approval) - port-to-port ───────────────────
   // Draft BL sent to customer, awaiting approval response
   {
     id: 'BKG-MOCK-009',
@@ -516,7 +516,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     bl_status: 'pending',
   },
 
-  // ── Admin › Master BL (record-master-bl) — door-to-door ─────────────────
+  // ── Admin › Master BL (record-master-bl) - door-to-door ─────────────────
   // SI submitted, Master BL not yet recorded
   {
     id: 'BKG-MOCK-010',
@@ -546,7 +546,7 @@ export const MOCK_BOOKINGS: Booking[] = [
   },
 
   // ── CS › Release Order (release-booking) ────────────────────────────────
-  // Liner Confirmed, release order attached by Procurement — ready for CS to release
+  // Liner Confirmed, release order attached by Procurement - ready for CS to release
   {
     id: 'BKG-MOCK-012',
     quote_id: 'QT-MOCK-012',
@@ -567,7 +567,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     confirmed_at: ts(4),
     released_at: null,
     procurement_notified: true,
-    notes: 'FCL export — general cargo.',
+    notes: 'FCL export - general cargo.',
     delivery_type: 'port-to-port',
     release_order_attached: true,
     release_order_fields: {
@@ -587,7 +587,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     } satisfies ReleaseOrderFields,
   },
 
-  // ── CS › Pre-Advice (send-pre-advice) — door-to-door ────────────────────
+  // ── CS › Pre-Advice (send-pre-advice) - door-to-door ────────────────────
   // Draft BL sent + SI submitted, pre-advice NOT yet sent. Door-to-door.
   {
     id: 'BKG-MOCK-013',
@@ -629,7 +629,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     house_bl_created: true,
   },
 
-  // ── CS › Pre-Advice (send-pre-advice) — port-to-door ──────────────────
+  // ── CS › Pre-Advice (send-pre-advice) - port-to-door ──────────────────
   // Draft BL sent + SI submitted, pre-advice NOT yet sent. Port-to-door.
   {
     id: 'BKG-MOCK-014',
@@ -651,7 +651,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     confirmed_at: ts(12),
     released_at: ts(8),
     procurement_notified: true,
-    notes: 'Port-to-door. Tea shipment — temperature sensitive.',
+    notes: 'Port-to-door. Tea shipment - temperature sensitive.',
     delivery_type: 'port-to-door',
     si_cutoff_date: future(1),
     bl_cutoff_date: future(1),
@@ -684,7 +684,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     confirmed_at: ts(14),
     released_at: ts(10),
     procurement_notified: true,
-    notes: 'Port-to-port. Cement bags — keep dry.',
+    notes: 'Port-to-port. Cement bags - keep dry.',
     delivery_type: 'port-to-port',
     si_cutoff_date: future(6),
     bl_cutoff_date: future(9),
@@ -759,7 +759,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     draft_bl_sent: false,
   },
 
-  // ── CS › Create BL (create-bl) — both MBL & HBL pending ─────────────────
+  // ── CS › Create BL (create-bl) - both MBL & HBL pending ─────────────────
   // SI generated, neither MBL recorded nor HBL created
   {
     id: 'BKG-MOCK-015',
@@ -781,7 +781,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     confirmed_at: ts(16),
     released_at: ts(12),
     procurement_notified: true,
-    notes: 'Port-to-port. Full container load — biscuits & confectionery.',
+    notes: 'Port-to-port. Full container load - biscuits & confectionery.',
     delivery_type: 'port-to-port',
     si_cutoff_date: future(5),
     bl_cutoff_date: future(8),
@@ -796,7 +796,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     house_bl_created: false,
   },
 
-  // ── CS › Create BL (create-bl) — MBL done, HBL pending ────────────────
+  // ── CS › Create BL (create-bl) - MBL done, HBL pending ────────────────
   // SI generated, MBL recorded, HBL not yet created
   {
     id: 'BKG-MOCK-016',
@@ -818,7 +818,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     confirmed_at: ts(14),
     released_at: ts(10),
     procurement_notified: true,
-    notes: 'Door-to-door. Rubber products — ambient temperature.',
+    notes: 'Door-to-door. Rubber products - ambient temperature.',
     delivery_type: 'door-to-door',
     si_cutoff_date: future(4),
     bl_cutoff_date: future(6),
@@ -835,7 +835,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     house_bl_created: false,
   },
 
-  // ── CS › Create BL (create-bl) — both pending, urgent ──────────────────
+  // ── CS › Create BL (create-bl) - both pending, urgent ──────────────────
   // SI generated, neither MBL nor HBL done, urgent shipment
   {
     id: 'BKG-MOCK-017',
@@ -857,7 +857,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     confirmed_at: ts(12),
     released_at: ts(8),
     procurement_notified: true,
-    notes: 'Door-to-door. Urgent — cutoff approaching. Electronics & appliances.',
+    notes: 'Door-to-door. Urgent - cutoff approaching. Electronics & appliances.',
     delivery_type: 'door-to-door',
     si_cutoff_date: future(2),
     bl_cutoff_date: future(3),
@@ -872,7 +872,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     house_bl_created: false,
   },
 
-  // ── Admin › House BL (create-house-bl) — door-to-door ───────────────────
+  // ── Admin › House BL (create-house-bl) - door-to-door ───────────────────
   // Master BL recorded, House BL not yet issued
   {
     id: 'BKG-MOCK-011',
@@ -905,8 +905,8 @@ export const MOCK_BOOKINGS: Booking[] = [
     house_bl_created: false,
   },
 
-  // ── CS › Create BL (create-bl) — HBL done, MBL pending ─────────────────
-  // These bookings have House BLs issued but no Master BL yet — they appear
+  // ── CS › Create BL (create-bl) - HBL done, MBL pending ─────────────────
+  // These bookings have House BLs issued but no Master BL yet - they appear
   // in the MBL step's "Search HBLs" panel so the user can select and attach them.
   {
     id: 'BKG-MOCK-021',
@@ -928,7 +928,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     confirmed_at: ts(20),
     released_at: ts(15),
     procurement_notified: true,
-    notes: 'FCL garments export — 2x 40HC. Consignee: Zara Logistics GmbH.',
+    notes: 'FCL garments export - 2x 40HC. Consignee: Zara Logistics GmbH.',
     delivery_type: 'port-to-port',
     si_cutoff_date: future(3),
     bl_cutoff_date: future(6),
@@ -965,7 +965,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     confirmed_at: ts(18),
     released_at: ts(13),
     procurement_notified: true,
-    notes: 'FCL textiles/fabric — 1x 40GP. Consignee: H&M Supply Chain BV.',
+    notes: 'FCL textiles/fabric - 1x 40GP. Consignee: H&M Supply Chain BV.',
     delivery_type: 'port-to-port',
     si_cutoff_date: future(4),
     bl_cutoff_date: future(7),
@@ -1002,7 +1002,7 @@ export const MOCK_BOOKINGS: Booking[] = [
     confirmed_at: ts(16),
     released_at: ts(11),
     procurement_notified: true,
-    notes: 'FCL FMCG / consumer goods — 1x 20GP. Consignee: Gulf Traders LLC.',
+    notes: 'FCL FMCG / consumer goods - 1x 20GP. Consignee: Gulf Traders LLC.',
     delivery_type: 'port-to-port',
     si_cutoff_date: future(2),
     bl_cutoff_date: future(4),
@@ -1022,7 +1022,7 @@ export const MOCK_BOOKINGS: Booking[] = [
 ]
 
 // ---------------------------------------------------------------------------
-// Activity log — "cutoff recorded" entries for BKG-MOCK-006 onwards
+// Activity log - "cutoff recorded" entries for BKG-MOCK-006 onwards
 // This prevents them from appearing in the Cutoff step (which only looks at
 // this log), while they continue to appear in their own targeted steps.
 // ---------------------------------------------------------------------------
@@ -1036,7 +1036,7 @@ const CUTOFF_DONE_IDS = [
 ]
 
 // ---------------------------------------------------------------------------
-// Open Voyages — searchable in the Booking Creation (create-vessel-booking) step
+// Open Voyages - searchable in the Booking Creation (create-vessel-booking) step
 // ---------------------------------------------------------------------------
 export interface OpenVoyage {
   id: string

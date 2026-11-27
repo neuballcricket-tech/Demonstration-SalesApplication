@@ -39,7 +39,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     // Surface FastAPI validation detail in the error message
     let msg = `POST ${path} failed: ${res.status}`
     if (detail) {
-      msg += ' — ' + JSON.stringify(detail)
+      msg += ' - ' + JSON.stringify(detail)
     }
     throw new Error(msg)
   }
@@ -67,12 +67,12 @@ async function postFile<T>(path: string, file: File): Promise<T> {
   form.append('file', file)
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
-    // No Content-Type header — the browser sets it with the multipart boundary
+    // No Content-Type header - the browser sets it with the multipart boundary
     body: form,
   })
   if (!res.ok) {
     const detail = await res.json().catch(() => null)
-    throw new Error(`POST ${path} failed: ${res.status}${detail ? ' — ' + JSON.stringify(detail) : ''}`)
+    throw new Error(`POST ${path} failed: ${res.status}${detail ? ' - ' + JSON.stringify(detail) : ''}`)
   }
   return res.json()
 }
@@ -124,7 +124,7 @@ export interface InquiryCreateResult {
 // One row per commodity-container join. cl.name is the client company name.
 export interface InquiryRow {
   inq_id: number
-  cli_id: number        // backend client PK — used for KYC status lookup
+  cli_id: number        // backend client PK - used for KYC status lookup
   rfq_ref: number | null
   workflow_stage: string | null  // from LEFT JOIN workflow_stats; null for brand-new rows
   kyc_completed: boolean | null  // joined from kyc_request; true when kyc_stage = 'kyc_completed'
@@ -164,18 +164,18 @@ export interface InquiryRow {
  * ContainerLine.isFcl is mapped to ContainerNew.is_fully_loaded (per backend convention).
  *
  * TODO: Fields dropped at this boundary (no backend column / endpoint yet):
- *   • request / inquiry_text  — free-text description; no inquiry-table column
- *   • destination (inquiry-level) — stored per container only, not at inquiry level
- *   • channel label — value routed to contact.email/whatsapp/phone/wechat;
+ *   • request / inquiry_text  - free-text description; no inquiry-table column
+ *   • destination (inquiry-level) - stored per container only, not at inquiry level
+ *   • channel label - value routed to contact.email/whatsapp/phone/wechat;
  *     the label itself ('Email'|'WhatsApp'|'Phone'|'WeChat') has no column
- *   • employee_id in payload — derived from auth session on the backend
- *   • ContainerLine.doorAgents[] — no backend equivalent
- *   • preferred_liners[] (array) — joined to comma string; splitting on read required
+ *   • employee_id in payload - derived from auth session on the backend
+ *   • ContainerLine.doorAgents[] - no backend equivalent
+ *   • preferred_liners[] (array) - joined to comma string; splitting on read required
  *
  * ENDPOINTS NOT YET IN BACKEND:
- *   • apiAdvanceWorkflow  — no /workflow-stage route
- *   • Delete inquiry      — no DELETE endpoint
- *   • Fetch all inquiries — no list/paginate endpoint (single-record GET only)
+ *   • apiAdvanceWorkflow  - no /workflow-stage route
+ *   • Delete inquiry      - no DELETE endpoint
+ *   • Fetch all inquiries - no list/paginate endpoint (single-record GET only)
  */
 export function apiCreateInquiry(data: {
   customer_name: string
@@ -211,7 +211,7 @@ export function apiCreateInquiry(data: {
   if (data.channel)       dropped['channel label']              = data.channel
   if (data.employee_id)   dropped['employee_id']                = data.employee_id
   if (Object.keys(dropped).length > 0)
-    console.warn('[apiCreateInquiry] Fields dropped — no backend column:', dropped)
+    console.warn('[apiCreateInquiry] Fields dropped - no backend column:', dropped)
 
   const channel = data.channel ?? 'Email'
   const contactEmail    = channel === 'Email'    ? (data.contact_channel_id ?? undefined) : undefined
@@ -298,7 +298,7 @@ export function apiCreateInquiry(data: {
 }
 
 // ---------------------------------------------------------------------------
-// Private helper — shared by cases 2 and 3.
+// Private helper - shared by cases 2 and 3.
 // Builds the inquiry + commodity/container arrays from the flat ContainerLine[] form data.
 // ---------------------------------------------------------------------------
 function buildInquiryAndContainers(data: {
@@ -401,7 +401,7 @@ export function apiCreateInquiryOldNew(data: {
 /**
  * Create a new inquiry for an EXISTING client with an EXISTING contact person.
  * Maps to POST /inquiries/inquiries-old-old (InquiryOldOld backend schema).
- * No contact block is sent — the backend resolves the contact from cp_id.
+ * No contact block is sent - the backend resolves the contact from cp_id.
  */
 export function apiCreateInquiryOldOld(data: {
   cli_id: number
@@ -454,9 +454,9 @@ export function apiDeleteInquiry(inq_id: number): Promise<Record<string, unknown
  * Patch editable fields on an existing inquiry.
  * Only the fields present in the payload are updated (exclude_unset on the backend).
  *
- * DISCREPANCIES — frontend-only fields not patchable via this endpoint:
+ * DISCREPANCIES - frontend-only fields not patchable via this endpoint:
  *   • workflow_stage, status, channel, destination (inquiry-level)
- *   • commodity / container fields — use apiPatchCommodity / apiPatchContainer
+ *   • commodity / container fields - use apiPatchCommodity / apiPatchContainer
  */
 export function apiPatchInquiry(inq_id: number, data: {
   sbu?: string
@@ -498,7 +498,7 @@ export function apiPatchContainer(inq_id: number, cont_id: number, data: {
 }
 
 // Allowed backend workflow stages (must match the WorkflowStage enum in activity_types.py).
-// Note: 'inquiry_received' and 'customer_check_pending' are NOT in the backend enum —
+// Note: 'inquiry_received' and 'customer_check_pending' are NOT in the backend enum -
 // the backend creates workflows starting at 'kyc_pending' (new client) or
 // 'rate_check_in_progress' (existing client). These two stages are frontend-only UI states.
 type BackendWorkflowStage =
@@ -514,7 +514,7 @@ type BackendWorkflowStage =
   | 'completed'
 
 // Maps frontend kebab-case WorkflowStage → backend snake_case enum value.
-// 'inquiry-received' and 'customer-check' are intentionally omitted — they are
+// 'inquiry-received' and 'customer-check' are intentionally omitted - they are
 // frontend-only UI stages with no backend equivalent. apiAdvanceWorkflow will
 // return { success: false } for them, which is the desired behaviour.
 const STAGE_MAP: Partial<Record<string, BackendWorkflowStage>> = {
@@ -529,7 +529,7 @@ const STAGE_MAP: Partial<Record<string, BackendWorkflowStage>> = {
   'completed':           'completed',
 }
 
-// Reverse map — used when reading stage back from the DB (InquiryRow.workflow_stage).
+// Reverse map - used when reading stage back from the DB (InquiryRow.workflow_stage).
 // Only contains stages present in the backend WorkflowStage enum.
 export const BE_STAGE_TO_FE: Record<string, string> = {
   rate_check_in_progress:   'rate-check',
@@ -541,7 +541,7 @@ export const BE_STAGE_TO_FE: Record<string, string> = {
   completed:                'completed',
 }
 
-// Called once when a new inquiry is persisted — creates the initial workflow row.
+// Called once when a new inquiry is persisted - creates the initial workflow row.
 // Default stage is kyc_pending (backend does not have 'inquiry_received' in its enum).
 export function apiCreateWorkflowEntry(inqId: number, initialStage: BackendWorkflowStage = 'kyc_pending'): Promise<Record<string, unknown>> {
   return post<Record<string, unknown>>('/inquiries/workflow', {
@@ -557,7 +557,7 @@ export function apiGetInquiry(inqId: number): Promise<InquiryRow[]> {
   return get<InquiryRow[]>(`/inquiries/inquiries/${inqId}`)
 }
 
-// Manual override — PATCHes the workflow row directly.
+// Manual override - PATCHes the workflow row directly.
 // Only needed for stages without an automatic backend trigger:
 // booking_request and completed (not yet auto-triggered by any backend call).
 // For all other stages the backend advances the workflow automatically as a
@@ -757,7 +757,7 @@ export interface KycRequestRecord {
   }
 }
 
-/** Fetch all KYC requests with full details — used by Finance for their review queue. */
+/** Fetch all KYC requests with full details - used by Finance for their review queue. */
 export function apiGetKycRequests(): Promise<KycRequestRecord[]> {
   return get<KycRequestRecord[]>('/kyc/kyc-requests/requests')
 }
@@ -803,7 +803,7 @@ export function apiSearchRates(params: {
 }
 
 // ---------------------------------------------------------------------------
-// Unified Rate Fetch — fans out to all 6 rate-table endpoints in parallel,
+// Unified Rate Fetch - fans out to all 6 rate-table endpoints in parallel,
 // resolves liner/trade-lane names client-side, normalises to UnifiedRate[].
 //
 // DISCREPANCIES vs backend noted here:
@@ -813,14 +813,14 @@ export function apiSearchRates(params: {
 //    not joined names. liner_name and trade_lane are resolved from the
 //    /liners and /trade-lanes lookups fetched in the same call.
 //    client_name (NAC), employee_name, commodity_name/type (Special) remain
-//    null — would require extra joins or lookup calls.
+//    null - would require extra joins or lookup calls.
 //  • DB field 'iwe'           → frontend field 'service_scope'
 //  • DB field 'issold'        → frontend field 'is_sold' (vessel / FAK)
-//  • DB field 'isSold'        → frontend field 'is_sold' (special — Pydantic inconsistency)
+//  • DB field 'isSold'        → frontend field 'is_sold' (special - Pydantic inconsistency)
 //  • DB field 'note'          → frontend field 'remark'
 //  • DB field 'etd'           → frontend field 'departure_date' (vessel rates)
 //  • VbV has no valid_from/valid_to; mapped from fcl_opening / fcl_cutoff.
-//  • FAK PATCH router path param is named '{srid}' but forwards to fak_id — backend naming bug.
+//  • FAK PATCH router path param is named '{srid}' but forwards to fak_id - backend naming bug.
 //  • tariff_rates table has no is_sold column; stripped from PATCH payload.
 // ---------------------------------------------------------------------------
 
@@ -855,7 +855,7 @@ function buildUnified(
     departure_date:      r.etd                 ?? null,
     is_sold:             r.issold              ?? null,
     service_scope:       (r.iwe as ServiceScope) ?? null,
-    client_name:         null,   // cli_id not joined — no /clients lookup here
+    client_name:         null,   // cli_id not joined - no /clients lookup here
     employee_name:       null,   // emp_id_sales not joined
     commodity_name:      null,   // com_id not joined (Special)
     commodity_type:      null,
@@ -902,7 +902,7 @@ export async function apiUpdateRate(rateId: string, data: Record<string, unknown
 
   switch (type) {
     case 'tariff':
-      // tariff_rates has no is_sold column — strip it to avoid 422
+      // tariff_rates has no is_sold column - strip it to avoid 422
       delete payload.is_sold
       return patch(`/rates/tariff-rates/${id}`, payload)
 
@@ -924,7 +924,7 @@ export async function apiUpdateRate(rateId: string, data: Record<string, unknown
       return patch(`/rates/fak-rates/${id}`, payload)
 
     case 'special':
-      // SpecialRatePatch uses isSold (camelCase) — backend Pydantic inconsistency
+      // SpecialRatePatch uses isSold (camelCase) - backend Pydantic inconsistency
       if ('is_sold' in payload) { payload.isSold = payload.is_sold; delete payload.is_sold }
       return patch(`/rates/special-rates/${id}`, payload)
 
@@ -1015,7 +1015,7 @@ export function apiGetTradeLanes(): Promise<TradeLaneRecord[]> {
 }
 
 /**
- * Disabled — the fan-out pattern (one GET /clients/clients/{id}/contacts per client)
+ * Disabled - the fan-out pattern (one GET /clients/clients/{id}/contacts per client)
  * spams the backend. Returns an empty list until the backend provides a bulk endpoint.
  */
 export function apiGetContactPersons(): Promise<ContactPersonRecord[]> {
@@ -1071,7 +1071,7 @@ export function apiCreateRateRequest(data: {
 }
 
 /**
- * Patch a rate request as Customer Service — updates remark and is_given flag.
+ * Patch a rate request as Customer Service - updates remark and is_given flag.
  * Backend route: PATCH /rate-requests/{request_id}/cs
  */
 export function apiPatchRateRequestCs(requestId: number, data: {
@@ -1083,7 +1083,7 @@ export function apiPatchRateRequestCs(requestId: number, data: {
 }
 
 /**
- * Patch a rate request as Procurement — updates remark and is_given flag.
+ * Patch a rate request as Procurement - updates remark and is_given flag.
  * Backend route: PATCH /rate-requests/{request_id}/proc
  */
 export function apiPatchRateRequestProc(requestId: number, data: {
@@ -1208,10 +1208,10 @@ function mapSchedule(r: any): OceanSchedule {
 
 /** Search ocean schedules via the INTTRA integration endpoint. */
 export function apiSearchSchedules(params: {
-  scac: string             // required — comma-separated carrier SCAC codes
+  scac: string             // required - comma-separated carrier SCAC codes
   originPort: string
   destinationPort: string
-  searchDate: string       // required — ISO date string (YYYY-MM-DD)
+  searchDate: string       // required - ISO date string (YYYY-MM-DD)
   searchDateType?: 'ByDepartureDate'
   weeksOut?: number
   directOnly?: boolean
@@ -1304,7 +1304,7 @@ export interface QuotationRecord {
   inq_id: number
   quote_date: string
   sent_via: string
-  acceptence_deadline: string | null   // backend typo — must match exactly
+  acceptence_deadline: string | null   // backend typo - must match exactly
   status: string
   is_follow_up: boolean
 }
@@ -1323,7 +1323,7 @@ export interface QuotationOptionPayload {
   final_amt: number
 }
 
-/** Row returned by GET /quotations/{quote_id} — one row per option (LEFT JOIN). */
+/** Row returned by GET /quotations/{quote_id} - one row per option (LEFT JOIN). */
 export interface QuotationOptionRow {
   quote_id: number
   inq_id: number
@@ -1380,7 +1380,7 @@ export function apiMarkQuotationSent(quoteId: number): Promise<Record<string, un
  * Record customer acceptance/rejection. Backend auto-advances workflow to customer_response.
  * Backend router expects a JSON body matching QuotationAcceptence: { status, option }.
  * NOTE: Backend QuotationAcceptence.status is typed as QuotationStatus.accepted (literal),
- *       so rejections will 422 at validation — backend fix needed for rejection support.
+ *       so rejections will 422 at validation - backend fix needed for rejection support.
  */
 export function apiRecordQuotationResponse(quoteId: number, status: 'accepted' | 'rejected', option: number): Promise<Record<string, unknown>> {
   return patch<Record<string, unknown>>(`/quotations/${quoteId}/response`, { status, option })
@@ -1419,7 +1419,7 @@ export function apiGetUnsentQuotations(): Promise<UnsentQuotation[]> {
   return get<UnsentQuotation[]>('/quotations/unsent')
 }
 
-/** Flat row from GET /quotations/sent — one row per quotation+option combination. */
+/** Flat row from GET /quotations/sent - one row per quotation+option combination. */
 export interface SentQuotationRow {
   quote_id: number
   inq_id: number
@@ -1456,7 +1456,7 @@ export function apiGetSentQuotations(): Promise<SentQuotationRow[]> {
   return get<SentQuotationRow[]>('/quotations/sent')
 }
 
-/** Accepted quotation row — one row per accepted quotation+option from GET /quotations/accepted. */
+/** Accepted quotation row - one row per accepted quotation+option from GET /quotations/accepted. */
 export interface AcceptedQuotationRow {
   inq_id: number
   cli_id: number
@@ -1483,7 +1483,7 @@ export interface AcceptedQuotationRow {
   lin_id: number | null
 }
 
-/** Fetch all accepted quotations (customer accepted — ready for booking). */
+/** Fetch all accepted quotations (customer accepted - ready for booking). */
 export function apiGetAcceptedQuotations(): Promise<AcceptedQuotationRow[]> {
   return get<AcceptedQuotationRow[]>('/quotations/accepted')
 }
@@ -1699,7 +1699,7 @@ export function apiFetchPendingReleaseOrders(): Promise<BackendReleaseOrderRecor
 }
 
 // ---------------------------------------------------------------------------
-// RFQ — bulk inquiry creation
+// RFQ - bulk inquiry creation
 // ---------------------------------------------------------------------------
 
 export interface RfqLinePayload {

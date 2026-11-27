@@ -33,15 +33,15 @@ function optionToRow(
   marginOverride?: { margin: number; isPercentage: boolean },
 ) {
   const r = opt.rate!
-  const linerName = r.lin_id ? (liners.find(l => l.lin_id === r.lin_id)?.name ?? `Liner #${r.lin_id}`) : '—'
+  const linerName = r.lin_id ? (liners.find(l => l.lin_id === r.lin_id)?.name ?? `Liner #${r.lin_id}`) : '-'
   const typeLabel = opt.rate_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
   const vesselLabel = opt.vessel_name || r.vessel_name || ''
-  const vessel = vesselLabel ? `${vesselLabel}${opt.voyage_number ? ` / ${opt.voyage_number}` : ''}` : '—'
+  const vessel = vesselLabel ? `${vesselLabel}${opt.voyage_number ? ` / ${opt.voyage_number}` : ''}` : '-'
   const baseRate = r.rate ?? 0
   const currency = r.currency ?? 'USD'
   const displayFinal = finalAmt != null ? Math.round(finalAmt * 100) / 100 : baseRate
-  const etd = fmtD(opt.etd_pol) || '—'
-  const eta = fmtD(opt.eta_pod) || '—'
+  const etd = fmtD(opt.etd_pol) || '-'
+  const eta = fmtD(opt.eta_pod) || '-'
   const transit = (opt.etd_pol && opt.eta_pod)
     ? ''
     : r.transit ? `${r.transit}d` : ''
@@ -102,7 +102,7 @@ export function buildRateSection(
       if (manualRates) manualRates.split('||').map(s => s.trim()).filter(Boolean).forEach(s => lines.push(`  • ${s}`))
       if (lines.length) return lines.join('\n')
     }
-    return '  (Rate options to be confirmed — please edit)'
+    return '  (Rate options to be confirmed - please edit)'
   }
 
   const selected = rr.options.filter(o => o.rate && selectedIds.includes(o.option_id))
@@ -127,16 +127,16 @@ export function buildRateSection(
     const header = isBest ? `Option ${idx + 1} (Recommended):` : `Option ${idx + 1}:`
     lines.push(header)
 
-    // Line 1: Liner — FinalAmt per ContainerType
+    // Line 1: Liner - FinalAmt per ContainerType
     const mainLine = [r.liner, `${r.displayFinal.toLocaleString()} ${r.currency}`]
     if (r.containerType) mainLine.push(`per ${r.containerType}`)
-    lines.push(`  ${mainLine.join(' — ')}`)
+    lines.push(`  ${mainLine.join(' - ')}`)
 
     // Line 2: Vessel/schedule OR transit
-    if (r.vessel !== '—') {
+    if (r.vessel !== '-') {
       const schedParts = [`Vessel: ${r.vessel}`]
-      if (r.etd !== '—') schedParts.push(`ETD ${r.etd}`)
-      if (r.eta !== '—') schedParts.push(`ETA ${r.eta}`)
+      if (r.etd !== '-') schedParts.push(`ETD ${r.etd}`)
+      if (r.eta !== '-') schedParts.push(`ETA ${r.eta}`)
       lines.push(`  ${schedParts.join(' · ')}`)
     } else if (r.transit) {
       lines.push(`  Transit: ${r.transit}`)
@@ -165,7 +165,7 @@ export function formatRateOptionLine(
   const r = opt.rate!
   const linerName = r.lin_id ? (liners.find(l => l.lin_id === r.lin_id)?.name ?? `Liner #${r.lin_id}`) : ''
   const typeLabel = opt.rate_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-  const displayRate = finalAmt != null ? Math.round(finalAmt * 100) / 100 : (r.rate ?? '—')
+  const displayRate = finalAmt != null ? Math.round(finalAmt * 100) / 100 : (r.rate ?? '-')
   const parts: string[] = []
   if (linerName) parts.push(linerName)
   parts.push(`${displayRate} ${r.currency ?? 'USD'}`)
@@ -194,7 +194,7 @@ export function generateReleaseOrderDraft(bkg: Booking, method: 'email' | 'whats
   const ro = bkg.release_order_fields
   if (method === 'email') {
     return [
-      `Subject: Release Order — ${bkg.id} — ${bkg.customer_name} — ${bkg.origin} → ${bkg.destination}`,
+      `Subject: Release Order - ${bkg.id} - ${bkg.customer_name} - ${bkg.origin} → ${bkg.destination}`,
       '',
       `Dear ${bkg.customer_name},`,
       '',
@@ -233,7 +233,7 @@ export function generateReleaseOrderDraft(bkg: Booking, method: 'email' | 'whats
     ].filter(l => l !== null && l !== undefined).join('\n')
   } else {
     return [
-      `*Release Order — ${bkg.customer_name}*`,
+      `*Release Order - ${bkg.customer_name}*`,
       `_${bkg.origin} → ${bkg.destination}_`,
       '',
       ro?.reference_nbr            ? `📋 *Reference:* ${ro.reference_nbr}`               : '',
@@ -268,30 +268,30 @@ export function buildQuotationHtml(
 ): string {
   const today = new Date().toISOString().slice(0, 10)
   const dest = container?.destination || inquiry.destination
-  const containerLabel = container ? `${container.quantity}× ${container.containerType}` : '—'
+  const containerLabel = container ? `${container.quantity}× ${container.containerType}` : '-'
   const commodity = container?.commodityType || inquiry.commodity_type || ''
-  const fmtShort = (d: string | null | undefined) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+  const fmtShort = (d: string | null | undefined) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'
 
   const selected = options.filter(o => o.rate && selectedIds.has(o.option_id))
   const tableRows = selected.map((opt, idx) => {
     const r = opt.rate!
-    const linerName = r.lin_id ? (liners.find(l => l.lin_id === r.lin_id)?.name ?? `Liner #${r.lin_id}`) : '—'
+    const linerName = r.lin_id ? (liners.find(l => l.lin_id === r.lin_id)?.name ?? `Liner #${r.lin_id}`) : '-'
     const baseRate = r.rate ?? 0
     const finalAmt = Math.round(computeFinal(opt.option_id, baseRate) * 100) / 100
     const currency = r.currency ?? 'USD'
     const vesselLabel = opt.vessel_name || r.vessel_name || ''
-    const vessel = vesselLabel ? `${vesselLabel}${opt.voyage_number ? ` / ${opt.voyage_number}` : ''}` : '—'
+    const vessel = vesselLabel ? `${vesselLabel}${opt.voyage_number ? ` / ${opt.voyage_number}` : ''}` : '-'
     const etd = fmtShort(opt.etd_pol)
     const eta = fmtShort(opt.eta_pod)
     const isBest = opt.option_id === bestId
     const ft = r.free_time ?? r.free_days
-    const freeTime = ft ? `${ft} days` : '—'
-    const validTo = r.valid_to ? fmtShort(r.valid_to) : '—'
+    const freeTime = ft ? `${ft} days` : '-'
+    const validTo = r.valid_to ? fmtShort(r.valid_to) : '-'
 
     return `<tr style="${isBest ? 'background:#eeeef8;' : idx % 2 ? 'background:#f8fafc;' : ''}">
       <td style="padding:8px 10px;border:1px solid #e2e8f0;text-align:center;font-weight:600;">${isBest ? '<span style="color:#f59e0b;">★</span> ' : ''}${idx + 1}</td>
       <td style="padding:8px 10px;border:1px solid #e2e8f0;font-weight:600;">${linerName}</td>
-      <td style="padding:8px 10px;border:1px solid #e2e8f0;">${r.container_type || '—'}</td>
+      <td style="padding:8px 10px;border:1px solid #e2e8f0;">${r.container_type || '-'}</td>
       <td style="padding:10px 16px;border:1px solid #e2e8f0;text-align:right;font-weight:700;font-size:14px;white-space:nowrap;">${finalAmt.toLocaleString()} ${currency}</td>
       <td style="padding:8px 10px;border:1px solid #e2e8f0;">${vessel}</td>
       <td style="padding:8px 10px;border:1px solid #e2e8f0;">${etd}</td>
@@ -305,7 +305,7 @@ export function buildQuotationHtml(
 <html>
 <head>
 <meta charset="utf-8">
-<title>Quotation — ${inquiry.id} — ${inquiry.customer_name}</title>
+<title>Quotation - ${inquiry.id} - ${inquiry.customer_name}</title>
 <style>
   @media print {
     body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -356,8 +356,8 @@ export function buildQuotationHtml(
     <div class="cell"><div class="lbl">Reference</div><div class="val">${inquiry.id}</div></div>
     <div class="cell"><div class="lbl">Route</div><div class="val">${inquiry.origin} → ${dest}</div></div>
     <div class="cell"><div class="lbl">Container</div><div class="val">${containerLabel}${commodity ? ` · ${commodity}` : ''}</div></div>
-    <div class="cell"><div class="lbl">Incoterm</div><div class="val">${inquiry.incoterm || '—'}</div></div>
-    <div class="cell"><div class="lbl">Cargo Ready</div><div class="val">${inquiry.cargo_ready_date || '—'}</div></div>
+    <div class="cell"><div class="lbl">Incoterm</div><div class="val">${inquiry.incoterm || '-'}</div></div>
+    <div class="cell"><div class="lbl">Cargo Ready</div><div class="val">${inquiry.cargo_ready_date || '-'}</div></div>
   </div>
 
   <div class="section-title">Rate Options</div>
@@ -520,7 +520,7 @@ export function openOutlookWithQuotation(
     `--${boundary}--`,
   ].join('\r\n')
 
-  // Download as .eml file — opens in Outlook as a draft with the attachment
+  // Download as .eml file - opens in Outlook as a draft with the attachment
   const blob = new Blob([eml], { type: 'message/rfc822' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')

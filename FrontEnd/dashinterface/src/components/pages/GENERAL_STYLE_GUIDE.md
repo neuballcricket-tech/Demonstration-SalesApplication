@@ -1,4 +1,4 @@
-# Track & Trace Interface — Style Guide
+# Track & Trace Interface - Style Guide
 
 Reference implementation: **TrackAndTrace.tsx**
 
@@ -449,7 +449,7 @@ A vertical timeline with coloured dots connected by a spine. Events are sorted m
 | Element | Size | Weight | Colour |
 |---------|------|--------|--------|
 | Event code badge | `9px` | `700` | Event colour on event bg |
-| Badge padding | — | — | `2px 7px`, radius `4px` |
+| Badge padding | - | - | `2px 7px`, radius `4px` |
 | Description | `11px` | `600` | `var(--text)` |
 | "Actual" classifier | `8px` | `600` | `#16a34a` |
 | "Estimated" classifier | `8px` | `600` | `#d97706` |
@@ -604,28 +604,28 @@ Usage: event code badges, timeline dots, and latest-event badges all pull from t
 
 | Element | Size | Weight | Spacing |
 |---------|------|--------|---------|
-| Page title | `18px` | `700` | — |
+| Page title | `18px` | `700` | - |
 | Section label (search card) | `11px` | `700` | `0.3px` |
-| Input label | `10px` | normal | — |
-| Input text | `12px` | normal | — |
-| Search button | `11px` | inherits `db-btn` | — |
-| Results summary | `11px` | normal | — |
+| Input label | `10px` | normal | - |
+| Input text | `12px` | normal | - |
+| Search button | `11px` | inherits `db-btn` | - |
+| Results summary | `11px` | normal | - |
 | Container number | `13px` | `700` | `0.3px` |
-| Size type badge | `9px` | `600` | — |
-| Reference labels | `10px` | normal | — |
-| Reference values | `10px` | `bold` | — |
-| Latest event badge | `10px` | `700` | — |
-| Latest event sub-text | `9px` | normal | — |
-| Event count pill | `10px` | `600` | — |
-| Event code badge | `9px` | `700` | — |
-| Event description | `11px` | `600` | — |
-| Event classifier | `8px` | `600` | — |
-| Event timestamp | `10px` | normal | — |
-| Detail row text | `10px` | normal | — |
-| Country name | `9px` | normal | — |
-| Load status badge | `9px` | `600` | — |
-| Route text (POL/POD) | `9px` | normal | — |
-| Empty state text | `12px` | normal | — |
+| Size type badge | `9px` | `600` | - |
+| Reference labels | `10px` | normal | - |
+| Reference values | `10px` | `bold` | - |
+| Latest event badge | `10px` | `700` | - |
+| Latest event sub-text | `9px` | normal | - |
+| Event count pill | `10px` | `600` | - |
+| Event code badge | `9px` | `700` | - |
+| Event description | `11px` | `600` | - |
+| Event classifier | `8px` | `600` | - |
+| Event timestamp | `10px` | normal | - |
+| Detail row text | `10px` | normal | - |
+| Country name | `9px` | normal | - |
+| Load status badge | `9px` | `600` | - |
+| Route text (POL/POD) | `9px` | normal | - |
+| Empty state text | `12px` | normal | - |
 
 ---
 

@@ -140,7 +140,7 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
         </button>
       </div>
 
-      {/* Top KPI cards — operational right-now snapshot, plus approval queue placeholder */}
+      {/* Top KPI cards - operational right-now snapshot, plus approval queue placeholder */}
       <div className="db-kpi-grid db-kpi-5" style={{ marginBottom: 14 }}>
         {kpis.map((k, i) => {
           const Icon = kpiIcons[i]
@@ -175,7 +175,7 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
       {/* NLQ box */}
       <NLQBox inquiries={inquiries} tasks={tasks} missingItems={missingItems} followups={followups} />
 
-      {/* Performance row — hit rate + SBU breakdown */}
+      {/* Performance row - hit rate + SBU breakdown */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 }}>
         <div style={CARD}>
           <div style={{ marginBottom: 14 }}>
@@ -275,7 +275,7 @@ export default function Dashboard({ inquiries, tasks, followups, missingItems, q
         </div>
       </div>
 
-      {/* Charts — pending vs completed per day, plus channel mix */}
+      {/* Charts - pending vs completed per day, plus channel mix */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16, marginBottom: 18 }}>
         <div style={CARD}>
           <div style={{ marginBottom: 14 }}>

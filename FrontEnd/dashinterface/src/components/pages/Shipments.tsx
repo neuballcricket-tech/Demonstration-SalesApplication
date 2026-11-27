@@ -61,7 +61,7 @@ export default function Shipments({ shipments, bookings, onAdvanceLeg, onRecordP
   const counts: Partial<Record<ShipmentStatus, number>> = {}
   for (const s of shipments) counts[s.status] = (counts[s.status] ?? 0) + 1
 
-  // Highlight the "stuck at transshipment" cases — meeting flagged this as the
+  // Highlight the "stuck at transshipment" cases - meeting flagged this as the
   // critical post-confirmation tracking gap.
   const stuckAtTransshipment = shipments.filter(s => s.status === 'At Transshipment')
 
@@ -75,14 +75,14 @@ export default function Shipments({ shipments, bookings, onAdvanceLeg, onRecordP
         </span>
       </div>
 
-      {/* Critical-watch banner — meeting flagged transshipment monitoring as a key gap */}
+      {/* Critical-watch banner - meeting flagged transshipment monitoring as a key gap */}
       {stuckAtTransshipment.length > 0 && (
         <div style={{ ...CARD, marginBottom: 18, borderColor: 'rgba(217,119,6,0.25)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Clock size={15} style={{ color: '#d97706' }} />
               <div>
-                <div style={SECTION_LABEL}>Critical Watch — At Transshipment</div>
+                <div style={SECTION_LABEL}>Critical Watch - At Transshipment</div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Verify connection to onward leg · we're liable until POD</div>
               </div>
             </div>
@@ -96,7 +96,7 @@ export default function Shipments({ shipments, bookings, onAdvanceLeg, onRecordP
                   <span style={{ color: 'var(--text)', fontWeight: 700 }}>{s.id}</span>
                   {' · '}{s.customer_name}
                   {' · '}{s.origin} → {s.destination}
-                  {' · via '}<strong style={{ color: '#d97706' }}>{transshipLeg?.port ?? '—'}</strong>
+                  {' · via '}<strong style={{ color: '#d97706' }}>{transshipLeg?.port ?? '-'}</strong>
                   {transshipLeg?.actual_at && <> · arrived {transshipLeg.actual_at}</>}
                 </div>
               )
@@ -116,15 +116,15 @@ export default function Shipments({ shipments, bookings, onAdvanceLeg, onRecordP
                 {' · '}{bookings.filter(b => b.status === 'Released').length} released
                 {bookings.some(b => b.is_urgent && !b.procurement_notified) && (
                   <span style={{ color: '#dc2626', fontWeight: 700 }}>
-                    {' · '}{bookings.filter(b => b.is_urgent && !b.procurement_notified).length} urgent — procurement not notified
+                    {' · '}{bookings.filter(b => b.is_urgent && !b.procurement_notified).length} urgent - procurement not notified
                   </span>
                 )}
               </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {bookings.map(b => {
-              const bookedByName = EMPLOYEES.find(e => e.id === b.booked_by)?.name ?? '—'
-              const confirmedByName = b.confirmed_by ? (EMPLOYEES.find(e => e.id === b.confirmed_by)?.name ?? '—') : null
+              const bookedByName = EMPLOYEES.find(e => e.id === b.booked_by)?.name ?? '-'
+              const confirmedByName = b.confirmed_by ? (EMPLOYEES.find(e => e.id === b.confirmed_by)?.name ?? '-') : null
               return (
                 <div key={b.id} style={{ padding: '12px 14px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
@@ -255,7 +255,7 @@ export default function Shipments({ shipments, bookings, onAdvanceLeg, onRecordP
                     className="db-btn primary"
                     onClick={() => canRecordPOD && onRecordPOD(s.id)}
                     disabled={!canRecordPOD}
-                    title={canRecordPOD ? 'Record proof of delivery' : 'Restricted — requires Admin role'}
+                    title={canRecordPOD ? 'Record proof of delivery' : 'Restricted - requires Admin role'}
                     style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, whiteSpace: 'nowrap', opacity: canRecordPOD ? 1 : 0.4, cursor: canRecordPOD ? 'pointer' : 'not-allowed' }}
                   >
                     <Package size={11} /> Record POD
@@ -291,7 +291,7 @@ export default function Shipments({ shipments, bookings, onAdvanceLeg, onRecordP
                         {leg.status !== 'Departed' && (leg.type !== 'Destination' || leg.status !== 'Arrived') && (
                           <button
                             className="lt-icon-btn"
-                            title={canAdvanceLeg ? (leg.status === 'Pending' ? 'Mark Arrived' : 'Mark Departed') : 'Restricted — requires Admin role'}
+                            title={canAdvanceLeg ? (leg.status === 'Pending' ? 'Mark Arrived' : 'Mark Departed') : 'Restricted - requires Admin role'}
                             onClick={() => canAdvanceLeg && onAdvanceLeg(s.id, leg.id)}
                             disabled={!canAdvanceLeg}
                             style={{ padding: '2px 6px', height: 20, width: 'auto', fontSize: 11, gap: 2, opacity: canAdvanceLeg ? 1 : 0.4, cursor: canAdvanceLeg ? 'pointer' : 'not-allowed' }}

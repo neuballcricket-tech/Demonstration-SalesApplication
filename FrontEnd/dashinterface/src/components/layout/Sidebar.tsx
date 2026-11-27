@@ -116,7 +116,7 @@ export default function Sidebar({ current, onNav, activeRole, collapsed, onToggl
 
                 <div className="help-item-list">
                   <HelpNavItem icon={<LayoutDashboard size={14} />} title="Dashboard" color={COLOR.primary}>
-                    High-level overview of your sales performance — KPIs, pipeline stages, conversion funnel, and top-performing accounts. Use it for a quick morning check or when reporting to management.
+                    High-level overview of your sales performance - KPIs, pipeline stages, conversion funnel, and top-performing accounts. Use it for a quick morning check or when reporting to management.
                   </HelpNavItem>
                   <HelpNavItem icon={<MessageSquare size={14} />} title="Command Center" color="#7c3aed">
                     AI-powered chat assistant. Ask questions in plain English, or use the <strong>Quick Commands</strong> panel on the right to fill structured forms. The AI can create customers, log inquiries, build quotes, and manage your entire workflow.
@@ -131,7 +131,7 @@ export default function Sidebar({ current, onNav, activeRole, collapsed, onToggl
                     Track booked shipments from origin to destination. Monitor leg-by-leg status (departed, in transit, at transshipment, delivered) and record proof of delivery.
                   </HelpNavItem>
                   <HelpNavItem icon={<ClipboardList size={14} />} title="Operations" color="#d97706">
-                    Operational task board — pending tasks, overdue items, missing documents (SI, KYC, PO, B/L), and follow-up notes. This is where day-to-day action items live.
+                    Operational task board - pending tasks, overdue items, missing documents (SI, KYC, PO, B/L), and follow-up notes. This is where day-to-day action items live.
                   </HelpNavItem>
                   <HelpNavItem icon={<Users size={14} />} title="Customers" color="#16a34a">
                     Customer master list. View tiers (Key Account, Regular, Walk-in), payment terms, blacklist/credit-hold flags, and margin floors. Edit customer details directly.
@@ -146,7 +146,7 @@ export default function Sidebar({ current, onNav, activeRole, collapsed, onToggl
               <section className="help-section">
                 <h3 className="help-section-title">Quick Commands Reference</h3>
                 <p className="help-intro">
-                  Available in the <strong>Command Center</strong> on the right sidebar. Click a command to open a structured form — the AI processes your input automatically.
+                  Available in the <strong>Command Center</strong> on the right sidebar. Click a command to open a structured form - the AI processes your input automatically.
                 </p>
 
                 <div className="help-cmd-grid">
@@ -210,7 +210,7 @@ export default function Sidebar({ current, onNav, activeRole, collapsed, onToggl
               <section className="help-section">
                 <h3 className="help-section-title">Inquiry Process Guide</h3>
                 <p className="help-intro">
-                  Step-by-step instructions for handling shipping inquiries — from first contact to confirmed booking.
+                  Step-by-step instructions for handling shipping inquiries - from first contact to confirmed booking.
                 </p>
 
                 {/* --- New Customer Flow --- */}
@@ -274,14 +274,14 @@ export default function Sidebar({ current, onNav, activeRole, collapsed, onToggl
                       <div className="help-step-num">1</div>
                       <div className="help-step-body">
                         <strong>Log the inquiry</strong>
-                        <p>Go to <strong>Command Center</strong> and click <code>/new inquiry</code>. Start typing the customer name — it will autocomplete from existing records. Enter the request details, ports, channel, and SBU.</p>
+                        <p>Go to <strong>Command Center</strong> and click <code>/new inquiry</code>. Start typing the customer name - it will autocomplete from existing records. Enter the request details, ports, channel, and SBU.</p>
                       </div>
                     </li>
                     <li>
                       <div className="help-step-num">2</div>
                       <div className="help-step-body">
                         <strong>Check customer status</strong>
-                        <p>The AI will automatically flag if the customer is <span style={{color:'#dc2626'}}>blacklisted</span> or on <span style={{color:'#ea580c'}}>credit hold</span>. If flagged, resolve the issue before proceeding — use <code>/blacklist</code> or <code>/credit hold</code> to update flags.</p>
+                        <p>The AI will automatically flag if the customer is <span style={{color:'#dc2626'}}>blacklisted</span> or on <span style={{color:'#ea580c'}}>credit hold</span>. If flagged, resolve the issue before proceeding - use <code>/blacklist</code> or <code>/credit hold</code> to update flags.</p>
                       </div>
                     </li>
                     <li>
@@ -311,7 +311,7 @@ export default function Sidebar({ current, onNav, activeRole, collapsed, onToggl
                 {/* --- Booking Process Flow --- */}
                 <div className="help-flow">
                   <div className="help-flow-badge" style={{ background: '#0d9488', color: '#fff' }}>Post-Quotation</div>
-                  <h4 className="help-flow-title">Booking Process — After customer accepts a quotation</h4>
+                  <h4 className="help-flow-title">Booking Process - After customer accepts a quotation</h4>
 
                   <ol className="help-steps">
                     <li>
@@ -362,7 +362,7 @@ export default function Sidebar({ current, onNav, activeRole, collapsed, onToggl
                       <div className="help-step-num">3</div>
                       <div className="help-step-body">
                         <strong>CS releases to customer</strong>
-                        <p>Same as normal flow — use <code>/release booking</code> to send instructions.</p>
+                        <p>Same as normal flow - use <code>/release booking</code> to send instructions.</p>
                       </div>
                     </li>
                   </ol>
@@ -372,11 +372,11 @@ export default function Sidebar({ current, onNav, activeRole, collapsed, onToggl
                 <div className="help-tips">
                   <div className="help-tips-title">Tips</div>
                   <ul>
-                    <li>You can always type free-form questions in the Command Center chat — the AI understands natural language too.</li>
+                    <li>You can always type free-form questions in the Command Center chat - the AI understands natural language too.</li>
                     <li>Use <code>/lookup</code> to quickly find any customer, inquiry ID, or shipment.</li>
-                    <li>The <strong>Operations</strong> page shows overdue tasks and missing documents — check it daily.</li>
+                    <li>The <strong>Operations</strong> page shows overdue tasks and missing documents - check it daily.</li>
                     <li>Quotations below the customer's minimum margin floor will be routed for SBU head approval automatically.</li>
-                    <li>Urgent bookings bypass Procurement but <strong>must</strong> be reported — check the Shipments page for unnotified bookings.</li>
+                    <li>Urgent bookings bypass Procurement but <strong>must</strong> be reported - check the Shipments page for unnotified bookings.</li>
                     <li>The <strong>Bookings Pipeline</strong> on the Shipments page shows the real-time status of all bookings with a workflow progress bar.</li>
                   </ul>
                 </div>

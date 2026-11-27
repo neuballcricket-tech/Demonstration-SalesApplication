@@ -11,7 +11,7 @@ import type { WorkspaceItem } from './types'
 import { findContext } from './utils'
 
 // ---------------------------------------------------------------------------
-// usePendingItems — derives the list of pending work items from live data.
+// usePendingItems - derives the list of pending work items from live data.
 // Extracted from the large useMemo block in Workspace.tsx.
 // ---------------------------------------------------------------------------
 
@@ -41,7 +41,7 @@ export function usePendingItems(
       if (role && !stage.roles.includes(role)) continue
       if (inq.workflow_stage === 'completed') continue
 
-      // Determine the next stage (simple step+1 — no KYC routing, all inquiries start at rate-check)
+      // Determine the next stage (simple step+1 - no KYC routing, all inquiries start at rate-check)
       const resolvedNextStage = WORKFLOW_STAGES.find(s => s.step === stage.step + 1)
       if (!resolvedNextStage) continue
 
@@ -57,7 +57,7 @@ export function usePendingItems(
                 containerType: inq.container_type ?? '20GP',
                 quantity: inq.container_qty ?? 1,
                 weight: inq.cargo_weight ?? '',
-                commodityType: inq.commodity_type ?? 'Miscellaneous manufactured articles — furniture, toys',
+                commodityType: inq.commodity_type ?? 'Miscellaneous manufactured articles - furniture, toys',
                 commodityName: '',
                 destination: inq.destination,
                 isFcl: inq.is_fcl ?? true,
@@ -108,7 +108,7 @@ export function usePendingItems(
             actionKind = 'booking-request'
             actionLabel = 'Create Booking'
             break
-          default:                    title = `${stage.label} — ${inq.customer_name}`
+          default:                    title = `${stage.label} - ${inq.customer_name}`
         }
 
         // Attach saved rate request data for quotation-prep and send-to-customer work items
@@ -145,7 +145,7 @@ export function usePendingItems(
           type: 'booking',
           refId: bkg.id,
           customerName: bkg.customer_name,
-          title: `Booking request from CS — ${bkg.customer_name}`,
+          title: `Booking request from CS - ${bkg.customer_name}`,
           subtitle: `${bkg.quantity}x ${bkg.container_type} · ${bkg.origin} → ${bkg.destination} · ${bkg.shipping_line || 'Any carrier'}`,
           urgentFlag: bkg.is_urgent,
           createdAt: bkg.created_at,
@@ -161,7 +161,7 @@ export function usePendingItems(
           type: 'booking',
           refId: bkg.id,
           customerName: bkg.customer_name,
-          title: `Confirm liner booking — ${bkg.customer_name}`,
+          title: `Confirm liner booking - ${bkg.customer_name}`,
           subtitle: `${bkg.quantity}x ${bkg.container_type} · ${bkg.shipping_line} · RA# ${bkg.voyage_number || 'pending'}`,
           urgentFlag: bkg.is_urgent,
           createdAt: bkg.created_at,
@@ -177,7 +177,7 @@ export function usePendingItems(
           type: 'booking',
           refId: bkg.id,
           customerName: bkg.customer_name,
-          title: `Attach release order — ${bkg.customer_name}`,
+          title: `Attach release order - ${bkg.customer_name}`,
           subtitle: `${bkg.quantity}x ${bkg.container_type} · ${bkg.shipping_line} · ${bkg.vessel_name}${bkg.voyage_number ? ` / ${bkg.voyage_number}` : ''}`,
           urgentFlag: bkg.is_urgent,
           createdAt: bkg.created_at,
@@ -210,7 +210,7 @@ export function usePendingItems(
           refId: bkg.id,
           customerName: bkg.customer_name,
           title: `Acknowledge urgent booking for ${bkg.customer_name}`,
-          subtitle: `Urgent bypass — CS booked directly. ${bkg.quantity}x ${bkg.container_type} · ${bkg.shipping_line}`,
+          subtitle: `Urgent bypass - CS booked directly. ${bkg.quantity}x ${bkg.container_type} · ${bkg.shipping_line}`,
           urgentFlag: true,
           createdAt: bkg.created_at,
           previousContext: findContext(activityLog, bkg.id),
@@ -243,7 +243,7 @@ export function usePendingItems(
       })
     }
 
-    // --- From Bookings (SI reminder — show all with cutoff dates, sorted by urgency) ---
+    // --- From Bookings (SI reminder - show all with cutoff dates, sorted by urgency) ---
     for (const bkg of bookings) {
       if (bkg.si_requested) continue
       const cutoffDate = bkg.bl_cutoff_date || bkg.si_cutoff_date
@@ -282,7 +282,7 @@ export function usePendingItems(
       return parts.length ? ` · ${parts.join(' · ')}` : ''
     }
 
-    // --- From Bookings (record SI) — parallel with reminders, Pre-Advice & Generate SI ---
+    // --- From Bookings (record SI) - parallel with reminders, Pre-Advice & Generate SI ---
     for (const bkg of bookings) {
       if (bkg.si_submitted) continue
       const hasCutoffDates = bkg.si_cutoff_date || bkg.bl_cutoff_date || bkg.vgm_cutoff_date
@@ -305,7 +305,7 @@ export function usePendingItems(
       })
     }
 
-    // --- Generate SI / Liner BL Instruction — parallel with reminders, Record SI & Pre-Advice ---
+    // --- Generate SI / Liner BL Instruction - parallel with reminders, Record SI & Pre-Advice ---
     for (const bkg of bookings) {
       if (bkg.liner_bl_instruction_generated) continue
       const hasCutoffDates = bkg.si_cutoff_date || bkg.bl_cutoff_date || bkg.vgm_cutoff_date
@@ -328,7 +328,7 @@ export function usePendingItems(
       })
     }
 
-    // --- Step 11: Vessel Schedule — CS confirms vessel details for BL processing ---
+    // --- Step 11: Vessel Schedule - CS confirms vessel details for BL processing ---
     for (const bkg of bookings) {
       if (!bkg.liner_bl_instruction_generated) continue
       if (bkg.bl_vessel_confirmed) continue
@@ -350,7 +350,7 @@ export function usePendingItems(
       })
     }
 
-    // --- Step 12: Vessel Booking — CS creates Gensoft booking ---
+    // --- Step 12: Vessel Booking - CS creates Gensoft booking ---
     for (const bkg of bookings) {
       if (!bkg.bl_vessel_confirmed) continue
       if (bkg.bl_booking_created) continue
@@ -372,7 +372,7 @@ export function usePendingItems(
       })
     }
 
-    // --- Step 13: Draft BL — CS records job reference number ---
+    // --- Step 13: Draft BL - CS records job reference number ---
     for (const bkg of bookings) {
       if (!bkg.bl_booking_created) continue
       if (bkg.draft_bl_sent) continue
@@ -438,7 +438,7 @@ export function usePendingItems(
       })
     }
 
-    // --- Pre-Advice (door-to-door / port-to-door only) — parallel with reminders, Record SI & Generate SI ---
+    // --- Pre-Advice (door-to-door / port-to-door only) - parallel with reminders, Record SI & Generate SI ---
     for (const bkg of bookings) {
       if (bkg.delivery_type !== 'door-to-door' && bkg.delivery_type !== 'port-to-door') continue
       if (bkg.pre_advice_sent) continue

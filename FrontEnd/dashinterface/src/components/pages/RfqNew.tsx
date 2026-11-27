@@ -80,7 +80,7 @@ export default function RfqNew({ clientList, onFlash, onGoBack }: Props) {
   const update = (i: number, patch: Partial<Row>) =>
     setRows(prev => prev.map((r, x) => (x === i ? { ...r, ...patch } : r)))
 
-  // Copy row 1's origin into every row — tenders usually share one origin
+  // Copy row 1's origin into every row - tenders usually share one origin
   const fillOrigin = () => {
     const o = rows[0]?.origin
     if (o) setRows(prev => prev.map(r => ({ ...r, origin: o })))
@@ -97,10 +97,10 @@ export default function RfqNew({ clientList, onFlash, onGoBack }: Props) {
       const d = r.destination.trim().toUpperCase()
 
       if (!o) e[`r${i}.origin`] = 'Required'
-      else if (!CODE.test(o)) e[`r${i}.origin`] = `"${r.origin}" is not a port code — pick one`
+      else if (!CODE.test(o)) e[`r${i}.origin`] = `"${r.origin}" is not a port code - pick one`
 
       if (!d) e[`r${i}.destination`] = 'Required'
-      else if (!CODE.test(d)) e[`r${i}.destination`] = `"${r.destination}" is not a port code — pick one`
+      else if (!CODE.test(d)) e[`r${i}.destination`] = `"${r.destination}" is not a port code - pick one`
       else if (d === o) e[`r${i}.destination`] = 'Same as origin'
       if (!r.qty || r.qty < 1) e[`r${i}.qty`] = 'Must be 1 or more'
     })
@@ -131,7 +131,7 @@ export default function RfqNew({ clientList, onFlash, onGoBack }: Props) {
         contact: { name: contactName.trim(), email: contactEmail.trim() || undefined },
         lines,
       })
-      onFlash(`RFQ-${res.rfq_ref} created — ${res.line_count} routes`)
+      onFlash(`RFQ-${res.rfq_ref} created - ${res.line_count} routes`)
       onGoBack()
     } catch (err) {
       onFlash(`Failed: ${(err as Error).message}`)

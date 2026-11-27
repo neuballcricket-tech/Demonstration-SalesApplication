@@ -32,7 +32,7 @@ const STATUS_BADGE: Record<QuoteStatus, string> = {
   'Lost':               'db-badge danger',
 }
 
-// Big Schedule stub (Phase 7) — pretend list of shipping lines per route lookup.
+// Big Schedule stub (Phase 7) - pretend list of shipping lines per route lookup.
 const BIG_SCHEDULE_LINES = ['Maersk', 'CMA CGM', 'MSC', 'Hapag-Lloyd', 'ONE', 'Evergreen', 'COSCO', 'OOCL']
 
 export default function Quotations({
@@ -99,7 +99,7 @@ export default function Quotations({
             className="db-btn primary"
             onClick={() => canCreate && setShowBuilder(true)}
             disabled={!canCreate}
-            title={canCreate ? 'Create a new quotation' : `Restricted — requires Sales role`}
+            title={canCreate ? 'Create a new quotation' : `Restricted - requires Sales role`}
             style={{ display: 'flex', alignItems: 'center', gap: 6, opacity: canCreate ? 1 : 0.4, cursor: canCreate ? 'pointer' : 'not-allowed' }}
           >
             {canCreate ? <Plus size={12} /> : <Lock size={10} />} New Quote
@@ -107,7 +107,7 @@ export default function Quotations({
         </div>
       </div>
 
-      {/* Ready to Quote — inquiries at quotation-prep stage */}
+      {/* Ready to Quote - inquiries at quotation-prep stage */}
       {readyToQuote.length > 0 && (
         <div style={{ ...CARD, marginBottom: 18 }}>
           <div style={{ marginBottom: 14 }}>
@@ -155,7 +155,7 @@ export default function Quotations({
                       opacity: canCreate ? 1 : 0.4,
                       cursor: canCreate ? 'pointer' : 'not-allowed',
                     }}
-                    title={canCreate ? 'Generate quotation for this inquiry' : 'Restricted — requires Sales role'}
+                    title={canCreate ? 'Generate quotation for this inquiry' : 'Restricted - requires Sales role'}
                   >
                     <FileText size={11} /> Generate Quote
                   </button>
@@ -231,7 +231,7 @@ export default function Quotations({
                     </div>
                     {q.approval_reason && (
                       <div style={{ fontSize: 11, color: '#d97706', marginTop: 4, fontWeight: 600 }}>
-                        ⚠ Awaiting approval — {q.approval_reason}
+                        ⚠ Awaiting approval - {q.approval_reason}
                       </div>
                     )}
                   </div>
@@ -274,7 +274,7 @@ export default function Quotations({
                   </table>
                 </div>
 
-                {/* Action row — status transitions (role-gated) */}
+                {/* Action row - status transitions (role-gated) */}
                 <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
                   {q.status === 'Awaiting Approval' && (
                     <>
@@ -282,7 +282,7 @@ export default function Quotations({
                         className="db-btn primary"
                         onClick={() => canApprove && onSetQuoteStatus(q.id, 'Approved')}
                         disabled={!canApprove}
-                        title={canApprove ? 'Approve this quote' : 'Restricted — requires Finance role'}
+                        title={canApprove ? 'Approve this quote' : 'Restricted - requires Finance role'}
                         style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: canApprove ? 1 : 0.4, cursor: canApprove ? 'pointer' : 'not-allowed' }}
                       >
                         {canApprove ? <ShieldCheck size={11} /> : <Lock size={9} />} Approve
@@ -291,7 +291,7 @@ export default function Quotations({
                         className="db-btn secondary"
                         onClick={() => canReject && onSetQuoteStatus(q.id, 'Lost')}
                         disabled={!canReject}
-                        title={canReject ? 'Reject this quote' : 'Restricted — requires Finance role'}
+                        title={canReject ? 'Reject this quote' : 'Restricted - requires Finance role'}
                         style={{ opacity: canReject ? 1 : 0.4, cursor: canReject ? 'pointer' : 'not-allowed' }}
                       >
                         Reject
@@ -303,7 +303,7 @@ export default function Quotations({
                       className="db-btn primary"
                       onClick={() => canSendQuote && handleSendClick(q)}
                       disabled={!canSendQuote}
-                      title={canSendQuote ? 'Copy quotation text and mark as sent' : 'Restricted — requires CS or Sales role'}
+                      title={canSendQuote ? 'Copy quotation text and mark as sent' : 'Restricted - requires CS or Sales role'}
                       style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: canSendQuote ? 1 : 0.4, cursor: canSendQuote ? 'pointer' : 'not-allowed' }}
                     >
                       {canSendQuote ? <Copy size={11} /> : <Lock size={9} />} Copy & Send
@@ -315,7 +315,7 @@ export default function Quotations({
                         className="db-btn primary"
                         onClick={() => canConfirm && onSetQuoteStatus(q.id, 'Confirmed')}
                         disabled={!canConfirm}
-                        title={canConfirm ? 'Mark confirmed' : 'Restricted — requires Sales role'}
+                        title={canConfirm ? 'Mark confirmed' : 'Restricted - requires Sales role'}
                         style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: canConfirm ? 1 : 0.4, cursor: canConfirm ? 'pointer' : 'not-allowed' }}
                       >
                         {canConfirm ? <CheckCircle2 size={11} /> : <Lock size={9} />} Mark Confirmed
@@ -404,7 +404,7 @@ function CopyQuotationModal({
     '─────────────────────────────────────────────',
     ...quote.lines.flatMap((l, i) => [
       '',
-      `Option ${i + 1}  —  ${l.shipping_line}`,
+      `Option ${i + 1}  -  ${l.shipping_line}`,
       `  Rate Type:            ${l.rate_type}`,
       `  Ocean Freight:        USD ${l.base_rate_usd.toLocaleString()}`,
       `  Destination Charges:  USD ${l.destination_charges_usd.toLocaleString()}`,
@@ -423,7 +423,7 @@ function CopyQuotationModal({
     '  • Subject to carrier surcharges in effect at time of shipment.',
     '  • All charges in USD unless otherwise stated.',
     '',
-    'CLSynergy — Commercial Team',
+    'CLSynergy - Commercial Team',
   ].join('\n')
 
   const handleCopy = () => {
@@ -431,7 +431,7 @@ function CopyQuotationModal({
       setCopied(true)
       onFlash?.('Quotation copied to clipboard')
       setTimeout(() => setCopied(false), 3000)
-    }).catch(() => onFlash?.('Could not access clipboard — please copy manually'))
+    }).catch(() => onFlash?.('Could not access clipboard - please copy manually'))
   }
 
   return (
@@ -627,7 +627,7 @@ function QuoteBuilderModal({
 
         {/* Big Schedule stub hint (Phase 7.1) */}
         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, padding: '6px 10px', background: 'rgba(44,44,130,0.03)', border: '1px solid rgba(44,44,130,0.12)', borderRadius: 6 }}>
-          📡 Big Schedule lines available for this route: {BIG_SCHEDULE_LINES.join(', ')} (stub data — real integration in Phase 2)
+          📡 Big Schedule lines available for this route: {BIG_SCHEDULE_LINES.join(', ')} (stub data - real integration in Phase 2)
         </div>
 
         {/* Rate lines */}
@@ -713,7 +713,7 @@ function QuoteBuilderModal({
         {/* Approval banner if margin under floor */}
         {willNeedApproval && (
           <div style={{ padding: '10px 14px', background: 'rgba(217,119,6,0.05)', border: '1px solid rgba(217,119,6,0.2)', borderRadius: 8, marginBottom: 12, fontSize: 12, color: '#b45309', fontWeight: 600 }}>
-            ⚠ This quote will be flagged Awaiting Approval — margin {margin}% is below {cust!.name}'s floor of {minMargin}%.
+            ⚠ This quote will be flagged Awaiting Approval - margin {margin}% is below {cust!.name}'s floor of {minMargin}%.
           </div>
         )}
 

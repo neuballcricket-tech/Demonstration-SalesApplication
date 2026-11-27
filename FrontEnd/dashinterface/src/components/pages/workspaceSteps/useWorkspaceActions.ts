@@ -554,7 +554,7 @@ CLSynergy (Pvt) Ltd`
         break
       }
       case 'send-to-customer': {
-        // CS sends quotation to customer — pre-fill contact details if available
+        // CS sends quotation to customer - pre-fill contact details if available
         setFormNote('')
         const sendCust = customers.find(c => c.name.toLowerCase() === item.customerName.toLowerCase())
         setCustomerContactEmail(sendCust?.contact_email ?? '')
@@ -891,7 +891,7 @@ CLSynergy (Pvt) Ltd`
       }
       case 'create-vessel-booking': {
         const blBkgInit = item.sourceData.booking as Booking
-        // Pre-fill vessel strip — use pending vessel if user came from the vessel step prompt
+        // Pre-fill vessel strip - use pending vessel if user came from the vessel step prompt
         const pv = pendingVesselForBooking.current
         if (pv) {
           setFormVessel(pv.vesselName); setFormVoyage(pv.voyageNumber)
@@ -906,7 +906,7 @@ CLSynergy (Pvt) Ltd`
           setVesselEtdPol(''); setVesselEtaFpod('')
         }
         setVesselRoutingType('DIRECT')
-        // Phase 2 booking form — prefill from booking + customer
+        // Phase 2 booking form - prefill from booking + customer
         const blCust = customers.find(c => c.name.toLowerCase() === item.customerName.toLowerCase())
         // Look up the related inquiry by customer name for commodity / weight / incoterm
         const blInq = inquiries.find(i => i.customer_name.toLowerCase() === item.customerName.toLowerCase())
@@ -1196,7 +1196,7 @@ CLSynergy (Pvt) Ltd`
           displayOnCarrierDraft: '',
           displayContainerNumbers: '',
         })
-        // Initialize HBL selection — pre-select the clicked booking if it has an HBL
+        // Initialize HBL selection - pre-select the clicked booking if it has an HBL
         setMblSelectedHblIds(blBkg.house_bl_created ? [blBkg.id] : [])
         setMblHblSearch('')
         // Auto-populate B/L table from the selected booking's HBL data
@@ -1383,7 +1383,7 @@ CLSynergy (Pvt) Ltd`
   }
 
   const handleModalSubmit = async () => {
-    // attach-release-order renders inline without requiring actionModal — allow it through
+    // attach-release-order renders inline without requiring actionModal - allow it through
     const effectiveKind = actionModal?.actionKind ?? (selectedItem?.actionKind === 'attach-release-order' ? 'attach-release-order' : null)
     if (!effectiveKind) return
     // Compute next-step action for interactive toast navigation
@@ -1415,7 +1415,7 @@ CLSynergy (Pvt) Ltd`
           cli_id = kycInquiry?.cli_id ?? kycClientRecord?.cli_id
         }
         if (!cli_id) {
-          console.warn('[Workspace] KYC submit skipped — cli_id is undefined. sourceData:', modal.sourceData)
+          console.warn('[Workspace] KYC submit skipped - cli_id is undefined. sourceData:', modal.sourceData)
           onFlash(`Could not send the KYC request: ${modal.customerName} has no saved client record yet`)
           return  // keep the form open with the user's input
         }
@@ -1482,9 +1482,9 @@ CLSynergy (Pvt) Ltd`
           ref_id: kycInquiry?.id ?? customer?.id ?? `CLI-${cli_id ?? ''}`,
           customer_name: customerName,
           pushed_to: 'Finance',
-          notes: formNote || `KYC request created — BR: ${kycBrNumber}`,
+          notes: formNote || `KYC request created - BR: ${kycBrNumber}`,
         })
-        onFlash(`KYC request created for ${customerName} — pushed to Finance`, nextStepAction)
+        onFlash(`KYC request created for ${customerName} - pushed to Finance`, nextStepAction)
         break
       }
       case 'verify-kyc': {
@@ -1522,7 +1522,7 @@ CLSynergy (Pvt) Ltd`
           })
           onFlash(`KYC verified for ${kycCustomerName}`, nextStepAction)
         } else {
-          // Reject — reset to uninitiated so CS's pending queue picks it up again
+          // Reject - reset to uninitiated so CS's pending queue picks it up again
           if (kycCliId) {
             try {
               await apiUpdateKycStage(kycCliId, 'kyc_uninitiated')
@@ -1546,7 +1546,7 @@ CLSynergy (Pvt) Ltd`
             pushed_to: 'CS',
             notes: formNote || 'KYC documents need resubmission.',
           })
-          onFlash(`KYC flagged — ${kycCustomerName} returned to CS`, nextStepAction)
+          onFlash(`KYC flagged - ${kycCustomerName} returned to CS`, nextStepAction)
         }
         break
       }
@@ -1555,7 +1555,7 @@ CLSynergy (Pvt) Ltd`
           inquiry: Inquiry; rateRequest?: CompletedRateRequest; container?: ContainerLine
         }
         // Create quotation record in backend (status = in_prep).
-        // Do NOT mark as sent here — that happens in the send-to-customer step.
+        // Do NOT mark as sent here - that happens in the send-to-customer step.
         if (inquiry.inq_id) {
           const today = new Date().toISOString().slice(0, 10)
           const deadline = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
@@ -1601,7 +1601,7 @@ CLSynergy (Pvt) Ltd`
             created = await apiCreateQuotation({
               inq_id: inquiry.inq_id,
               quote_date: today,
-              sent_via: 'email',           // placeholder — updated to actual method in send step
+              sent_via: 'email',           // placeholder - updated to actual method in send step
               options: quotationOptions,
               acceptence_deadline: deadline,
             })
@@ -1630,7 +1630,7 @@ CLSynergy (Pvt) Ltd`
             }
           }
         }
-        // Advance to quotation-sent — both CS and Sales go through the same Send Quote step
+        // Advance to quotation-sent - both CS and Sales go through the same Send Quote step
         onAdvanceWorkflow(inquiry.id, 'quotation-sent')
         onLogActivity({
           actor_role: activeRole,
@@ -1644,7 +1644,7 @@ CLSynergy (Pvt) Ltd`
             ? `${formNote} | Quotation:\n${quotationContent}`
             : `Quotation:\n${quotationContent}`,
         })
-        onFlash(`${inquiry.id} → Quotation prepared — ready to send`, nextStepAction)
+        onFlash(`${inquiry.id} → Quotation prepared - ready to send`, nextStepAction)
         break
       }
       case 'send-to-customer': {
@@ -1664,7 +1664,7 @@ CLSynergy (Pvt) Ltd`
           }
         }
 
-        // Email delivery endpoint not yet implemented on backend — skip apiSendQuotation call.
+        // Email delivery endpoint not yet implemented on backend - skip apiSendQuotation call.
         // The quotation record is already marked as sent via apiMarkQuotationSent above.
 
         onAdvanceWorkflow(inquiry.id, 'customer-response')
@@ -1711,7 +1711,7 @@ CLSynergy (Pvt) Ltd`
             pushed_to: 'CS',
             notes: `Customer accepted${formNote ? ` | ${formNote}` : ''}`,
           })
-          onFlash(`${inquiry.id} → ${inquiry.customer_name} accepted — ready for booking request`, nextStepAction)
+          onFlash(`${inquiry.id} → ${inquiry.customer_name} accepted - ready for booking request`, nextStepAction)
         } else {
           onAdvanceWorkflow(inquiry.id, 'completed')
           onLogActivity({
@@ -1724,7 +1724,7 @@ CLSynergy (Pvt) Ltd`
             pushed_to: 'CS',
             notes: `Customer rejected${formNote ? ` | Reason: ${formNote}` : ''}`,
           })
-          onFlash(`${inquiry.id} → ${inquiry.customer_name} rejected quotation — inquiry closed`)
+          onFlash(`${inquiry.id} → ${inquiry.customer_name} rejected quotation - inquiry closed`)
         }
         break
       }
@@ -1822,7 +1822,7 @@ CLSynergy (Pvt) Ltd`
       }
       case 'review-booking-request': {
         const { booking: rbBkg } = modal.sourceData
-        // Assign the RA number — booking moves to proc-booking step for liner confirmation
+        // Assign the RA number - booking moves to proc-booking step for liner confirmation
         onMarkRaAssigned(rbBkg.id, bkRaNumber, [bkVessel, bkVoyage].filter(Boolean).join(' / ') || '', bkShippingLine)
         const rbNoteParts = [
           bkContainers.map(c => `${c.qty}x${c.type}`).join(', '),
@@ -1854,7 +1854,7 @@ CLSynergy (Pvt) Ltd`
           pushed_to: 'Procurement',
           notes: rbNoteParts,
         })
-        onFlash(`RA# assigned — ${rbBkg.customer_name} moved to Booking step`, nextStepAction)
+        onFlash(`RA# assigned - ${rbBkg.customer_name} moved to Booking step`, nextStepAction)
         break
       }
       case 'attach-release-order': {
@@ -1871,7 +1871,7 @@ CLSynergy (Pvt) Ltd`
           pushed_to: 'CS',
           notes: `Release order sent to CS.${formNote ? ` | ${formNote}` : ''}`,
         })
-        onFlash(`Release order sent to CS — ${roBkg.customer_name}`, nextStepAction)
+        onFlash(`Release order sent to CS - ${roBkg.customer_name}`, nextStepAction)
         break
       }
       case 'confirm-liner-booking': {
@@ -1888,7 +1888,7 @@ CLSynergy (Pvt) Ltd`
             pushed_to: 'CS',
             notes: `Liner confirmed. RA#: ${cbBkg.voyage_number || 'N/A'}${formNote ? ` | ${formNote}` : ''}`,
           })
-          onFlash(`Liner confirmed — ${cbBkg.customer_name}`, nextStepAction)
+          onFlash(`Liner confirmed - ${cbBkg.customer_name}`, nextStepAction)
         } else if (linerBooked === 'no') {
           onRevertBookingRequest(cbBkg.id)
           onLogActivity({
@@ -1901,7 +1901,7 @@ CLSynergy (Pvt) Ltd`
             pushed_to: 'Procurement',
             notes: `Booking failed. Reason: ${formNote || 'Not specified'}`,
           })
-          onFlash(`Booking reverted — ${cbBkg.customer_name} (reason logged)`, nextStepAction)
+          onFlash(`Booking reverted - ${cbBkg.customer_name} (reason logged)`, nextStepAction)
         }
         break
       }
@@ -1994,7 +1994,7 @@ CLSynergy (Pvt) Ltd`
         onLogActivity({
           actor_role: activeRole,
           actor_id: activeEmployee.id,
-          action: `SI recorded for ${booking.customer_name} — submitted to ${booking.shipping_line || 'liner'} ${method}.${vgmCertFileName ? ` VGM document attached: ${vgmCertFileName}` : ''}`,
+          action: `SI recorded for ${booking.customer_name} - submitted to ${booking.shipping_line || 'liner'} ${method}.${vgmCertFileName ? ` VGM document attached: ${vgmCertFileName}` : ''}`,
           ref_type: 'booking',
           ref_id: booking.id,
           customer_name: booking.customer_name,
@@ -2088,7 +2088,7 @@ CLSynergy (Pvt) Ltd`
         onLogActivity({
           actor_role: activeRole,
           actor_id: activeEmployee.id,
-          action: `Recorded Master BL for ${hblNames} — ${mblRef || 'N/A'}.`,
+          action: `Recorded Master BL for ${hblNames} - ${mblRef || 'N/A'}.`,
           ref_type: 'booking',
           ref_id: booking.id,
           customer_name: booking.customer_name,
@@ -2120,7 +2120,7 @@ CLSynergy (Pvt) Ltd`
       case 'send-pre-alert': {
         const { booking } = modal.sourceData
         // Auto-open Outlook with the pre-alert email
-        const praSubject = `Pre-Alert — ${paField('hbl_number') || paField('mbl_number') || 'N/A'} — ${paField('vessel')} ${paField('voyage')}`
+        const praSubject = `Pre-Alert - ${paField('hbl_number') || paField('mbl_number') || 'N/A'} - ${paField('vessel')} ${paField('voyage')}`
         const praBody = [
           'Dear Sir / Madam,',
           '',

@@ -89,14 +89,14 @@ export default function Followups({
         </span>
       </div>
 
-      {/* Phase 4.2: Spot Rate / Urgent — only render if we actually have any */}
+      {/* Phase 4.2: Spot Rate / Urgent - only render if we actually have any */}
       {spotInquiries.length > 0 && (
         <div style={{ ...CARD, marginBottom: 22, borderColor: 'rgba(220,38,38,0.25)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Zap size={15} style={{ color: '#dc2626' }} />
               <div>
-                <div style={SECTION_LABEL}>Spot Rate / Urgent — Time Critical</div>
+                <div style={SECTION_LABEL}>Spot Rate / Urgent - Time Critical</div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Confirm within 15 minutes · spot-rate validity windows are short</div>
               </div>
             </div>
@@ -136,14 +136,14 @@ export default function Followups({
         </div>
       )}
 
-      {/* Phase 4.1: Most-chased inquiries — surfaces the procurement chase load */}
+      {/* Phase 4.1: Most-chased inquiries - surfaces the procurement chase load */}
       {mostChased.length > 0 && (
         <div style={{ ...CARD, marginBottom: 22 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <Phone size={14} style={{ color: '#d97706' }} />
             <div>
               <div style={SECTION_LABEL}>Most-Chased Pending Inquiries</div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>How many times sales has followed up — high counts = procurement bottleneck</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>How many times sales has followed up - high counts = procurement bottleneck</div>
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -220,7 +220,7 @@ export default function Followups({
             className="db-btn primary"
             onClick={() => canCreateFollowup && handleLogFollowup()}
             disabled={!canCreateFollowup}
-            title={canCreateFollowup ? 'Log follow-up' : 'Restricted — requires CS, Sales, or Procurement role'}
+            title={canCreateFollowup ? 'Log follow-up' : 'Restricted - requires CS, Sales, or Procurement role'}
             style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', opacity: canCreateFollowup ? 1 : 0.4, cursor: canCreateFollowup ? 'pointer' : 'not-allowed' }}
           >
             {canCreateFollowup ? <CheckCircle2 size={12} /> : <Lock size={10} />} Log Follow-up
@@ -313,7 +313,7 @@ export default function Followups({
             className="db-btn primary"
             onClick={() => canCreateTask && handleAddTask()}
             disabled={!canCreateTask || !taskCustomer.trim() || !taskText.trim()}
-            title={canCreateTask ? 'Add task' : 'Restricted — requires CS, Sales, or Procurement role'}
+            title={canCreateTask ? 'Add task' : 'Restricted - requires CS, Sales, or Procurement role'}
             style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', opacity: canCreateTask && taskCustomer.trim() && taskText.trim() ? 1 : 0.4, cursor: canCreateTask ? 'pointer' : 'not-allowed' }}
           >
             {canCreateTask ? <ListPlus size={12} /> : <Lock size={10} />} Add Task
@@ -354,7 +354,7 @@ export default function Followups({
                       {isPending && (
                         <button
                           className="lt-icon-btn"
-                          title={canCompleteTask ? 'Complete task' : 'Restricted — requires CS, Sales, or Procurement role'}
+                          title={canCompleteTask ? 'Complete task' : 'Restricted - requires CS, Sales, or Procurement role'}
                           onClick={() => canCompleteTask && onCompleteTask(t.id)}
                           disabled={!canCompleteTask}
                           style={{ opacity: canCompleteTask ? 1 : 0.4, cursor: canCompleteTask ? 'pointer' : 'not-allowed' }}
@@ -413,7 +413,7 @@ export default function Followups({
                     <td style={{ padding: '12px 8px', color: 'var(--text-muted)' }}>{m.since}</td>
                     <td style={{ padding: '12px 8px' }}>
                       <span style={{ color: overdue ? '#dc2626' : 'var(--text-muted)', fontWeight: overdue ? 600 : 400 }}>
-                        {m.cutoff_date ?? '—'}
+                        {m.cutoff_date ?? '-'}
                       </span>
                       {overdue && <span className="lt-pill overdue" style={{ marginLeft: 6 }}>{daysOverdue(m.cutoff_date)}d past</span>}
                       {dueToday && <span className="lt-pill due-today" style={{ marginLeft: 6 }}>Cutoff today</span>}
@@ -423,7 +423,7 @@ export default function Followups({
                 )
               })}
               {missingItems.length === 0 && (
-                <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Nothing missing — all customers up to date.</td></tr>
+                <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Nothing missing - all customers up to date.</td></tr>
               )}
             </tbody>
           </table>

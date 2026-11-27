@@ -503,7 +503,7 @@ export default function Workspace({
                 containerType: inq.container_type ?? '20GP',
                 quantity: inq.container_qty ?? 1,
                 weight: inq.cargo_weight ?? '',
-                commodityType: inq.commodity_type ?? 'Miscellaneous manufactured articles — furniture, toys',
+                commodityType: inq.commodity_type ?? 'Miscellaneous manufactured articles - furniture, toys',
                 commodityName: '',
                 destination: inq.destination,
                 isFcl: inq.is_fcl ?? true,
