@@ -1319,6 +1319,38 @@ export function apiSaveSchedules(schedules: OceanSchedule[]): Promise<number[]> 
 }
 
 // ---------------------------------------------------------------------------
+// Adhoc Rates
+// ---------------------------------------------------------------------------
+
+export interface AdhocRatePayload {
+  schedule_id: number
+  rate: number
+  valid_from: string
+  valid_to: string
+  teus?: number
+  remark?: string
+}
+
+export interface AdhocRateRow extends AdhocRatePayload {
+  adhoc_id: number
+}
+
+/** Create a new adhoc rate linked to an ocean schedule. */
+export function apiCreateAdhocRate(data: AdhocRatePayload): Promise<{ adhoc_id: number }> {
+  return post<{ adhoc_id: number }>('/rates/adhoc-rates', data)
+}
+
+/** Update an existing adhoc rate. Accepts any subset of rate, valid_from, valid_to, teus, remark. */
+export function apiPatchAdhocRate(adhocId: number, data: Partial<Omit<AdhocRatePayload, 'schedule_id'>>): Promise<AdhocRateRow> {
+  return patch<AdhocRateRow>(`/rates/adhoc-rates/${adhocId}`, data)
+}
+
+/** Delete an adhoc rate. */
+export function apiDeleteAdhocRate(adhocId: number): Promise<void> {
+  return del<void>(`/rates/adhoc-rates/${adhocId}`)
+}
+
+// ---------------------------------------------------------------------------
 // Tracking Events (Track & Trace)
 // ---------------------------------------------------------------------------
 
