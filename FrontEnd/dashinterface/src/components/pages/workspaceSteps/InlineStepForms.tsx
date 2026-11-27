@@ -1,5 +1,5 @@
 // InlineStepForms -- extracted from Workspace.tsx ternary chain
-import React, { type ReactNode } from "react"
+import React, { useId, type ReactNode } from "react"
 import {
   AlertTriangle, Check, Paperclip, ClipboardPaste,
   FileText, Ship, ShieldCheck, X, User, Mail, Loader2, MessageSquare,
@@ -262,6 +262,26 @@ function SendMethodToggle({ id, label, value, onSelect }: { id: string; label: s
           icon={<MessageCircle size={14} aria-hidden="true" />} onClick={() => onSelect('whatsapp')}>
           WhatsApp
         </Button>
+      </div>
+    </div>
+  )
+}
+
+/** Single-choice group of toggle buttons whose labels are their values (Freight, Shipped on Board, Vessel Schedule Type). */
+function ToggleGroup<T extends string>({ label, options, value, onSelect, stretch }: {
+  label: string; options: readonly T[]; value: string; onSelect: (v: T) => void; stretch?: boolean
+}) {
+  const id = useId()
+  return (
+    <div className="flex flex-col gap-1">
+      <span id={id} className={labelClass}>{label}</span>
+      <div role="group" aria-labelledby={id} className="flex gap-2">
+        {options.map(o => (
+          <Button key={o} aria-pressed={value === o} className={cn(stretch && 'flex-1', value === o && SELECTED_TOGGLE)}
+            onClick={() => onSelect(o)}>
+            {o}
+          </Button>
+        ))}
       </div>
     </div>
   )
@@ -1905,24 +1925,26 @@ export default function InlineStepForms({
 })() : selectedItem.actionKind === 'generate-si' && actionModal ? (() => {
   const gsBkg = actionModal.sourceData.booking as Booking
   const gsInput = (label: string, key: string, opts?: { placeholder?: string; readOnly?: boolean; span2?: boolean; type?: string }) => (
-    <div style={opts?.span2 ? { gridColumn: '1 / -1' } : {}}>
-      <label className="lt-label">{label}</label>
-      <input className="lt-input" style={{ width: '100%', ...(opts?.readOnly ? { background: 'rgba(0,0,0,0.03)' } : {}) }}
-        type={opts?.type || 'text'}
-        value={siField(key)} onChange={e => setSiField(key, e.target.value)}
-        placeholder={opts?.placeholder || ''} readOnly={opts?.readOnly} />
-    </div>
+    <Field label={label} className={cn(opts?.span2 && 'col-span-full')}>
+      {ids => opts?.type === 'date'
+        ? <DatePicker {...ids} value={siField(key)} onChange={v => setSiField(key, v)} />
+        : <Input {...ids} type={opts?.type || 'text'}
+          value={siField(key)} onChange={e => setSiField(key, e.target.value)}
+          placeholder={opts?.placeholder || ''} readOnly={opts?.readOnly} className={cn(opts?.readOnly && 'bg-canvas')} />}
+    </Field>
   )
   const gsTextarea = (label: string, key: string, placeholder?: string) => (
-    <div style={{ gridColumn: '1 / -1' }}>
-      <label className="lt-label">{label}</label>
-      <textarea className="lt-input" rows={3} style={{ width: '100%', resize: 'vertical' as const, fontSize: 12 }}
+    <Field label={label} className="col-span-full">
+      {ids => <Textarea {...ids} rows={3} className="resize-y"
         value={siField(key)} onChange={e => setSiField(key, e.target.value)}
-        placeholder={placeholder || ''} />
-    </div>
+        placeholder={placeholder || ''} />}
+    </Field>
   )
-  const gsSectionHeader = (title: string) => (
-    <div style={{ padding: '6px 12px', background: 'rgba(8,145,178,0.08)', borderLeft: '3px solid #0891b2', borderRadius: '0 6px 6px 0', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#0891b2', marginTop: 4 }}>{title}</div>
+  const gsSelect = (label: string, key: string, options: string[]) => (
+    <Field label={label}>
+      {ids => <Select {...ids} value={siField(key)} onChange={v => setSiField(key, v)}
+        options={options.map(o => ({ value: o, label: o }))} />}
+    </Field>
   )
   // Generate pre-filled email draft for NVOCC
   const generateEmailDraft = (): string => {
@@ -1978,172 +2000,112 @@ export default function InlineStepForms({
     return lines
   }
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {/* Header */}
-      <div style={{ padding: '8px 14px', background: '#0891b2', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>GENERATE SI</span>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>{gsBkg.customer_name}</span>
-      </div>
+    <div className="flex flex-col gap-4">
+      <StepHeader title="GENERATE SI" subtitle={gsBkg.customer_name} />
 
       {/* Booking summary */}
-      <div style={{ padding: '10px 14px', background: 'rgba(44,44,130,0.06)', border: '1px solid rgba(44,44,130,0.15)', borderRadius: 8, fontSize: 12 }}>
+      <div className="rounded-card border border-line-soft bg-primary-subtle px-3.5 py-2.5 text-control text-fg">
         <strong>{gsBkg.customer_name}</strong> — {gsBkg.origin} → {gsBkg.destination}
-        <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
+        <div className="mt-0.5 text-fg-muted">
           {gsBkg.quantity}x {gsBkg.container_type} · {gsBkg.shipping_line || 'No liner'}
-          {gsBkg.job_reference_number && <span style={{ marginLeft: 8 }}>· Job Ref: <strong>{gsBkg.job_reference_number}</strong></span>}
+          {gsBkg.job_reference_number && <span className="ml-2">· Job Ref: <strong>{gsBkg.job_reference_number}</strong></span>}
         </div>
       </div>
 
       {/* ══════ NON-NVOCC: Simple confirmation ══════ */}
       {!siIsNvocc && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ padding: '16px 18px', background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: 8 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: '#15803d', marginBottom: 8 }}>Confirm SI Submitted to Liner</div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+        <div className="flex flex-col gap-4">
+          <div className="rounded-card border border-success-line bg-success-bg px-4 py-3.5">
+            <div className="mb-2 text-control font-bold text-success">Confirm SI Submitted to Liner</div>
+            <div className="text-control leading-relaxed text-fg-label">
               For non-NVOCC shipments, the Shipping Instructions are submitted directly to the liner by the shipper or through the liner's portal.
               Please confirm that the SI has been submitted for this booking.
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <label className="lt-label">Shipping Line</label>
-              <input className="lt-input" style={{ width: '100%', background: 'rgba(0,0,0,0.03)' }} value={gsBkg.shipping_line || ''} readOnly />
-            </div>
-            <div>
-              <label className="lt-label">Booking Ref</label>
-              <input className="lt-input" style={{ width: '100%', background: 'rgba(0,0,0,0.03)' }} value={gsBkg.id} readOnly />
-            </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+            <Field label="Shipping Line">
+              {ids => <Input {...ids} value={gsBkg.shipping_line || ''} readOnly className="bg-canvas" />}
+            </Field>
+            <Field label="Booking Ref">
+              {ids => <Input {...ids} value={gsBkg.id} readOnly className="bg-canvas" />}
+            </Field>
           </div>
-          <div>
-            <label className="lt-label">Notes (optional)</label>
-            <input className="lt-input" style={{ width: '100%' }} value={formNote}
-              onChange={e => setFormNote(e.target.value)} placeholder="e.g. SI submitted via INTTRA portal on..." />
-          </div>
+          <Field label="Notes (optional)">
+            {ids => <Input {...ids} value={formNote}
+              onChange={e => setFormNote(e.target.value)} placeholder="e.g. SI submitted via INTTRA portal on..." />}
+          </Field>
         </div>
       )}
 
       {/* ══════ NVOCC: Full SI Generation Form ══════ */}
       {siIsNvocc && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* ── HEADER INFO ── */}
-          {gsSectionHeader('Addressed To')}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div className="flex flex-col gap-4">
+          <FormSection title="Addressed To">
             {gsInput('To (Shipping Line)', 'to_liner', { placeholder: 'e.g. HAPAG LLOYD' })}
             {gsInput('Attn', 'attn', { placeholder: 'e.g. B/L DEPARTMENT' })}
-            <div>
-              <label className="lt-label">BL Type</label>
-              <select className="lt-input" style={{ width: '100%' }} value={siField('bl_type')} onChange={e => setSiField('bl_type', e.target.value)}>
-                <option value="ORIGINAL">ORIGINAL</option>
-                <option value="SEAWAY BILL">SEAWAY BILL</option>
-                <option value="TELEX RELEASE">TELEX RELEASE</option>
-                <option value="EXPRESS RELEASE">EXPRESS RELEASE</option>
-              </select>
-            </div>
-          </div>
+            {gsSelect('BL Type', 'bl_type', ['ORIGINAL', 'SEAWAY BILL', 'TELEX RELEASE', 'EXPRESS RELEASE'])}
+          </FormSection>
 
-          {/* ── REFERENCE ── */}
-          {gsSectionHeader('Reference')}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <FormSection title="Reference">
             {gsInput('Booking Ref', 'booking_ref', { readOnly: true })}
             {gsInput('Job Ref', 'job_ref', { readOnly: true })}
-          </div>
+          </FormSection>
 
-          {/* ── PARTIES ── */}
-          {gsSectionHeader('Parties')}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
+          {/* One column */}
+          <section className="flex flex-col gap-3">
+            <SectionHead>Parties</SectionHead>
             {gsInput('Shipper Name', 'shipper_name', { placeholder: 'Shipper company name' })}
             {gsTextarea('Shipper Address', 'shipper_address', 'Full shipper address...')}
             {gsInput('Consignee Name', 'consignee_name', { placeholder: 'Consignee company name' })}
             {gsTextarea('Consignee Address', 'consignee_address', 'Full consignee address...')}
             {gsInput('Notify Party Name', 'notify_name', { placeholder: 'Notify party name' })}
             {gsTextarea('Notify Party Address', 'notify_address', 'Notify party address...')}
-          </div>
+          </section>
 
-          {/* ── VESSEL & ROUTE ── */}
-          {gsSectionHeader('Vessel & Route')}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <FormSection title="Vessel & Route">
             {gsInput('Vessel', 'vessel')}
             {gsInput('Voyage', 'voyage')}
-            <div>
-              <label className="lt-label">Delivery Type</label>
-              <select className="lt-input" style={{ width: '100%' }} value={siField('delivery_type')} onChange={e => setSiField('delivery_type', e.target.value)}>
-                <option value="CY/CY">CY/CY</option>
-                <option value="CY/SD">CY/SD</option>
-                <option value="SD/CY">SD/CY</option>
-                <option value="SD/SD">SD/SD</option>
-              </select>
-            </div>
+            {gsSelect('Delivery Type', 'delivery_type', ['CY/CY', 'CY/SD', 'SD/CY', 'SD/SD'])}
             {gsInput('Place of Receipt', 'place_of_receipt')}
             {gsInput('Port of Loading (POL)', 'pol')}
             {gsInput('Port of Discharge (POD)', 'pod')}
             {gsInput('SOB Date', 'sob_date', { type: 'date' })}
-          </div>
+          </FormSection>
 
-          {/* ── CONTAINER DETAILS ── */}
-          {gsSectionHeader('Container Details')}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <FormSection title="Container Details">
             {gsInput('Container No', 'container_no', { placeholder: 'e.g. HLBU1234567' })}
             {gsInput('Seal No', 'seal_no', { placeholder: 'e.g. SL123456' })}
             {gsInput('Container Size/Type', 'container_size', { readOnly: true })}
-          </div>
+          </FormSection>
 
-          {/* ── CARGO DETAILS ── */}
-          {gsSectionHeader('Cargo Details')}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <FormSection title="Cargo Details">
             {gsTextarea('Marks & Nos', 'marks_and_numbers', 'Marks and numbers...')}
             {gsTextarea('Description of Goods', 'description_of_goods', 'Commodity description...')}
             {gsInput('Weight (KGS)', 'weight_kgs', { placeholder: '0.00', type: 'number' })}
             {gsInput('Volume (M3)', 'volume_m3', { placeholder: '0.00', type: 'number' })}
-          </div>
+          </FormSection>
 
-          {/* ── TERMS ── */}
-          {gsSectionHeader('Terms')}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <label className="lt-label">Freight</label>
-              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                {(['PREPAID', 'COLLECT'] as const).map(f => (
-                  <button key={f}
-                    className={`db-btn ${siField('freight') === f ? 'primary' : ''}`}
-                    style={siField('freight') !== f ? { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' } : {}}
-                    onClick={() => setSiField('freight', f)}>
-                    {f}
-                  </button>
-                ))}
-              </div>
-            </div>
+          <FormSection title="Terms">
+            <ToggleGroup label="Freight" options={['PREPAID', 'COLLECT'] as const} value={siField('freight')}
+              onSelect={f => setSiField('freight', f)} />
             {gsInput('Total Containers', 'total_containers', { readOnly: true })}
-            <div>
-              <label className="lt-label">Shipped on Board</label>
-              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                {(['YES', 'NO'] as const).map(v => (
-                  <button key={v}
-                    className={`db-btn ${siField('shipped_on_board') === v ? 'primary' : ''}`}
-                    style={siField('shipped_on_board') !== v ? { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' } : {}}
-                    onClick={() => setSiField('shipped_on_board', v)}>
-                    {v}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+            <ToggleGroup label="Shipped on Board" options={['YES', 'NO'] as const} value={siField('shipped_on_board')}
+              onSelect={v => setSiField('shipped_on_board', v)} />
+          </FormSection>
 
-          {/* Notes */}
-          <div>
-            <label className="lt-label">Notes (optional)</label>
-            <input className="lt-input" style={{ width: '100%' }} value={formNote}
-              onChange={e => setFormNote(e.target.value)} placeholder="Internal notes..." />
-          </div>
+          <Field label="Notes (optional)">
+            {ids => <Input {...ids} value={formNote}
+              onChange={e => setFormNote(e.target.value)} placeholder="Internal notes..." />}
+          </Field>
 
           {/* ── SEND TO LINER ── */}
-          <div style={{ borderTop: '2px solid var(--border)', paddingTop: 14, marginTop: 4, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div>
-              <label className="lt-label">Liner Email Address <span style={{ color: '#dc2626' }}>*</span></label>
-              <input className="lt-input" type="email" style={{ width: '100%', marginTop: 4 }}
+          <div className="flex flex-col gap-3 border-t-2 border-line pt-4">
+            <Field label="Liner Email Address" required>
+              {ids => <Input {...ids} type="email"
                 value={siLinerEmail} onChange={e => setSiLinerEmail(e.target.value)}
-                placeholder="bl@hapag-lloyd.com" />
-            </div>
-            <button className="db-btn" type="button"
+                placeholder="bl@hapag-lloyd.com" />}
+            </Field>
+            <Button variant="primary" className="w-full justify-start" icon={<Mail size={14} aria-hidden="true" />}
               disabled={!siLinerEmail.includes('@')}
               onClick={() => {
                 const draft = siEmailDraft.trim() || generateEmailDraft()
@@ -2151,42 +2113,30 @@ export default function InlineStepForms({
                 const subject = lines[0].replace(/^Subject:\s*/i, '').trim()
                 const body = lines.slice(2).join('\n')
                 openMailto(siLinerEmail, subject, body)
-              }}
-              style={siLinerEmail.includes('@')
-                ? { background: '#0078d4', borderColor: '#0078d4', color: '#fff', width: '100%' }
-                : { opacity: 0.4, cursor: 'not-allowed', width: '100%' }}>
-              <Mail size={13} style={{ marginRight: 6 }} /> Open in Outlook
-            </button>
+              }}>
+              Open in Outlook
+            </Button>
 
             {/* Draft — collapsible, optional */}
             {!siEmailShow ? (
-              <button
-                className="db-btn"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: '#0891b2', fontWeight: 600, fontSize: 12, width: '100%', padding: '10px 0' }}
+              <Button className="w-full font-semibold text-primary" icon={<ChevronRight size={14} aria-hidden="true" />}
                 onClick={generateEmailDraft}>
-                <ChevronDown size={13} style={{ marginRight: 6, transform: 'rotate(-90deg)' }} />
                 View Email Draft
-              </button>
+              </Button>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#0891b2', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email Draft to Liner</span>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="db-btn" style={{ fontSize: 11, background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span id="ws-gs-draft-label" className="text-label font-bold uppercase tracking-label text-primary">Email Draft to Liner</span>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" icon={<ClipboardPaste size={12} aria-hidden="true" />}
                       onClick={() => { navigator.clipboard.writeText(siEmailDraft) }}>
-                      <ClipboardPaste size={11} style={{ marginRight: 4 }} /> Copy
-                    </button>
-                    <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11 }}
-                      onClick={() => setSiEmailShow(false)}>Collapse</button>
+                      Copy
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setSiEmailShow(false)}>Collapse</Button>
                   </div>
                 </div>
-                <textarea
-                  className="lt-input mono"
-                  rows={16}
-                  style={{ width: '100%', resize: 'vertical', fontSize: 11, lineHeight: 1.6, fontFamily: 'ui-monospace, "Cascadia Code", monospace' }}
-                  value={siEmailDraft}
-                  onChange={e => setSiEmailDraft(e.target.value)}
-                />
+                <Textarea aria-labelledby="ws-gs-draft-label" rows={16} className="resize-y font-mono text-label leading-relaxed"
+                  value={siEmailDraft} onChange={e => setSiEmailDraft(e.target.value)} />
               </div>
             )}
           </div>
@@ -2197,13 +2147,11 @@ export default function InlineStepForms({
       {(() => {
         const gsDisabled = siIsNvocc && (!siField('shipper_name').trim() || !siField('consignee_name').trim())
         return (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            <button className="db-btn primary" onClick={handleModalSubmit} disabled={gsDisabled}
-              style={gsDisabled ? { opacity: 0.4, cursor: 'not-allowed' } : { background: '#0891b2', borderColor: '#0891b2' }}>
-              {siIsNvocc
-                ? <><FileText size={12} /> Generate SI Document</>
-                : <><Check size={12} /> Confirm SI Submitted</>}
-            </button>
+          <div className="flex justify-end">
+            <Button variant="primary" onClick={handleModalSubmit} disabled={gsDisabled}
+              icon={siIsNvocc ? <FileText size={14} aria-hidden="true" /> : <Check size={14} aria-hidden="true" />}>
+              {siIsNvocc ? 'Generate SI Document' : 'Confirm SI Submitted'}
+            </Button>
           </div>
         )
       })()}

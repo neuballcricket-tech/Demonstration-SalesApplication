@@ -458,6 +458,8 @@ describe('InlineStepForms confirm-liner-booking', () => {
 
 // ── Part 2b (SI, vessel, BL and booking request steps) ─────────────────────
 
+const rec = (values: Record<string, string>) => (k: string) => values[k] ?? ''
+
 describe('InlineStepForms submit-si', () => {
   const siProps = (over: Partial<InlineStepFormsProps> = {}): Partial<InlineStepFormsProps> => ({
     siMode: 'paste', setSiMode: () => {}, siContent: '', setSiContent: () => {},
@@ -512,5 +514,76 @@ describe('InlineStepForms submit-si', () => {
     await user.click(screen.getByRole('button', { name: 'Remove vgm.pdf' }))
     expect(setVgmCertFileName).toHaveBeenLastCalledWith('')
     expect(setVgmCertContent).toHaveBeenLastCalledWith('')
+  })
+})
+
+describe('InlineStepForms generate-si', () => {
+  const gsProps = (fields: Record<string, string>, over: Partial<InlineStepFormsProps> = {}): Partial<InlineStepFormsProps> => ({
+    siField: rec(fields), setSiField: () => {}, siIsNvocc: true,
+    siEmailShow: false, setSiEmailShow: () => {}, siEmailDraft: '', setSiEmailDraft: () => {},
+    siLinerEmail: '', setSiLinerEmail: () => {},
+    ...over,
+  })
+
+  it('non-NVOCC shows read-only liner and booking ref and an enabled confirm button', async () => {
+    const user = userEvent.setup()
+    const setFormNote = vi.fn()
+    renderStep('generate-si', booking(), gsProps({}, { siIsNvocc: false, setFormNote }))
+    expect(screen.getByRole('textbox', { name: 'Shipping Line' })).toHaveValue('Maersk')
+    expect(screen.getByRole('textbox', { name: 'Booking Ref' })).toHaveAttribute('readonly')
+    expect(screen.getByRole('button', { name: 'Confirm SI Submitted' })).toBeEnabled()
+    await user.type(screen.getByRole('textbox', { name: 'Notes (optional)' }), 'x')
+    expect(setFormNote).toHaveBeenCalledWith('x')
+  })
+
+  it('NVOCC needs shipper and consignee names; Freight and BL Type update their fields', async () => {
+    const user = userEvent.setup()
+    const setSiField = vi.fn()
+    const { unmount } = renderStep('generate-si', booking(), gsProps({ freight: 'PREPAID', bl_type: 'ORIGINAL', shipper_name: 'S' }, { setSiField }))
+    expect(screen.getByRole('button', { name: 'Generate SI Document' })).toBeDisabled()
+    const freight = screen.getByRole('group', { name: 'Freight' })
+    expect(within(freight).getByRole('button', { name: 'PREPAID' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(freight).getByRole('button', { name: 'COLLECT' })).toHaveAttribute('aria-pressed', 'false')
+    await user.click(within(freight).getByRole('button', { name: 'COLLECT' }))
+    expect(setSiField).toHaveBeenCalledWith('freight', 'COLLECT')
+    await user.click(within(screen.getByRole('group', { name: 'Shipped on Board' })).getByRole('button', { name: 'NO' }))
+    expect(setSiField).toHaveBeenCalledWith('shipped_on_board', 'NO')
+    await user.click(screen.getByRole('button', { name: /BL Type/ }))
+    await user.click(screen.getByRole('option', { name: 'TELEX RELEASE' }))
+    expect(setSiField).toHaveBeenCalledWith('bl_type', 'TELEX RELEASE')
+    await user.type(screen.getByRole('textbox', { name: 'Shipper Name' }), 'X')
+    expect(setSiField).toHaveBeenCalledWith('shipper_name', 'SX')
+    unmount()
+    renderStep('generate-si', booking(), gsProps({ shipper_name: 'S', consignee_name: 'C' }))
+    expect(screen.getByRole('button', { name: 'Generate SI Document' })).toBeEnabled()
+  })
+
+  it('the SOB Date picker round-trips an ISO date', async () => {
+    const setSiField = vi.fn()
+    renderStep('generate-si', booking(), gsProps({ sob_date: '2026-12-05' }, { setSiField }))
+    const group = screen.getByRole('group', { name: 'SOB Date' })
+    expect(within(group).getByRole('spinbutton', { name: /day/ })).toHaveTextContent('05')
+    expect(within(group).getByRole('spinbutton', { name: /year/ })).toHaveTextContent('2026')
+  })
+
+  it('Open in Outlook needs an email; View Email Draft builds the draft; the shown draft can be edited and collapsed', async () => {
+    const user = userEvent.setup()
+    const setSiEmailDraft = vi.fn(), setSiEmailShow = vi.fn()
+    const fields = { booking_ref: 'BKG-TEST', pol: 'Colombo', pod: 'Hamburg', to_liner: 'HL' }
+    const { unmount } = renderStep('generate-si', booking(), gsProps(fields, { setSiEmailDraft, setSiEmailShow, siLinerEmail: 'bl' }))
+    expect(screen.getByRole('button', { name: 'Open in Outlook' })).toBeDisabled()
+    await user.click(screen.getByRole('button', { name: 'View Email Draft' }))
+    expect(setSiEmailDraft).toHaveBeenCalledWith(expect.stringMatching(/^Subject: Shipping Instructions .* BKG-TEST — Colombo → Hamburg\nDear HL,/))
+    expect(setSiEmailShow).toHaveBeenCalledWith(true)
+    unmount()
+    setSiEmailDraft.mockClear()
+    renderStep('generate-si', booking(), gsProps(fields, { setSiEmailDraft, setSiEmailShow, siEmailShow: true, siEmailDraft: 'Subject: X', siLinerEmail: 'bl@hl.com' }))
+    expect(screen.getByRole('button', { name: 'Open in Outlook' })).toBeEnabled()
+    const draft = screen.getByRole('textbox', { name: 'Email Draft to Liner' })
+    expect(draft).toHaveClass('font-mono')
+    await user.type(draft, '!')
+    expect(setSiEmailDraft).toHaveBeenCalledWith('Subject: X!')
+    await user.click(screen.getByRole('button', { name: 'Collapse' }))
+    expect(setSiEmailShow).toHaveBeenCalledWith(false)
   })
 })
