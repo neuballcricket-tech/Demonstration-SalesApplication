@@ -17,7 +17,8 @@ import type { WorkspaceItem, BlContainerRow, MblContainerRow, QuotationOptionOve
 import { empName, openMailto, buildRateSection, generateQuotationPdf } from "./utils"
 import { lookupQuotationId } from "./useWorkspaceActions"
 import { COLOR } from "../../ui/tokens"
-import { Button, Checkbox, DatePicker, Field, Input, Select, type Option } from "../../ui"
+import { Button, Checkbox, DatePicker, Field, Input, NumberInput, Select, Textarea, Tooltip, type Option } from "../../ui"
+import { labelClass } from "../../ui/controlStyles"
 import { cn } from "../../../lib/cn"
 
 export interface InlineStepFormsProps {
@@ -159,6 +160,9 @@ export interface InlineStepFormsProps {
 const KYC_CLIENT_TYPE_OPTIONS: Option[] = ['Shipper', 'Buyer', 'Agent', 'Trader'].map(v => ({ value: v, label: v }))
 const KYC_CURRENCY_OPTIONS: Option[] = ['USD', 'LKR', 'EUR', 'GBP'].map(v => ({ value: v, label: v }))
 
+/** Column layout of the Prepare Quotation rate-option table (header and rows). */
+const PQ_GRID = 'grid grid-cols-[48px_1fr_110px_80px_104px_80px_1fr]'
+
 /** Navy title bar at the top of a step form. */
 function StepHeader({ icon, title, subtitle, className }: { icon?: ReactNode; title: string; subtitle?: string; className?: string }) {
   return (
@@ -185,6 +189,16 @@ function RegistryValue({ label, strong, className, children }: { label: string; 
     <div className={className}>
       <div className="mb-0.5 text-label text-fg-muted">{label}</div>
       <div className={cn('text-control text-fg', strong && 'font-semibold')}>{children}</div>
+    </div>
+  )
+}
+
+/** Label-cell row of the Prepare Quotation summary table. */
+function SummaryRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-[140px_1fr] border-b border-line-soft">
+      <div className={cn(labelClass, 'flex items-center border-r border-line-soft bg-canvas px-3 py-2')}>{label}</div>
+      <div className="px-2.5 py-2 text-control font-semibold text-fg">{children}</div>
     </div>
   )
 }
@@ -435,57 +449,31 @@ export default function InlineStepForms({
   })
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      {/* Header */}
-      <div style={{ padding: '8px 14px', background: 'var(--accent)', borderRadius: '8px 8px 0 0', marginBottom: 1 }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>PREPARE QUOTATION</span>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginLeft: 10 }}>
-          Select rates, set margins, and review before sending
-        </span>
-      </div>
+    <div className="flex flex-col">
+      <StepHeader className="mb-px rounded-b-none" title="PREPARE QUOTATION" subtitle="Select rates, set margins, and review before sending" />
 
       {/* Fields */}
-      <div style={{ border: '1px solid var(--border)', borderRadius: '0 0 8px 8px', overflow: 'hidden' }}>
-        {/* Customer row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Customer</div>
-          <div style={{ padding: '8px 10px', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
-            {pqInq.customer_name}
-          </div>
-        </div>
-
-        {/* Route row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Route</div>
-          <div style={{ padding: '8px 10px', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
-            {pqInq.origin} → {pqDest}
-          </div>
-        </div>
-
-        {/* Cargo row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Cargo</div>
-          <div style={{ padding: '8px 10px', fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
-            {pqContainerLabel}{pqCommodity ? ` · ${pqCommodity}` : ''}
-          </div>
-        </div>
+      <div className="overflow-hidden rounded-b-card border border-line-soft bg-surface">
+        <SummaryRow label="Customer">{pqInq.customer_name}</SummaryRow>
+        <SummaryRow label="Route">{pqInq.origin} → {pqDest}</SummaryRow>
+        <SummaryRow label="Cargo">{pqContainerLabel}{pqCommodity ? ` · ${pqCommodity}` : ''}</SummaryRow>
 
         {/* RATE OPTIONS section divider */}
-        <div style={{ padding: '7px 12px', background: 'rgba(44,44,130,0.12)', borderBottom: '1px solid var(--border)' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: 0.4 }}>RATE OPTIONS</span>
-          <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>{pqOptions.length} option{pqOptions.length !== 1 ? 's' : ''}</span>
+        <div className="border-b border-line-soft bg-primary-subtle px-3 py-2">
+          <span className="text-label font-bold uppercase tracking-label text-primary">RATE OPTIONS</span>
+          <span className="ml-2 text-label text-fg-muted">{pqOptions.length} option{pqOptions.length !== 1 ? 's' : ''}</span>
         </div>
 
         {/* Rate options table header */}
         {pqOptions.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: '36px 1fr 110px 80px 100px 80px 1fr', borderBottom: '1px solid var(--border)', background: 'var(--bg-card)' }}>
-            <div style={{ padding: '6px 4px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center' }}></div>
-            <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', borderRight: '1px solid var(--border)' }}>LINER / VESSEL</div>
-            <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center', borderRight: '1px solid var(--border)' }}>SCHEDULE</div>
-            <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'right', borderRight: '1px solid var(--border)' }}>RATE</div>
-            <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center', borderRight: '1px solid var(--border)' }}>MARGIN</div>
-            <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'right', borderRight: '1px solid var(--border)' }}>FINAL</div>
-            <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>REMARK</div>
+          <div className={cn(PQ_GRID, 'border-b border-line-soft bg-canvas text-label font-bold text-fg-muted')}>
+            <div className="px-1 py-1.5"></div>
+            <div className="border-r border-line-soft px-2 py-1.5">LINER / VESSEL</div>
+            <div className="border-r border-line-soft px-2 py-1.5 text-center">SCHEDULE</div>
+            <div className="border-r border-line-soft px-2 py-1.5 text-right">RATE</div>
+            <div className="border-r border-line-soft px-2 py-1.5 text-center">MARGIN</div>
+            <div className="border-r border-line-soft px-2 py-1.5 text-right">FINAL</div>
+            <div className="px-2 py-1.5">REMARK</div>
           </div>
         )}
 
@@ -503,18 +491,23 @@ export default function InlineStepForms({
           const fmtShort = (d: string | null | undefined) => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : null
           const vesselLabel = opt.vessel_name || r.vessel_name || null
           const voyageLabel = opt.voyage_number || null
+          const optionName = `${linerName}${vesselLabel ? ` ${vesselLabel}` : ''}${voyageLabel ? ` / ${voyageLabel}` : ''}`
+          const marginInvalid = isSelected && ovr.margin <= 0
+          const markupLabel = ovr.isPercentage ? 'Percentage markup' : 'Flat amount markup'
+          // A disabled button can't be focused or hovered, so it gets no tooltip.
+          const markupButton = (
+            <Button className={cn('w-8 px-0', ovr.isPercentage ? 'text-primary' : 'text-fg-muted')}
+              onClick={() => setOptionOverrides(prev => ({ ...prev, [opt.option_id]: { ...ovr, isPercentage: !ovr.isPercentage } }))}
+              disabled={!isSelected}>
+              {ovr.isPercentage ? '%' : '$'}
+            </Button>
+          )
 
           return (
-            <div key={opt.option_id} style={{
-              display: 'grid',
-              gridTemplateColumns: '36px 1fr 110px 80px 100px 80px 1fr',
-              borderBottom: isLast ? undefined : '1px solid var(--border)',
-              opacity: isSelected ? 1 : 0.4,
-              background: isBest ? 'rgba(22,163,74,0.04)' : undefined,
-            }}>
+            <div key={opt.option_id} className={cn(PQ_GRID, !isLast && 'border-b border-line-soft', !isSelected && 'opacity-40', isBest && 'bg-success-bg')}>
               {/* Checkbox + best star */}
-              <div style={{ padding: '6px 4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-                <input type="checkbox" checked={isSelected}
+              <div className="flex items-center justify-center gap-1 px-1 py-1.5">
+                <Checkbox checked={isSelected} aria-label={`Include ${optionName}`}
                   onChange={() => {
                     setSelectedRateOptionIds(prev => {
                       const next = new Set(prev)
@@ -523,42 +516,44 @@ export default function InlineStepForms({
                       return next
                     })
                   }}
-                  style={{ cursor: 'pointer' }}
                 />
-                <button type="button" title={isBest ? 'Best rate' : 'Mark as best'}
-                  onClick={() => setBestRateOptionId(isBest ? null : opt.option_id)}
-                  style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0, fontSize: 13, lineHeight: 1, color: isBest ? '#f59e0b' : 'var(--text-muted)' }}>
-                  {isBest ? '★' : '☆'}
-                </button>
+                <Tooltip content={isBest ? 'Best rate' : 'Mark as best'}>
+                  <button type="button" aria-label={`Best rate: ${optionName}`} aria-pressed={isBest}
+                    onClick={() => setBestRateOptionId(isBest ? null : opt.option_id)}
+                    className={cn('border-none bg-transparent p-0 text-body leading-none', isBest ? 'text-warning' : 'text-fg-muted')}>
+                    {isBest ? '★' : '☆'}
+                  </button>
+                </Tooltip>
               </div>
 
               {/* Liner / Vessel info */}
-              <div style={{ padding: '6px 8px', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{linerName}</span>
-                {vesselLabel && <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{vesselLabel}{voyageLabel ? ` / ${voyageLabel}` : ''}</span>}
-                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{typeLabel}{opt.service_name ? ` · ${opt.service_name}` : ''}</span>
+              <div className="flex flex-col justify-center gap-px border-r border-line-soft px-2 py-1.5">
+                <span className="text-control font-semibold text-fg">{linerName}</span>
+                {vesselLabel && <span className="text-label text-fg-label">{vesselLabel}{voyageLabel ? ` / ${voyageLabel}` : ''}</span>}
+                <span className="text-label text-fg-muted">{typeLabel}{opt.service_name ? ` · ${opt.service_name}` : ''}</span>
               </div>
 
               {/* Schedule — ETD / ETA / Cutoff */}
-              <div style={{ padding: '5px 8px', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 1 }}>
+              <div className="flex flex-col justify-center gap-px border-r border-line-soft px-2 py-1.5 text-label">
                 {(opt.etd_pol || opt.eta_pod) ? (<>
-                  {opt.etd_pol && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>ETD {fmtShort(opt.etd_pol)}</div>}
-                  {opt.eta_pod && <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>ETA {fmtShort(opt.eta_pod)}</div>}
-                  {opt.bk_cutoff && <div style={{ fontSize: 11, color: '#b45309' }}>Cut {fmtShort(opt.bk_cutoff)}</div>}
+                  {opt.etd_pol && <div className="text-fg-label">ETD {fmtShort(opt.etd_pol)}</div>}
+                  {opt.eta_pod && <div className="text-fg-label">ETA {fmtShort(opt.eta_pod)}</div>}
+                  {opt.bk_cutoff && <div className="text-warning">Cut {fmtShort(opt.bk_cutoff)}</div>}
                 </>) : (
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.transit ? `${r.transit}d transit` : '—'}</span>
+                  <span className="text-fg-muted">{r.transit ? `${r.transit}d transit` : '—'}</span>
                 )}
               </div>
 
               {/* Base rate */}
-              <div style={{ padding: '6px 8px', borderRight: '1px solid var(--border)', textAlign: 'right', fontSize: 12, fontWeight: 600, color: 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+              <div className="flex items-center justify-end border-r border-line-soft px-2 py-1.5 text-control font-semibold text-fg">
                 {baseRate.toLocaleString()} {r.currency ?? 'USD'}
               </div>
 
               {/* Margin input + toggle */}
-              <div style={{ padding: '4px 4px', borderRight: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 2 }}>
-                <input className="lt-input" type="number" step="any"
-                  style={{ width: 48, border: `1px solid ${isSelected && ovr.margin <= 0 ? '#dc2626' : 'var(--border)'}`, borderRadius: 4, background: isSelected && ovr.margin <= 0 ? 'rgba(220,38,38,0.04)' : 'transparent', padding: '3px 4px', textAlign: 'right', fontSize: 11 }}
+              <div className="flex items-center gap-1 border-r border-line-soft px-1 py-1">
+                <NumberInput step="any" aria-label={`Margin: ${optionName}`}
+                  className={cn('w-12 text-right', marginInvalid && 'bg-danger-bg')}
+                  aria-invalid={marginInvalid || undefined}
                   value={ovr.margin}
                   onChange={e => {
                     const val = parseFloat(e.target.value) || 0
@@ -566,24 +561,17 @@ export default function InlineStepForms({
                   }}
                   disabled={!isSelected}
                 />
-                <button type="button"
-                  style={{ border: '1px solid var(--border)', borderRadius: 4, background: 'transparent', cursor: 'pointer', padding: '2px 4px', fontSize: 11, fontWeight: 600, color: ovr.isPercentage ? 'var(--accent)' : 'var(--text-muted)', minWidth: 24, textAlign: 'center' }}
-                  onClick={() => setOptionOverrides(prev => ({ ...prev, [opt.option_id]: { ...ovr, isPercentage: !ovr.isPercentage } }))}
-                  disabled={!isSelected}
-                  title={ovr.isPercentage ? 'Percentage markup' : 'Flat amount markup'}>
-                  {ovr.isPercentage ? '%' : '$'}
-                </button>
+                {isSelected ? <Tooltip content={markupLabel}>{markupButton}</Tooltip> : markupButton}
               </div>
 
               {/* Final amount */}
-              <div style={{ padding: '6px 8px', borderRight: '1px solid var(--border)', textAlign: 'right', fontSize: 12, fontWeight: 700, color: isBest ? '#16a34a' : 'var(--text)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
+              <div className={cn('flex items-center justify-end border-r border-line-soft px-2 py-1.5 text-control font-bold', isBest ? 'text-success' : 'text-fg')}>
                 {(Math.round(finalAmt * 100) / 100).toLocaleString()}
               </div>
 
               {/* Remark input */}
-              <div style={{ padding: '4px 6px', display: 'flex', alignItems: 'center' }}>
-                <input className="lt-input"
-                  style={{ width: '100%', border: 'none', background: 'transparent', padding: '3px 0', fontSize: 11 }}
+              <div className="flex items-center px-1.5 py-1">
+                <Input aria-label={`Remark: ${optionName}`}
                   value={ovr.remark}
                   onChange={e => setOptionOverrides(prev => ({ ...prev, [opt.option_id]: { ...ovr, remark: e.target.value } }))}
                   placeholder="Add remark…"
@@ -595,27 +583,25 @@ export default function InlineStepForms({
         })}
 
         {pqOptions.length === 0 && (
-          <div style={{ padding: '16px 12px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>
+          <div className="px-3 py-4 text-center text-control text-fg-muted">
             No rate options available. Rate check may not have been completed.
           </div>
         )}
 
         {/* QUOTATION DOCUMENT section divider */}
-        <div style={{ padding: '7px 12px', background: 'rgba(44,44,130,0.12)', borderBottom: '1px solid var(--border)' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', letterSpacing: 0.4 }}>QUOTATION DOCUMENT</span>
+        <div className="border-b border-line-soft bg-primary-subtle px-3 py-2">
+          <span id="ws-pq-document-label" className="text-label font-bold uppercase tracking-label text-primary">QUOTATION DOCUMENT</span>
         </div>
 
         {/* Quotation textarea */}
-        <div style={{ padding: '8px 10px', borderBottom: '1px solid var(--border)' }}>
-          <textarea
-            className="lt-input"
-            style={{ width: '100%', minHeight: 140, border: '1px solid var(--border)', borderRadius: 6, background: 'transparent', padding: '8px 10px', fontSize: 11, fontFamily: 'monospace', resize: 'vertical' }}
+        <div className="border-b border-line-soft px-2.5 py-2">
+          <Textarea aria-labelledby="ws-pq-document-label"
+            className="min-h-[140px] resize-y font-mono text-label"
             value={quotationContent}
             onChange={e => { setQuotationContent(e.target.value); setQuoteCopied(false) }}
           />
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
-            <button type="button"
-              style={{ border: '1px solid var(--border)', borderRadius: 4, background: 'transparent', cursor: 'pointer', padding: '3px 10px', fontSize: 11, fontWeight: 600, color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: 4 }}
+          <div className="mt-1 flex justify-end gap-2">
+            <Button size="sm" icon={<FileText size={14} aria-hidden="true" />}
               onClick={() => generateQuotationPdf(
                 pqInq,
                 pqCont,
@@ -627,43 +613,40 @@ export default function InlineStepForms({
                 activeEmployee.name,
                 computeFinal,
               )}>
-              <FileText size={11} /> Download PDF
-            </button>
-            <button type="button"
-              style={{ border: '1px solid var(--border)', borderRadius: 4, background: quoteCopied ? 'rgba(22,163,74,0.08)' : 'transparent', cursor: 'pointer', padding: '3px 10px', fontSize: 11, fontWeight: 600, color: quoteCopied ? '#16a34a' : 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4 }}
+              Download PDF
+            </Button>
+            <Button size="sm" className={cn(quoteCopied && 'text-success')}
+              icon={quoteCopied ? <ClipboardCheck size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
               onClick={() => { navigator.clipboard.writeText(quotationContent); setQuoteCopied(true) }}>
-              {quoteCopied ? <><ClipboardCheck size={11} /> Copied</> : <><Copy size={11} /> Copy to Clipboard</>}
-            </button>
+              {quoteCopied ? 'Copied' : 'Copy to Clipboard'}
+            </Button>
           </div>
         </div>
 
         {/* Notes row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr' }}>
-          <div style={{ padding: '8px 12px', background: 'var(--bg-card)', borderRight: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center' }}>Notes</div>
-          <div style={{ padding: '4px 8px' }}>
-            <input className="lt-input" style={{ width: '100%', border: 'none', background: 'transparent', padding: '4px 0' }}
-              value={formNote} onChange={e => setFormNote(e.target.value)}
-              placeholder="Internal notes (optional)"
-            />
+        <div className="grid grid-cols-[140px_1fr]">
+          <label htmlFor="ws-pq-notes" className={cn(labelClass, 'flex items-center border-r border-line-soft bg-canvas px-3 py-2')}>Notes</label>
+          <div className="px-2 py-1">
+            <Input id="ws-pq-notes" value={formNote} onChange={e => setFormNote(e.target.value)} placeholder="Internal notes (optional)" />
           </div>
         </div>
       </div>
 
       {/* Margin warning */}
       {hasInvalidMargin && selectedRateOptionIds.size > 0 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', marginTop: 12, background: 'rgba(220,38,38,0.06)', border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8, fontSize: 12, color: '#dc2626' }}>
-          <AlertTriangle size={14} />
+        <div className="mt-3 flex items-center gap-2 rounded-card border border-danger-line bg-danger-bg px-3.5 py-2 text-control text-danger">
+          <AlertTriangle size={14} className="shrink-0" aria-hidden="true" />
           <span>One or more selected options have a <strong>zero or negative margin</strong>. Special permission is required to proceed with non-positive margins.</span>
         </div>
       )}
 
       {/* Submit */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-        <button className="db-btn primary"
+      <div className="mt-5 flex justify-end gap-2.5">
+        <Button variant="primary" icon={<Send size={14} aria-hidden="true" />}
           disabled={(selectedRateOptionIds.size === 0 && pqOptions.length > 0) || hasInvalidMargin}
           onClick={handleModalSubmit}>
-          <Send size={12} /> Save Quotation
-        </button>
+          Save Quotation
+        </Button>
       </div>
     </div>
   )
