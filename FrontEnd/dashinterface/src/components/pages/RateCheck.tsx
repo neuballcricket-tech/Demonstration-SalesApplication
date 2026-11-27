@@ -1754,6 +1754,7 @@ export default function RateCheck({
 
   // Options for the manual entry controls
   const preferredLinerOptions: Option[] = [
+    { value: '', label: 'Select preferred liner' },
     ...(inquiry.preferred_liners || []).map(name => {
       const lr = linerList.find(x => x.name === name)
       return { value: name, label: lr ? linerDisplay(lr) : name }
@@ -1761,7 +1762,8 @@ export default function RateCheck({
     { value: '__other__', label: 'Other' },
   ]
   const linerItems = useMemo(() => uniqueItems(linerList.map(l => ({ value: l.name, description: linerDisplay(l) }))), [linerList])
-  const tradeLaneOptions: Option[] = tradeLaneList.map(t => ({ value: t.trln_name, label: t.trln_name }))
+  // As with the old native selects, the empty choice can be picked again
+  const tradeLaneOptions: Option[] = [{ value: '', label: 'Select trade lane' }, ...tradeLaneList.map(t => ({ value: t.trln_name, label: t.trln_name }))]
   const serviceLaneItems = uniqueItems(tradeLaneList.map(t => ({ value: t.trln_name })))
   // Optional field: the empty choice stays selectable
   const salesContactOptions: Option[] = [{ value: '', label: 'Select sales contact' }, ...employeeList.map(e => ({ value: e.name, label: e.name }))]
@@ -2065,7 +2067,6 @@ export default function RateCheck({
                                 setMrLiner(v)
                               }
                             }}
-                            placeholder="Select preferred liner"
                             options={preferredLinerOptions}
                           />
                         ) : (
@@ -2084,7 +2085,7 @@ export default function RateCheck({
                         )}
                       </Field>
                       <Field label="Trade Lane">
-                        {ids => <Select {...ids} value={mrTradeLane} onChange={setMrTradeLane} placeholder="Select trade lane" options={tradeLaneOptions} />}
+                        {ids => <Select {...ids} value={mrTradeLane} onChange={setMrTradeLane} options={tradeLaneOptions} />}
                       </Field>
                       <Field label="Service Lane">
                         {ids => <ComboBox {...ids} value={mrServiceLane} onChange={setMrServiceLane} items={serviceLaneItems} placeholder="Type to search..." />}
@@ -2174,7 +2175,7 @@ export default function RateCheck({
                     </SectionTitle>
                     <div className="flex flex-col gap-2">
                       <div className={cn(CONTAINER_GRID, 'items-end')}>
-                        <ColumnLabel>Container type</ColumnLabel>
+                        <ColumnLabel>Type</ColumnLabel>
                         <ColumnLabel>TUs</ColumnLabel>
                         <ColumnLabel>Max weight</ColumnLabel>
                         <ColumnLabel required>Rate</ColumnLabel>

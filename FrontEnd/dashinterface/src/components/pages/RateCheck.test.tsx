@@ -488,6 +488,22 @@ describe('RateCheck manual rate entry', () => {
     expect(screen.getByText('Added Manual Rates (2)')).toBeInTheDocument()
   })
 
+  it('lets the trade lane be cleared again, which blocks Add to brief with the trade lane message', async () => {
+    const { user, onFlash } = await openManualEntry()
+    expect(screen.getByRole('button', { name: / Trade Lane$/ })).toHaveTextContent('Asia - North Europe')
+    await pick(user, / Trade Lane$/, 'Select trade lane')
+    expect(screen.getByRole('button', { name: / Trade Lane$/ })).toHaveTextContent('Select trade lane')
+
+    await user.click(within(screen.getByRole('group', { name: 'Rate type' })).getByRole('button', { name: 'FAK' }))
+    await pick(user, / Liner$/, 'MSC – MSCU')
+    await typeDate(user, 'Valid From', '01122026')
+    await typeDate(user, 'Valid To', '31122026')
+    await user.type(screen.getByRole('spinbutton', { name: 'Rate, row 1' }), '1500')
+    await user.click(screen.getByRole('button', { name: 'Add to brief' }))
+    expect(onFlash).toHaveBeenCalledWith('Select a trade lane before adding this rate.')
+    expect(api.apiCreateFakRate).not.toHaveBeenCalled()
+  })
+
   it('switches the liner to a free-text search with Other and back to the preferred list', async () => {
     const { user } = await openManualEntry()
     await user.click(screen.getByRole('button', { name: 'Other' }))
