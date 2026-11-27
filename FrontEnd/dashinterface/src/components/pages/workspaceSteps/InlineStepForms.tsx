@@ -159,10 +159,12 @@ export interface InlineStepFormsProps {
 const KYC_CLIENT_TYPE_OPTIONS: Option[] = ['Shipper', 'Buyer', 'Agent', 'Trader'].map(v => ({ value: v, label: v }))
 const KYC_CURRENCY_OPTIONS: Option[] = ['USD', 'LKR', 'EUR', 'GBP'].map(v => ({ value: v, label: v }))
 
-/** Selected state of a toggle button in a group (Customer Decision, Send Method). */
+/** Selected state of a toggle button in a group (Send Method). */
 const SELECTED_TOGGLE = 'border-primary bg-primary text-white hover:bg-primary-hover'
-/** "Download Quotation PDF" after the file was fetched. */
-const DOWNLOADED_BUTTON = 'border-success bg-success text-white hover:bg-success'
+/** Success state: the selected "Accepted" decision and "Download Quotation PDF" after the file was fetched. */
+const SELECTED_SUCCESS = 'border-success bg-success text-white hover:bg-success'
+/** Danger state: the selected "Rejected" decision. */
+const SELECTED_DANGER = 'border-danger bg-danger text-white hover:bg-danger hover:opacity-90'
 /** Column layout of the Prepare Quotation rate-option table (header and rows). */
 const PQ_GRID = 'grid grid-cols-[48px_1fr_110px_80px_104px_80px_1fr]'
 
@@ -682,12 +684,12 @@ export default function InlineStepForms({
       <div className="flex flex-col gap-1">
         <span id="ws-cr-decision-label" className={labelClass}>Customer Decision</span>
         <div role="group" aria-labelledby="ws-cr-decision-label" className="flex gap-2">
-          <Button aria-pressed={customerDecision === 'accepted'} className={cn(customerDecision === 'accepted' && SELECTED_TOGGLE)}
+          <Button aria-pressed={customerDecision === 'accepted'} className={cn(customerDecision === 'accepted' && SELECTED_SUCCESS)}
             icon={<Check size={14} aria-hidden="true" />}
             onClick={() => setCustomerDecision('accepted')}>
             Accepted
           </Button>
-          <Button aria-pressed={customerDecision === 'rejected'} className={cn(customerDecision === 'rejected' && SELECTED_TOGGLE)}
+          <Button aria-pressed={customerDecision === 'rejected'} className={cn(customerDecision === 'rejected' && SELECTED_DANGER)}
             icon={<X size={14} aria-hidden="true" />}
             onClick={() => setCustomerDecision('rejected')}>
             Rejected
@@ -3902,7 +3904,7 @@ export default function InlineStepForms({
             <>
               {/* Download quotation PDF from S3 */}
               {resolvedQuoteId && (
-                <Button className={cn('w-full justify-start', pdfDownloaded && DOWNLOADED_BUTTON)}
+                <Button className={cn('w-full justify-start', pdfDownloaded && SELECTED_SUCCESS)}
                   icon={<FileText size={14} aria-hidden="true" />}
                   isPending={pdfDownloading} onClick={handleDownloadPdf}>
                   {pdfDownloading ? 'Downloading...' : pdfDownloaded ? 'Downloaded — attach to email' : 'Download Quotation PDF'}
@@ -3919,7 +3921,7 @@ export default function InlineStepForms({
               </p>
               <div className="rounded-card border border-info-line bg-info-bg px-3.5 py-2.5">
                 <Checkbox checked={emailConfirmed} onChange={setEmailConfirmed} className="items-start">
-                  <span className="text-fg-label">
+                  <span className="leading-4 text-fg-label">
                     I confirm that I have sent this quotation to the customer via email.
                     <span className="mt-0.5 block text-label text-fg-muted">
                       Download the PDF, open Outlook, attach the file, verify the content, send it, then check this box.
@@ -3944,7 +3946,7 @@ export default function InlineStepForms({
             <>
               {/* Download quotation PDF for WhatsApp attachment */}
               {resolvedQuoteId && (
-                <Button className={cn('w-full justify-start', pdfDownloaded && DOWNLOADED_BUTTON)}
+                <Button className={cn('w-full justify-start', pdfDownloaded && SELECTED_SUCCESS)}
                   icon={<FileText size={14} aria-hidden="true" />}
                   isPending={pdfDownloading} onClick={handleDownloadPdf}>
                   {pdfDownloading ? 'Downloading...' : pdfDownloaded ? 'Downloaded — attach to WhatsApp' : 'Download Quotation PDF'}
@@ -3966,7 +3968,7 @@ export default function InlineStepForms({
               </p>
               <div className="rounded-card border border-success-line bg-success-bg px-3.5 py-2.5">
                 <Checkbox checked={waConfirmed} onChange={setWaConfirmed} className="items-start">
-                  <span className="text-fg-label">
+                  <span className="leading-4 text-fg-label">
                     I confirm that I have sent this quotation to the customer via WhatsApp.
                     <span className="mt-0.5 block text-label text-fg-muted">
                       Download the PDF, open WhatsApp, attach the file, verify the content, send it, then check this box.
