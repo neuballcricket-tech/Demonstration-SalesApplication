@@ -12,6 +12,8 @@ import { useRole } from '../../RoleContext'
 import { FIELD_LABEL, INPUT_STYLE } from './pageStyles'
 import { apiFetchAllRates, apiGetPorts, apiGetLiners, apiGetTradeLanes, apiGetEmployeesDb, apiGetAuthEmployees, apiCreateVesselRate, apiCreateFakRate, apiCreateSpecialRate, apiCreateRateRequest, apiPatchRateRequestProc, apiAddRateRequestOption, apiGetIncomingRateRequests, apiGetAggregateScheduleRates, apiGetEnrichedScheduleRates, BACKEND_ACTOR_ID } from '../../api'
 import { COLOR } from '../ui/tokens'
+import { Button, Checkbox, EmptyState, Tooltip } from '../ui'
+import { cn } from '../../lib/cn'
 
 type ManualRateTab = 'vessel-spot' | 'fak' | 'special'
 const MR_TAB_LABELS: Record<ManualRateTab, string> = { 'vessel-spot': 'Spot Rate', fak: 'FAK', special: 'Special Rate' }
@@ -234,7 +236,11 @@ function countPivotRates(pivot: SelectablePivotResult): number {
 // SelectablePivotRateTable - rate types as columns, container types as sub-cols
 // ---------------------------------------------------------------------------
 
-function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onToggleGroup, onToggleSchedule, onAttachManualRate, emptyMessage }: {
+// Header and body cell classes for the pivot table (dense 11px data grid)
+const PIVOT_TH = 'whitespace-nowrap border-l border-white/20 px-1 py-1.5 text-center text-label font-bold tracking-label text-white'
+const PIVOT_TD = 'border-b border-l border-line-soft px-1 py-1.5 align-middle text-label text-fg'
+
+export function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onToggleGroup, onToggleSchedule, onAttachManualRate, emptyMessage }: {
   pivot: SelectablePivotResult
   selectedIds: Set<string>
   selectedScheduleIds: Set<number>
@@ -292,7 +298,7 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
   const clearAll = () => { setFCarrier(new Set()); setFOrigin(new Set()); setFDest(new Set()); setOpenFilter(null) }
 
   if (rows.length === 0) {
-    return <div style={{ padding: 16, fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>{emptyMessage || 'No schedule rates available.'}</div>
+    return <EmptyState title={emptyMessage || 'No schedule rates available.'} />
   }
 
   const SCHED_COL_COUNT = 9 + (onAttachManualRate ? 1 : 0) // 1 select checkbox + 8 schedule fields + optional attach col
@@ -305,15 +311,6 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
     { key: 'destination', label: 'Destination', values: distinct.destinations, active: fDest, set: setFDest },
   ]
 
-  const thBase: React.CSSProperties = {
-    padding: '5px 4px', fontSize: 11, fontWeight: 700, color: '#fff', letterSpacing: 0.3,
-    textAlign: 'center', whiteSpace: 'nowrap', borderLeft: '1px solid rgba(255,255,255,0.2)',
-  }
-  const tdBase: React.CSSProperties = {
-    padding: '5px 4px', fontSize: 11, color: 'var(--text)', verticalAlign: 'middle',
-    borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)',
-  }
-
   function cellTooltip(cell: SelectableRateCell): string {
     const lines: string[] = []
     lines.push(`${cell.currency} ${cell.rate.toLocaleString()}`)
@@ -324,65 +321,62 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
     return lines.join('\n')
   }
 
+  const scheduleName = (row: SelectablePivotRow) =>
+    `${row.linerName || '-'} ${row.vesselName || '-'}${row.voyageNumber ? ` / ${row.voyageNumber}` : ''}`
+
   return (
     <>
       {/* Count + clear */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, padding: '0 2px' }}>
-        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+      <div className="flex min-h-7 items-center justify-between px-0.5">
+        <div className="text-label text-fg-muted">
           {filtered.length === rows.length
             ? `${rows.length} schedule${rows.length !== 1 ? 's' : ''}`
             : `${filtered.length} of ${rows.length} (filtered)`}
         </div>
         {activeCount > 0 && (
-          <button onClick={clearAll} style={{ fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
-            <X size={10} /> Clear filters
-          </button>
+          <Button variant="ghost" size="sm" icon={<X size={14} aria-hidden="true" />} onClick={clearAll} className="text-danger">
+            Clear filters
+          </Button>
         )}
       </div>
 
       {/* Filter chips */}
-      <div ref={filterBarRef} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+      <div ref={filterBarRef} className="flex flex-wrap gap-2">
         {FILTERS.map(f => {
           const isOpen = openFilter === f.key
           const hasActive = f.active.size > 0
           const entries = [...f.values.entries()].sort((a, b) => b[1] - a[1])
           if (entries.length <= 1) return null
           return (
-            <div key={f.key} style={{ position: 'relative' }}>
-              <button onClick={() => setOpenFilter(isOpen ? null : f.key)}
-                style={{
-                  fontSize: 11, padding: '3px 10px', borderRadius: 14, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  border: hasActive ? `1px solid ${COLOR.primary}` : '1px solid var(--border)',
-                  background: hasActive ? 'rgba(44,44,130,0.08)' : 'transparent',
-                  color: hasActive ? COLOR.primary : 'var(--text-secondary)',
-                  fontWeight: hasActive ? 600 : 400,
-                }}>
-                <Filter size={10} />
+            <div key={f.key} className="relative">
+              <Button
+                size="sm"
+                icon={<Filter size={14} aria-hidden="true" />}
+                aria-expanded={isOpen}
+                onClick={() => setOpenFilter(isOpen ? null : f.key)}
+                className={cn(hasActive ? 'border-primary bg-primary-subtle text-primary' : 'font-normal text-fg-label')}
+              >
                 {f.label}
-                {hasActive && <span style={{ fontSize: 11, background: COLOR.primary, color: '#fff', borderRadius: 8, padding: '0 5px', fontWeight: 700 }}>{f.active.size}</span>}
-              </button>
+                {hasActive && <span className="rounded-control bg-primary px-1.5 text-label font-bold text-white">{f.active.size}</span>}
+              </Button>
               {isOpen && (
-                <div style={{
-                  position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 50,
-                  background: 'var(--card, #fff)', border: '1px solid var(--border)', borderRadius: 8,
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.12)', minWidth: 180, maxHeight: 240, overflowY: 'auto', padding: '4px 0',
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 10px', borderBottom: '1px solid var(--border)' }}>
-                    <button onClick={() => f.set(new Set(entries.map(e => e[0])))} style={{ fontSize: 11, color: COLOR.primary, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Select all</button>
-                    <button onClick={() => f.set(new Set())} style={{ fontSize: 11, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>Clear</button>
+                <div className="absolute left-0 top-full z-20 mt-1 max-h-60 min-w-[180px] overflow-y-auto rounded-card border border-line-popover bg-surface py-1 shadow-popover">
+                  <div className="flex justify-between border-b border-line-soft px-1 pb-1">
+                    <Button variant="ghost" size="sm" onClick={() => f.set(new Set(entries.map(e => e[0])))}>Select all</Button>
+                    <Button variant="ghost" size="sm" onClick={() => f.set(new Set())} className="font-normal text-fg-muted">Clear</Button>
                   </div>
                   {entries.map(([val, count]) => (
-                    <label key={val} style={{
-                      display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', cursor: 'pointer',
-                      fontSize: 11, color: 'var(--text)', background: f.active.has(val) ? 'rgba(44,44,130,0.04)' : 'transparent',
-                    }}>
-                      <input type="checkbox" checked={f.active.has(val)} onChange={() => {
+                    <Checkbox
+                      key={val}
+                      checked={f.active.has(val)}
+                      onChange={() => {
                         f.set(prev => { const n = new Set(prev); if (n.has(val)) n.delete(val); else n.add(val); return n })
-                      }} />
-                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{val}</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{count}</span>
-                    </label>
+                      }}
+                      className={cn('flex w-full px-2.5 py-1.5 hover:bg-surface-hover', f.active.has(val) && 'bg-primary-subtle')}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{val}</span>
+                      <span className="shrink-0 text-label text-fg-muted">{count}</span>
+                    </Checkbox>
                   ))}
                 </div>
               )}
@@ -392,71 +386,46 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
       </div>
 
       {/* Pivot table */}
-      <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto', maxHeight: 500 }}>
-          <table style={{ borderCollapse: 'collapse', minWidth: SCHED_COL_COUNT * 80 + rateCols * 58 }}>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 2 }}>
+      <div className="overflow-hidden rounded-card border border-line">
+        <div className="relative max-h-[500px] overflow-x-auto">
+          <table className="border-collapse" style={{ minWidth: SCHED_COL_COUNT * 80 + rateCols * 58 }}>
+            <thead className="sticky top-0 z-10">
               {/* Row 1: group headers */}
-              <tr style={{ background: 'var(--accent, #2c2c82)' }}>
-                <th rowSpan={2} style={{
-                  padding: '5px 4px', fontSize: 11, fontWeight: 700, color: '#fff',
-                  letterSpacing: 0.3, textAlign: 'center', whiteSpace: 'nowrap',
-                  borderBottom: '1px solid rgba(255,255,255,0.2)',
-                  borderRight: '1px solid rgba(255,255,255,0.2)',
-                  width: 32, minWidth: 32,
-                }}>
+              <tr className="bg-primary">
+                <th rowSpan={2} className={cn(PIVOT_TH, 'w-8 min-w-8 border-b border-l-0 border-r border-white/20')}>
                   SELECT
                 </th>
-                <th colSpan={8} style={{
-                  padding: '5px 8px', fontSize: 11, fontWeight: 700, color: '#fff',
-                  letterSpacing: 0.5, textAlign: 'center',
-                  borderBottom: '1px solid rgba(255,255,255,0.2)',
-                }}>
+                <th colSpan={8} className={cn(PIVOT_TH, 'border-b border-l-0 px-2')}>
                   SCHEDULE
                 </th>
                 {onAttachManualRate && (
-                  <th rowSpan={2} style={{
-                    padding: '5px 4px', fontSize: 11, fontWeight: 700, color: '#fff',
-                    letterSpacing: 0.3, textAlign: 'center', whiteSpace: 'nowrap',
-                    borderBottom: '1px solid rgba(255,255,255,0.2)',
-                    borderLeft: '1px solid rgba(255,255,255,0.2)',
-                    width: 32, minWidth: 32,
-                  }}>
+                  <th rowSpan={2} className={cn(PIVOT_TH, 'w-8 min-w-8 border-b')}>
+                    <span className="sr-only">Attach rate</span>
                   </th>
                 )}
                 {rateTypes.map(rt => (
-                  <th key={rt} colSpan={1 + containerTypes.length} style={{
-                    padding: '5px 4px', fontSize: 11, fontWeight: 700,
-                    color: '#fff', letterSpacing: 0.5, textAlign: 'center',
-                    borderLeft: '2px solid rgba(255,255,255,0.5)',
-                    borderBottom: '1px solid rgba(255,255,255,0.2)',
-                    background: RATE_COLORS_RC[rt] ?? '#64748b',
-                  }}>
+                  <th key={rt} colSpan={1 + containerTypes.length}
+                    className={cn(PIVOT_TH, 'border-b border-l-2 border-b-white/20 border-l-white/50')}
+                    style={{ background: RATE_COLORS_RC[rt] ?? COLOR.muted }}>
                     {rt.toUpperCase()}
                   </th>
                 ))}
               </tr>
               {/* Row 2: sub-headers */}
-              <tr style={{ background: 'var(--accent, #2c2c82)' }}>
+              <tr className="bg-primary">
                 {['CARRIER', 'VESSEL / VOYAGE', 'ORIGIN', 'DEST', 'ETD', 'ETA', 'TT', 'CUTOFF'].map((h) => (
-                  <th key={h} style={{
-                    ...thBase,
-                    textAlign: ['ETD', 'ETA', 'TT', 'CUTOFF'].includes(h) ? 'center' : 'left',
-                  }}>{h}</th>
+                  <th key={h} className={cn(PIVOT_TH, !['ETD', 'ETA', 'TT', 'CUTOFF'].includes(h) && 'text-left')}>{h}</th>
                 ))}
                 {rateTypes.map(rt => (
                   <Fragment key={rt}>
-                    <th style={{
-                      ...thBase, width: 28, minWidth: 28, maxWidth: 28, textAlign: 'center',
-                      borderLeft: '2px solid rgba(255,255,255,0.5)',
-                      background: RATE_COLORS_RC[rt] ?? '#64748b',
-                    }}>{'\u2713'}</th>
+                    <th className={cn(PIVOT_TH, 'w-7 min-w-7 max-w-7 border-l-2 border-l-white/50')}
+                      style={{ background: RATE_COLORS_RC[rt] ?? COLOR.muted }}>
+                      <span aria-hidden="true">{'\u2713'}</span>
+                      <span className="sr-only">Select {rt}</span>
+                    </th>
                     {containerTypes.map((ct, ctIdx) => (
-                      <th key={`${rt}-${ct}`} style={{
-                        ...thBase, fontSize: 11,
-                        borderLeft: ctIdx === 0 ? '1px solid rgba(255,255,255,0.3)' : thBase.borderLeft,
-                        background: RATE_COLORS_RC[rt] ?? '#64748b',
-                      }}>{ct}</th>
+                      <th key={`${rt}-${ct}`} className={cn(PIVOT_TH, ctIdx === 0 && 'border-l-white/30')}
+                        style={{ background: RATE_COLORS_RC[rt] ?? COLOR.muted }}>{ct}</th>
                     ))}
                   </Fragment>
                 ))}
@@ -464,52 +433,48 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={totalCols} style={{ padding: 20, textAlign: 'center', fontSize: 11, color: 'var(--text-muted)' }}>No schedules match the active filters.</td></tr>
+                <tr><td colSpan={totalCols} className="p-5 text-center text-label text-fg-muted">No schedules match the active filters.</td></tr>
               )}
               {filtered.map((row, rowIdx) => {
-                const bg = rowIdx % 2 ? 'rgba(100,116,139,0.04)' : 'transparent'
                 const hasAnySelection = rateTypes.some(rt => isGroupSelected(row, rt, selectedIds) || isGroupPartial(row, rt, selectedIds))
                 const schedSelected = selectedScheduleIds.has(row.scheduleId)
                 return (
-                  <tr key={row.scheduleId} style={{ background: (hasAnySelection || schedSelected) ? 'rgba(44,44,130,0.06)' : bg }}>
-                    <td style={{
-                      ...tdBase, borderLeft: 'none', width: 32, textAlign: 'center', verticalAlign: 'middle',
-                      background: schedSelected ? 'rgba(44,44,130,0.08)' : undefined,
-                    }}>
-                      <input
-                        type="checkbox"
+                  <tr key={row.scheduleId} className={(hasAnySelection || schedSelected) ? 'bg-primary-subtle' : rowIdx % 2 ? 'bg-canvas' : undefined}>
+                    <td className={cn(PIVOT_TD, 'w-8 border-l-0')}>
+                      <Checkbox
                         checked={schedSelected}
                         onChange={() => onToggleSchedule(row.scheduleId)}
-                        style={{ cursor: 'pointer', accentColor: COLOR.primary }}
+                        aria-label={`Select schedule ${scheduleName(row)}`}
+                        className="flex justify-center"
                       />
                     </td>
-                    <td style={{ ...tdBase, fontWeight: 600 }}>{row.linerName || '-'}</td>
-                    <td style={tdBase}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                        <Ship size={9} style={{ opacity: 0.5, flexShrink: 0 }} />
-                        <span style={{ fontSize: 11 }}>{row.vesselName || '-'}{row.voyageNumber ? ` / ${row.voyageNumber}` : ''}</span>
+                    <td className={cn(PIVOT_TD, 'font-semibold')}>{row.linerName || '-'}</td>
+                    <td className={PIVOT_TD}>
+                      <div className="flex items-center gap-1">
+                        <Ship size={14} aria-hidden="true" className="shrink-0 text-fg-muted" />
+                        <span>{row.vesselName || '-'}{row.voyageNumber ? ` / ${row.voyageNumber}` : ''}</span>
                       </div>
                     </td>
-                    <td style={tdBase}>{row.originCity || row.origin || '-'}</td>
-                    <td style={tdBase}>{row.destinationCity || row.destination || '-'}</td>
-                    <td style={{ ...tdBase, textAlign: 'center' }}>{fmtDate(row.etd)}</td>
-                    <td style={{ ...tdBase, textAlign: 'center' }}>{fmtDate(row.eta)}</td>
-                    <td style={{ ...tdBase, fontWeight: 600, textAlign: 'center' }}>
+                    <td className={PIVOT_TD}>{row.originCity || row.origin || '-'}</td>
+                    <td className={PIVOT_TD}>{row.destinationCity || row.destination || '-'}</td>
+                    <td className={cn(PIVOT_TD, 'text-center')}>{fmtDate(row.etd)}</td>
+                    <td className={cn(PIVOT_TD, 'text-center')}>{fmtDate(row.eta)}</td>
+                    <td className={cn(PIVOT_TD, 'text-center font-semibold')}>
                       {row.totalDuration != null ? `${row.totalDuration}d` : '-'}
                     </td>
-                    <td style={{ ...tdBase, fontSize: 11 }}>{fmtDate(row.bkCutoff)}</td>
+                    <td className={PIVOT_TD}>{fmtDate(row.bkCutoff)}</td>
                     {onAttachManualRate && (
-                      <td style={{ ...tdBase, textAlign: 'center', width: 32 }}>
-                        <button
-                          onClick={() => onAttachManualRate(row)}
-                          title="Attach manual rate to this schedule"
-                          style={{
-                            background: 'none', border: '1px solid rgba(217,119,6,0.3)', borderRadius: 4,
-                            cursor: 'pointer', color: '#d97706', padding: '2px 4px', display: 'inline-flex', alignItems: 'center',
-                          }}
-                        >
-                          <Plus size={11} />
-                        </button>
+                      <td className={cn(PIVOT_TD, 'w-8 text-center')}>
+                        <Tooltip content="Attach manual rate to this schedule">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            icon={<Plus size={14} aria-hidden="true" />}
+                            aria-label="Attach manual rate to this schedule"
+                            onClick={() => onAttachManualRate(row)}
+                            className="w-7 px-0"
+                          />
+                        </Tooltip>
                       </td>
                     )}
                     {rateTypes.map(rt => {
@@ -520,23 +485,19 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
                       return (
                         <Fragment key={rt}>
                           {/* Checkbox cell */}
-                          <td style={{
-                            ...tdBase, width: 28, textAlign: 'center', verticalAlign: 'middle',
-                            borderLeft: '2px solid var(--border)',
-                            background: checked ? 'rgba(44,44,130,0.08)' : undefined,
-                          }}>
+                          <td className={cn(PIVOT_TD, 'w-7 border-l-2 border-l-line', checked && 'bg-primary-subtle')}>
                             {hasRates && (
-                              <input
-                                type="checkbox"
+                              <Checkbox
                                 checked={checked}
-                                ref={el => { if (el) el.indeterminate = partial && !checked }}
+                                isIndeterminate={partial && !checked}
                                 onChange={() => onToggleGroup(row, rt)}
-                                style={{ cursor: 'pointer', accentColor: COLOR.primary }}
+                                aria-label={`Select ${rt} rates for ${scheduleName(row)}`}
+                                className="flex justify-center"
                               />
                             )}
                           </td>
                           {/* Container type cells */}
-                          {containerTypes.map((ct, ctIdx) => {
+                          {containerTypes.map(ct => {
                             const cells = row.rates[rt]?.[ct]
                             const display = cells?.length
                               ? cells.reduce((best, c) => c.rate < best.rate ? c : best)
@@ -545,34 +506,24 @@ function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleIds, onT
                               <td
                                 key={`${rt}-${ct}`}
                                 title={display ? cellTooltip(display) : undefined}
-                                style={{
-                                  ...tdBase,
-                                  textAlign: 'center',
-                                  borderLeft: ctIdx === 0 ? '1px solid var(--border)' : tdBase.borderLeft,
-                                  background: checked ? 'rgba(44,44,130,0.04)' : undefined,
-                                  padding: '4px 3px',
-                                }}
+                                className={cn(PIVOT_TD, 'text-center', checked && 'bg-primary-subtle')}
                               >
                                 {display ? (
                                   <>
-                                    <div style={{ fontWeight: 700, fontSize: 11, whiteSpace: 'nowrap' }}>
+                                    <div className="whitespace-nowrap font-bold">
                                       {display.currency} {display.rate.toLocaleString()}
                                     </div>
                                     {cells!.length > 1 && (
-                                      <div style={{ fontSize: 7, color: '#94a3b8' }}>+{cells!.length - 1} more</div>
+                                      <div className="text-label text-fg-muted">+{cells!.length - 1} more</div>
                                     )}
                                     {display.note && (
-                                      <div style={{
-                                        fontSize: 11, color: '#94a3b8', lineHeight: 1.2, marginTop: 1,
-                                        maxWidth: 72, overflow: 'hidden', textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap', margin: '1px auto 0',
-                                      }}>
+                                      <div className="mx-auto mt-px max-w-[72px] truncate leading-tight text-fg-muted">
                                         {display.note}
                                       </div>
                                     )}
                                   </>
                                 ) : (
-                                  <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>-</span>
+                                  <span className="text-fg-muted">-</span>
                                 )}
                               </td>
                             )
