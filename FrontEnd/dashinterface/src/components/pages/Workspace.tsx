@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react'
-import { Inbox, User, ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Inbox, User, ChevronDown, PanelLeftClose, PanelLeftOpen, Plus } from 'lucide-react'
 import {
   EMPLOYEES, WORKFLOW_STAGES, ROLE_LABELS, ROLE_COLORS, stageRoleLabel,
   isSpotInquiry, daysUntil,
@@ -17,7 +17,8 @@ import ModalStepForms from './workspaceSteps/ModalStepForms'
 import VesselCreatedPrompt from './workspaceSteps/VesselCreatedPrompt'
 import { useWorkspaceActions } from './workspaceSteps/useWorkspaceActions'
 import { generateReleaseOrderDraft } from './workspaceSteps/utils'
-import { COLOR } from '../ui/tokens'
+import { Badge, Button, EmptyState, Tooltip, type BadgeProps } from '../ui'
+import { cn } from '../../lib/cn'
 
 // ---------------------------------------------------------------------------
 // Props
@@ -103,19 +104,19 @@ interface WorkspaceItem {
   urgencySortKey?: number
   /** True when the client's KYC is not yet completed for this inquiry. */
   kycIncomplete?: boolean
-  /** RFQ group number — present when this inquiry came from an uploaded tender. */
+  /** RFQ group number - present when this inquiry came from an uploaded tender. */
   rfqRef?: number
 }
 
-const TYPE_BADGE_CLASS: Record<ItemType, string> = {
-  inquiry: 'db-badge accent',
-  booking: 'db-badge warning',
-  quote: 'db-badge purple',
-  customer: 'db-badge',
+const TYPE_BADGE_TONE: Record<ItemType, BadgeProps['tone']> = {
+  inquiry: 'info',
+  booking: 'warning',
+  quote: 'orange',
+  customer: 'neutral',
 }
 
 // ---------------------------------------------------------------------------
-// Step-based navigation — per-role workflow steps
+// Step-based navigation - per-role workflow steps
 // ---------------------------------------------------------------------------
 
 interface StepDef {
@@ -141,7 +142,7 @@ const CS_STEPS: StepDef[] = [
 
   { key: 'cs-generate-si', label: 'Generate SI',       actionKinds: ['generate-si'],          stepNumber: 10, group: 'post-cutoff' },
 
-  // --- Steps 11–17: BL processing pipeline — reserved for future release ---
+  // --- Steps 11–17: BL processing pipeline - reserved for future release ---
   // These steps cover the full BL lifecycle (vessel schedule → vessel booking →
   // draft BL → HBL → MBL → pre-advice → pre-alert) and will be enabled once
   // the BL module is production-ready.
@@ -237,7 +238,7 @@ export default function Workspace({
   const [formDecision, setFormDecision] = useState<'approve' | 'reject'>('approve')
   const [kycSending, setKycSending] = useState(false)
   // kycPendingClients come from props (fetched in App.tsx loadAppData alongside inquiries)
-  // KYC document form state (Check Documents modal — CS/Sales fill in and submit to backend)
+  // KYC document form state (Check Documents modal - CS/Sales fill in and submit to backend)
   const [kycBrNumber, setKycBrNumber] = useState('')
   const [kycParentOrg, setKycParentOrg] = useState('')
   const [kycDeadline, setKycDeadline] = useState('')
@@ -256,7 +257,7 @@ export default function Workspace({
   const [kycGeneralCargo, setKycGeneralCargo] = useState(false)
   const [kycDangerousGoods, setKycDangerousGoods] = useState(false)
   const [kycPerishableGoods, setKycPerishableGoods] = useState(false)
-  // Document checklist — backend accepts 'true' or 'false' as strings
+  // Document checklist - backend accepts 'true' or 'false' as strings
   const [kycDocBrForm, setKycDocBrForm] = useState('false')
   const [kycDocVatCert, setKycDocVatCert] = useState('false')
   const [kycDocSvatCert, setKycDocSvatCert] = useState('false')
@@ -265,7 +266,7 @@ export default function Workspace({
   // Quotation prep state (Sales edits document)
   const [quotationContent, setQuotationContent] = useState('')
   const [quoteCopied, setQuoteCopied] = useState(false)
-  // Selected rate option IDs for quotation prep — user ticks which options to include
+  // Selected rate option IDs for quotation prep - user ticks which options to include
   const [selectedRateOptionIds, setSelectedRateOptionIds] = useState<Set<number>>(new Set())
   // The single "best option" recommended to the customer
   const [bestRateOptionId, setBestRateOptionId] = useState<number | null>(null)
@@ -284,7 +285,7 @@ export default function Workspace({
   const [customerDecision, setCustomerDecision] = useState<'accepted' | 'rejected'>('accepted')
   // Liner booking confirmation state (Procurement Booking step)
   const [linerBooked, setLinerBooked] = useState<'yes' | 'no' | ''>('')
-  // Backend quotation ID — set in prepare-quotation, used in customer-response
+  // Backend quotation ID - set in prepare-quotation, used in customer-response
   const [lastQuotationId, setLastQuotationId] = useState<number | null>(null)
   // Quotation options loaded from backend for the customer-response modal
   const [quotationOptions, setQuotationOptions] = useState<QuotationOptionRow[]>([])
@@ -312,7 +313,7 @@ export default function Workspace({
   const [bkReeferTemp, setBkReeferTemp] = useState('')
   const [bkDeliveryAgent, setBkDeliveryAgent] = useState('')
   const [bkSpecificRouting, setBkSpecificRouting] = useState('')
-  const [bkRaNumber, setBkRaNumber] = useState('')        // RA number — added by Procurement
+  const [bkRaNumber, setBkRaNumber] = useState('')        // RA number - added by Procurement
 
   // Release order attachment state (Procurement Release Order step)
   const [roFields, setRoFields] = useState<ReleaseOrderFields>({
@@ -321,13 +322,13 @@ export default function Workspace({
     cargo_weight: '', cut_off_date: '', etd: '', eta: '',
     next_port_of_discharge: '', transport_mode: '', transport_carrier: '',
   })
-  // CS Release Order — two-phase: review first, then send
+  // CS Release Order - two-phase: review first, then send
   const [releasePhase, setReleasePhase] = useState<'review' | 'send'>('review')
   const [releaseDraft, setReleaseDraft] = useState('')
   const [roRefCollapsed, setRoRefCollapsed] = useState(true)
 
   // Vessel cutoff schedule panel state
-  // cutoffPanelOpen removed — cutoff is now a workflow step modal
+  // cutoffPanelOpen removed - cutoff is now a workflow step modal
   const [_cutoffBookingId, setCutoffBookingId] = useState('')
   const [cutoffLiner, setCutoffLiner] = useState('')
   const [cutoffMode, setCutoffMode] = useState<'paste' | 'upload'>('paste')
@@ -392,7 +393,7 @@ export default function Workspace({
   const [_draftBlFileName, _setDraftBlFileName] = useState('')
   const [_draftBlMode, _setDraftBlMode] = useState<'paste' | 'upload'>('paste')
   const [jobRefNumber, setJobRefNumber] = useState('')
-  // Draft BL — Phase 1 vessel / Phase 2 booking / Phase 3 save
+  // Draft BL - Phase 1 vessel / Phase 2 booking / Phase 3 save
   const [draftBlPhase, setDraftBlPhase] = useState<1 | 2 | 3>(1)
   const [vesselScheduleType, setVesselScheduleType] = useState<'FCL' | 'CONSOL' | 'BOTH'>('FCL')
   const [vesselPol, setVesselPol] = useState('')
@@ -412,7 +413,7 @@ export default function Workspace({
   const voyagePickedRef = useRef(false)   // true when user just selected from the voyage dropdown
   const [vesselCreatedPrompt, setVesselCreatedPrompt] = useState<{ vesselName: string; voyageNumber: string; pol: string; fpod: string; etdPol: string; etaFpod: string; bookingId: string } | null>(null)
   const pendingVesselForBooking = useRef<{ vesselName: string; voyageNumber: string; pol: string; fpod: string; etdPol: string; etaFpod: string } | null>(null)
-  // Draft BL — Phase 2 booking form (Gensoft fields)
+  // Draft BL - Phase 2 booking form (Gensoft fields)
   const [bkgForm, setBkgForm] = useState<Record<string, string>>({})
   const bkgField = (key: string) => bkgForm[key] ?? ''
   const setBkgField = (key: string, value: string) => setBkgForm(prev => ({ ...prev, [key]: value }))
@@ -448,7 +449,7 @@ export default function Workspace({
   const [mblContainers, setMblContainers] = useState<MblContainerRow[]>([{ containerNo: '', containerType: "40' HIGH CUBE", sealNo: '', poNumber: '', hsCode: '', description: '', grossWeight: '', cbm: '' }])
   const [hblCollapsed, setHblCollapsed] = useState<Record<string, boolean>>({})
   const toggleHblSection = (sectionId: string) => setHblCollapsed(prev => ({ ...prev, [sectionId]: !prev[sectionId] }))
-  // MBL step: HBL selection state — search and pick HBLs to attach to this Master BL
+  // MBL step: HBL selection state - search and pick HBLs to attach to this Master BL
   const [mblSelectedHblIds, setMblSelectedHblIds] = useState<string[]>([])
   const [mblHblSearch, setMblHblSearch] = useState('')
   // Pre-Advice state
@@ -456,7 +457,7 @@ export default function Workspace({
   const paField = (key: string) => paForm[key] ?? ''
   const setPaField = (key: string, value: string) => setPaForm(prev => ({ ...prev, [key]: value }))
 
-  // Step navigation state — initialStep lets the parent jump directly to a specific step on mount
+  // Step navigation state - initialStep lets the parent jump directly to a specific step on mount
   const [activeStep, setActiveStep] = useState<string | null>(initialStep ?? null)
   useEffect(() => { setActiveStep(null) }, [activeRole])
 
@@ -486,7 +487,7 @@ export default function Workspace({
       if (role && !stage.roles.includes(role)) continue
       if (inq.workflow_stage === 'completed') continue
 
-      // Determine the next stage (simple step+1 — no KYC routing, all inquiries start at rate-check)
+      // Determine the next stage (simple step+1 - no KYC routing, all inquiries start at rate-check)
       const resolvedNextStage = WORKFLOW_STAGES.find(s => s.step === stage.step + 1)
       if (!resolvedNextStage) continue
 
@@ -547,7 +548,7 @@ export default function Workspace({
             continue // customer-response items are built from GET /quotations/sent below
           case 'booking-request':
             continue // booking-request items are built from GET /quotations/accepted below
-          default:                    title = `${stage.label} — ${inq.customer_name}`
+          default:                    title = `${stage.label} - ${inq.customer_name}`
         }
 
         // Attach saved rate request data for quotation-prep and quotation-sent work items
@@ -586,7 +587,7 @@ export default function Workspace({
     }
     for (const [quoteId, rows] of sentByQuote) {
       const first = rows[0]
-      // Role guard — customer-response is a CS/Sales step
+      // Role guard - customer-response is a CS/Sales step
       if (role && role !== 'CS' && role !== 'Sales') continue
 
       // Try to find the matching inquiry for extra display data
@@ -679,7 +680,7 @@ export default function Workspace({
           type: 'booking',
           refId: bkg.id,
           customerName: bkg.customer_name,
-          title: `Booking request from CS — ${bkg.customer_name}`,
+          title: `Booking request from CS - ${bkg.customer_name}`,
           subtitle: `${bkg.quantity}x ${bkg.container_type} · ${bkg.origin} → ${bkg.destination} · ${bkg.shipping_line || 'Any carrier'}`,
           urgentFlag: bkg.is_urgent,
           createdAt: bkg.created_at,
@@ -695,7 +696,7 @@ export default function Workspace({
           type: 'booking',
           refId: bkg.id,
           customerName: bkg.customer_name,
-          title: `Confirm liner booking — ${bkg.customer_name}`,
+          title: `Confirm liner booking - ${bkg.customer_name}`,
           subtitle: `${bkg.quantity}x ${bkg.container_type} · ${bkg.shipping_line} · RA# ${bkg.voyage_number || 'pending'}`,
           urgentFlag: bkg.is_urgent,
           createdAt: bkg.created_at,
@@ -711,7 +712,7 @@ export default function Workspace({
           type: 'booking',
           refId: bkg.id,
           customerName: bkg.customer_name,
-          title: `Attach release order — ${bkg.customer_name}`,
+          title: `Attach release order - ${bkg.customer_name}`,
           subtitle: `${bkg.quantity}x ${bkg.container_type} · ${bkg.shipping_line} · ${bkg.vessel_name}${bkg.voyage_number ? ` / ${bkg.voyage_number}` : ''}`,
           urgentFlag: bkg.is_urgent,
           createdAt: bkg.created_at,
@@ -744,7 +745,7 @@ export default function Workspace({
           refId: bkg.id,
           customerName: bkg.customer_name,
           title: `Acknowledge urgent booking for ${bkg.customer_name}`,
-          subtitle: `Urgent bypass — CS booked directly. ${bkg.quantity}x ${bkg.container_type} · ${bkg.shipping_line}`,
+          subtitle: `Urgent bypass - CS booked directly. ${bkg.quantity}x ${bkg.container_type} · ${bkg.shipping_line}`,
           urgentFlag: true,
           createdAt: bkg.created_at,
           previousContext: findContext(bkg.id),
@@ -777,7 +778,7 @@ export default function Workspace({
       })
     }
 
-    // --- From Bookings (SI reminder — show all with cutoff dates, sorted by urgency) ---
+    // --- From Bookings (SI reminder - show all with cutoff dates, sorted by urgency) ---
     for (const bkg of bookings) {
       if (bkg.si_requested) continue
       const cutoffDate = bkg.bl_cutoff_date || bkg.si_cutoff_date
@@ -816,7 +817,7 @@ export default function Workspace({
       return parts.length ? ` · ${parts.join(' · ')}` : ''
     }
 
-    // --- From Bookings (record SI) — parallel with reminders, Pre-Advice & Generate SI ---
+    // --- From Bookings (record SI) - parallel with reminders, Pre-Advice & Generate SI ---
     for (const bkg of bookings) {
       if (bkg.si_submitted) continue
       const hasCutoffDates = bkg.si_cutoff_date || bkg.bl_cutoff_date || bkg.vgm_cutoff_date
@@ -839,7 +840,7 @@ export default function Workspace({
       })
     }
 
-    // --- Generate SI / Liner BL Instruction — parallel with reminders, Record SI & Pre-Advice ---
+    // --- Generate SI / Liner BL Instruction - parallel with reminders, Record SI & Pre-Advice ---
     for (const bkg of bookings) {
       if (bkg.liner_bl_instruction_generated) continue
       const hasCutoffDates = bkg.si_cutoff_date || bkg.bl_cutoff_date || bkg.vgm_cutoff_date
@@ -862,7 +863,7 @@ export default function Workspace({
       })
     }
 
-    // --- Step 11: Vessel Schedule — CS confirms vessel details for BL processing ---
+    // --- Step 11: Vessel Schedule - CS confirms vessel details for BL processing ---
     for (const bkg of bookings) {
       if (!bkg.liner_bl_instruction_generated) continue
       if (bkg.bl_vessel_confirmed) continue
@@ -884,7 +885,7 @@ export default function Workspace({
       })
     }
 
-    // --- Step 12: Vessel Booking — CS creates Gensoft booking ---
+    // --- Step 12: Vessel Booking - CS creates Gensoft booking ---
     for (const bkg of bookings) {
       if (!bkg.bl_vessel_confirmed) continue
       if (bkg.bl_booking_created) continue
@@ -906,7 +907,7 @@ export default function Workspace({
       })
     }
 
-    // --- Step 13: Draft BL — CS records job reference number ---
+    // --- Step 13: Draft BL - CS records job reference number ---
     for (const bkg of bookings) {
       if (!bkg.bl_booking_created) continue
       if (bkg.draft_bl_sent) continue
@@ -972,7 +973,7 @@ export default function Workspace({
       })
     }
 
-    // --- Pre-Advice (door-to-door / port-to-door only) — parallel with reminders, Record SI & Generate SI ---
+    // --- Pre-Advice (door-to-door / port-to-door only) - parallel with reminders, Record SI & Generate SI ---
     for (const bkg of bookings) {
       if (bkg.delivery_type !== 'door-to-door' && bkg.delivery_type !== 'port-to-door') continue
       if (bkg.pre_advice_sent) continue
@@ -1192,7 +1193,7 @@ export default function Workspace({
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
 
   // Action kinds that fire immediately on click (navigate away, open modal, or
-  // advance workflow). These should NOT be auto-selected on load — the right
+  // advance workflow). These should NOT be auto-selected on load - the right
   // panel stays blank until the user explicitly clicks one.
   const IMMEDIATE_FIRE_KINDS = useMemo(() => new Set([
     'check-rates', 'check-inttra-rates',
@@ -1203,7 +1204,7 @@ export default function Workspace({
 
   const selectedItem = useMemo(() => {
     if (!selectedItemId) {
-      // No explicit click yet — auto-select the first item ONLY if it has an
+      // No explicit click yet - auto-select the first item ONLY if it has an
       // inline form (i.e. is NOT an immediate-fire kind). Otherwise show blank.
       const first = filteredItems[0] ?? null
       if (first && IMMEDIATE_FIRE_KINDS.has(first.actionKind)) return null
@@ -1319,55 +1320,48 @@ export default function Workspace({
 
 
   return (
-    <div className="ws-split-layout">
-      <div className="ws-split-body">
+    <div className="flex h-full flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1">
       {/* ---- Left Panel: Item List ---- */}
-      <div className={`ws-left-panel ${leftPanelOpen ? '' : 'ws-left-collapsed'}`}>
+      <div className={cn('flex min-h-0 shrink-0 flex-col overflow-hidden border-r border-line-soft bg-surface transition-[width] duration-200', leftPanelOpen ? 'w-[344px]' : 'w-12')}>
         {leftPanelOpen ? (
           <>
-        <div style={{ padding: '20px 20px 14px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div className="flex items-start justify-between gap-2 px-5 pt-5 pb-3.5">
           <div>
-            <h1 style={{ fontSize: 19, fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text)' }}>Your workspace</h1>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 3 }}>
+            <h1 className="m-0 text-title font-semibold text-fg">Your workspace</h1>
+            <p className="m-0 mt-1 text-control text-fg-muted">
               {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''} in this step
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <div className="flex items-center gap-1.5">
           {(effectiveStep === 'cs-inquiry' || effectiveStep === 'adm-inquiry' || effectiveStep === 'sales-inquiry') && (
-            <button
-              onClick={() => onGoTo('new-inquiry')}
-              title="New Inquiry"
-              style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: COLOR.primary, color: '#fff', border: 'none', fontSize: 17, fontWeight: 600, cursor: 'pointer', lineHeight: 1 }}
-            >+</button>
+            <Tooltip content="New Inquiry">
+              <Button variant="primary" className="w-8 px-0" aria-label="New Inquiry"
+                icon={<Plus size={16} aria-hidden="true" />} onClick={() => onGoTo('new-inquiry')} />
+            </Tooltip>
           )}
           {effectiveStep === 'proc-rates' && (
-            <button
-              onClick={() => onGoTo('record-rate')}
-              title="Record Rate"
-              style={{ flexShrink: 0, width: 30, height: 30, borderRadius: 8, background: '#d97706', color: '#fff', border: 'none', fontSize: 17, fontWeight: 600, cursor: 'pointer', lineHeight: 1 }}
-            >+</button>
+            <Tooltip content="Record Rate">
+              <Button variant="primary" className="w-8 px-0" aria-label="Record Rate"
+                icon={<Plus size={16} aria-hidden="true" />} onClick={() => onGoTo('record-rate')} />
+            </Tooltip>
           )}
-          <button onClick={() => setLeftPanelOpen(false)} title="Collapse panel"
-            style={{ flexShrink: 0, width: 28, height: 28, borderRadius: 6, background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <PanelLeftClose size={14} />
-          </button>
+          <Tooltip content="Collapse panel">
+            <Button className="w-8 px-0 text-fg-muted" aria-label="Collapse panel"
+              icon={<PanelLeftClose size={14} aria-hidden="true" />} onClick={() => setLeftPanelOpen(false)} />
+          </Tooltip>
           </div>
         </div>
-        <div className="ws-left-scroll">
+        <div className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 pb-3">
           {filteredItems.length === 0 ? (
-            <div style={{ padding: '28px 10px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+            <p className="m-0 px-2.5 py-7 text-center text-control text-fg-muted">
               Nothing in this step right now.
-            </div>
+            </p>
           ) : (
             itemGroups.map(group => (
-              <div key={group.rfqRef ?? 'ungrouped'}>
+              <div key={group.rfqRef ?? 'ungrouped'} className="flex flex-col gap-1">
                 {group.rfqRef != null && (
-                  <div style={{
-                    padding: '7px 11px', margin: '10px 0 5px',
-                    background: 'rgba(44,44,130,0.07)', borderLeft: `3px solid ${COLOR.primary}`,
-                    borderRadius: 4, fontSize: 11, fontWeight: 700, color: COLOR.primary,
-                    textTransform: 'uppercase', letterSpacing: '0.04em',
-                  }}>
+                  <div className="mt-2.5 mb-1 rounded-control border-l-[3px] border-l-primary bg-primary-subtle px-3 py-2 text-label font-bold uppercase tracking-label text-primary">
                     RFQ-{group.rfqRef} · {group.items[0].customerName} · {group.items.length} route{group.items.length !== 1 ? 's' : ''}
                   </div>
                 )}
@@ -1375,24 +1369,29 @@ export default function Workspace({
               const key = getItemKey(item)
               const isSelected = selectedItem ? getItemKey(selectedItem) === key : false
               return (
-                <div
+                <button
+                  type="button"
                   key={key}
+                  aria-current={isSelected || undefined}
                   onClick={() => {
                     setSelectedItemId(key)
                     if (item.actionKind === 'send-kyc' || item.actionKind === 'prepare-quotation' || item.actionKind === 'customer-response' || item.actionKind === 'booking-request' || item.actionKind === 'review-booking-request' || item.actionKind === 'confirm-liner-booking' || item.actionKind === 'attach-release-order' || item.actionKind === 'release-booking' || item.actionKind === 'save-draft-bl' || item.actionKind === 'send-draft-bl' || item.actionKind === 'generate-si' || item.actionKind === 'create-hbl' || item.actionKind === 'create-bl' || item.actionKind === 'record-cutoff' || item.actionKind === 'request-si' || item.actionKind === 'submit-si' || item.actionKind === 'send-pre-advice' || item.actionKind === 'send-pre-alert' || item.actionKind === 'save-vessel-schedule' || item.actionKind === 'create-vessel-booking' || item.actionKind === 'check-rates' || item.actionKind === 'check-inttra-rates' || item.actionKind === 'send-to-customer' || item.actionKind === 'confirm-booking' || item.actionKind === 'bl-approval' || item.actionKind === 'verify-kyc' || item.actionKind === 'approve-quote' || item.actionKind === 'record-master-bl' || item.actionKind === 'create-house-bl' || item.actionKind === 'acknowledge-procurement' || item.actionKind === 'advance-workflow') {
                       handleAction(item)
                     }
                   }}
-                  className={`ws-list-item ${isSelected ? 'active' : ''}`}
+                  className={cn(
+                    'flex w-full flex-col items-start rounded-card border p-3.5 text-left text-control text-fg transition-colors',
+                    isSelected ? 'border-primary bg-primary-subtle' : 'border-transparent bg-transparent hover:bg-surface-hover',
+                  )}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>{item.customerName}</span>
-                    {item.urgentFlag && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#dc2626', marginLeft: 'auto', flexShrink: 0 }} />}
-                    {item.kycIncomplete && <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f59e0b', marginLeft: item.urgentFlag ? 0 : 'auto', flexShrink: 0 }} title="KYC pending" />}
-                  </div>
-                  <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>{item.subtitle}</div>
-                  <span className={TYPE_BADGE_CLASS[item.type]} style={{ fontSize: 11 }}>{item.actionLabel}</span>
-                </div>
+                  <span className="mb-1 flex w-full items-center gap-2">
+                    <span className="text-body font-bold text-fg">{item.customerName}</span>
+                    {item.urgentFlag && <span role="img" aria-label="Urgent" title="Urgent" className="ml-auto size-1.5 shrink-0 rounded-full bg-danger" />}
+                    {item.kycIncomplete && <span role="img" aria-label="KYC pending" title="KYC pending" className={cn('size-1.5 shrink-0 rounded-full bg-warning', !item.urgentFlag && 'ml-auto')} />}
+                  </span>
+                  <span className="mb-2 text-control text-fg-muted">{item.subtitle}</span>
+                  <Badge tone={TYPE_BADGE_TONE[item.type]}>{item.actionLabel}</Badge>
+                </button>
               )
                 })}
               </div>
@@ -1401,12 +1400,12 @@ export default function Workspace({
         </div>
           </>
         ) : (
-          <div className="ws-left-collapsed-content">
-            <button onClick={() => setLeftPanelOpen(true)} title="Expand panel"
-              style={{ width: 32, height: 32, borderRadius: 6, background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-              <PanelLeftOpen size={15} />
-            </button>
-            <div style={{ writingMode: 'vertical-rl', textOrientation: 'mixed', transform: 'rotate(180deg)', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+          <div className="flex flex-col items-center gap-3 px-2 py-4">
+            <Tooltip content="Expand panel" placement="right">
+              <Button className="w-8 px-0 text-fg-muted" aria-label="Expand panel"
+                icon={<PanelLeftOpen size={15} aria-hidden="true" />} onClick={() => setLeftPanelOpen(true)} />
+            </Tooltip>
+            <div className="rotate-180 whitespace-nowrap text-label font-bold tracking-label text-fg-muted [writing-mode:vertical-rl]">
               {filteredItems.length} item{filteredItems.length !== 1 ? 's' : ''}
             </div>
           </div>
@@ -1414,45 +1413,41 @@ export default function Workspace({
       </div>
 
       {/* ---- Right Panel: Detail + Action ---- */}
-      <div className="ws-right-panel">
+      <div className="min-w-0 flex-1 overflow-y-auto bg-canvas px-9 py-7">
         {selectedItem ? (
-          <div style={{ maxWidth: '100%' }}>
+          <div className="max-w-full">
             {/* Ref ID + badges */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-              <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, color: '#94a3b8' }}>{selectedItem.refId}</span>
-              {selectedItem.urgentFlag && (
-                <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.04em', background: 'rgba(220,38,38,0.08)', color: '#dc2626' }}>Urgent</span>
-              )}
-              {selectedItem.kycIncomplete && (
-                <span style={{ padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.04em', background: 'rgba(245,158,11,0.1)', color: '#b45309' }}>KYC Pending</span>
-              )}
-              <span className={TYPE_BADGE_CLASS[selectedItem.type]}>{selectedItem.type}</span>
+            <div className="mb-2 flex items-center gap-2.5">
+              <span className="font-mono text-label text-fg-muted">{selectedItem.refId}</span>
+              {selectedItem.urgentFlag && <Badge tone="danger" className="uppercase tracking-label">Urgent</Badge>}
+              {selectedItem.kycIncomplete && <Badge tone="warning" className="uppercase tracking-label">KYC Pending</Badge>}
+              <Badge tone={TYPE_BADGE_TONE[selectedItem.type]}>{selectedItem.type}</Badge>
             </div>
 
             {/* Customer / Title */}
-            <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.03em', marginBottom: 4, color: 'var(--text)' }}>{selectedItem.customerName}</h1>
-            <p style={{ fontSize: 15, color: '#475569', marginBottom: 24 }}>{selectedItem.title}</p>
+            <h1 className="m-0 mb-1 text-title font-bold text-fg">{selectedItem.customerName}</h1>
+            <p className="m-0 mb-6 text-body text-fg-label">{selectedItem.title}</p>
 
             {/* Where it came from - context card */}
             {selectedItem.previousContext && (
-              <div style={{ padding: '14px 16px', background: '#fff', border: '1px solid #e2e8f0', borderLeft: `3px solid ${COLOR.primary}`, borderRadius: 10, marginBottom: 26 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#94a3b8', marginBottom: 6 }}>Where it came from</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                  <User size={11} style={{ color: 'var(--text-muted)' }} />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
+              <div className="mb-6 rounded-card border border-line-soft border-l-[3px] border-l-primary bg-surface px-4 py-3.5">
+                <div className="mb-1.5 text-label font-bold uppercase tracking-label text-fg-muted">Where it came from</div>
+                <div className="mb-1 flex items-center gap-1.5">
+                  <User size={11} className="text-fg-muted" aria-hidden="true" />
+                  <span className="text-label font-semibold text-fg-label">
                     {empName(selectedItem.previousContext.actor_id)} ({ROLE_LABELS[selectedItem.previousContext.actor_role]})
                   </span>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{selectedItem.previousContext.timestamp}</span>
+                  <span className="ml-auto text-label text-fg-muted">{selectedItem.previousContext.timestamp}</span>
                 </div>
-                <div style={{ fontSize: 13.5, color: '#334155', lineHeight: 1.55 }}>{selectedItem.previousContext.action}</div>
+                <div className="text-body leading-normal text-fg-label">{selectedItem.previousContext.action}</div>
                 {selectedItem.previousContext.notes && (
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, fontStyle: 'italic' }}>{selectedItem.previousContext.notes}</div>
+                  <div className="mt-1 text-control italic text-fg-muted">{selectedItem.previousContext.notes}</div>
                 )}
               </div>
             )}
 
             {/* Complete this step */}
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#94a3b8', marginBottom: 14 }}>Complete this step</div>
+            <h2 className="m-0 mb-3.5 text-label font-bold uppercase tracking-label text-fg-muted">Complete this step</h2>
 
 
             <InlineStepForms
@@ -1702,60 +1697,34 @@ export default function Workspace({
 
           </div>
         ) : (
-          <div style={{ maxWidth: 420, margin: '60px auto 0', textAlign: 'center' }}>
-            <Inbox size={40} style={{ color: 'var(--text-muted)', marginBottom: 14, opacity: 0.4 }} />
+          <div className="mx-auto mt-5 max-w-[420px]">
             {filteredItems.length > 0 ? (
-              <>
-                <div style={{ fontSize: 17, fontWeight: 700, color: '#334155', marginBottom: 6 }}>Select an item</div>
-                <div style={{ fontSize: 13, color: '#94a3b8' }}>Click on an item from the list to get started.</div>
-              </>
+              <EmptyState icon={<Inbox size={40} />} title="Select an item" description="Click on an item from the list to get started." />
             ) : (
-              <>
-                <div style={{ fontSize: 17, fontWeight: 700, color: '#334155', marginBottom: 6 }}>All caught up</div>
-                <div style={{ fontSize: 13, color: '#94a3b8' }}>No items need your attention in this step.</div>
-              </>
+              <EmptyState icon={<Inbox size={40} />} title="All caught up" description="No items need your attention in this step." />
             )}
           </div>
         )}
       </div>
-      </div>{/* end ws-split-body */}
+      </div>{/* end split body */}
 
       {/* Step Navigation Bar */}
-      <div style={{
-        position: 'sticky',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        background: 'var(--bg-card)',
-        borderTop: '1px solid var(--border)',
-        zIndex: 10,
-        boxShadow: '0 -2px 12px rgba(0,0,0,0.04)',
-        transition: 'max-height 0.2s ease',
-        overflow: 'hidden',
-      }}>
+      <nav aria-label="Workflow steps" className="sticky inset-x-0 bottom-0 z-10 overflow-hidden border-t border-line-soft bg-surface">
         {/* Collapse / expand toggle bar */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0 14px', height: 28, borderBottom: stepRibbonOpen ? '1px solid var(--border)' : 'none',
-        }}>
-          <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
+        <div className={cn('flex h-8 items-center justify-between px-3.5', stepRibbonOpen && 'border-b border-line-soft')}>
+          <span className="text-label font-bold uppercase tracking-label text-fg-muted">
             {stepRibbonOpen ? 'Steps' : (() => {
               const active = roleSteps.find(s => s.key === effectiveStep)
-              return active ? `Step ${active.stepNumber} — ${active.label}` : 'Steps'
+              return active ? `Step ${active.stepNumber} - ${active.label}` : 'Steps'
             })()}
           </span>
-          <button onClick={() => setStepRibbonOpen(o => !o)} title={stepRibbonOpen ? 'Collapse steps' : 'Expand steps'}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: 2, display: 'flex', alignItems: 'center' }}>
-            <ChevronDown size={14} style={{ transform: stepRibbonOpen ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.2s' }} />
-          </button>
+          <Tooltip content={stepRibbonOpen ? 'Collapse steps' : 'Expand steps'} placement="left">
+            <Button variant="ghost" size="sm" className="w-7 px-0 text-fg-muted" aria-label={stepRibbonOpen ? 'Collapse steps' : 'Expand steps'}
+              aria-expanded={stepRibbonOpen} onClick={() => setStepRibbonOpen(o => !o)}
+              icon={<ChevronDown size={14} aria-hidden="true" className={cn('transition-transform duration-200', !stepRibbonOpen && 'rotate-180')} />} />
+          </Tooltip>
         </div>
-        {stepRibbonOpen && <div style={{
-          padding: '10px 14px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 0,
-          overflowX: 'auto',
-        }}>
+        {stepRibbonOpen && <div className="flex items-center overflow-x-auto px-3.5 py-2.5">
         {(() => {
           // Group consecutive steps that share a group tag
           const chunks: (StepDef | StepDef[])[] = []
@@ -1774,76 +1743,52 @@ export default function Workspace({
             ci++
           }
 
+          // Colours derive from the role's colour at runtime (ROLE_COLORS), so they stay inline.
           const renderStepBtn = (step: StepDef, compact?: boolean) => {
             const count = stepCounts[step.key] ?? 0
             const isActive = effectiveStep === step.key
             const isGroupAvailable = step.group ? (groupHasItems[step.group] ?? false) : false
             const isEmpty = count === 0 && !isGroupAvailable
             const isGreyedOut = false
+            // Grey number and label: greyed out, or an empty step that isn't the active one
+            const muted = isGreyedOut || (!isActive && isEmpty)
             return (
               <button
+                type="button"
                 key={step.key}
+                aria-current={isActive ? 'step' : undefined}
+                disabled={isGreyedOut}
                 onClick={() => { if (!isGreyedOut) setActiveStep(step.key) }}
-                style={{
-                  display: 'flex',
-                  flexDirection: compact ? 'row' : 'column',
-                  alignItems: 'center',
-                  gap: compact ? 6 : 3,
-                  padding: compact ? '3px 10px' : '6px 14px',
-                  minWidth: compact ? undefined : 80,
-                  border: 'none',
-                  borderRadius: compact ? 6 : 10,
-                  cursor: isGreyedOut ? 'not-allowed' : 'pointer',
-                  background: isActive && !isGreyedOut ? roleColor + '12' : 'transparent',
-                  transition: 'background 0.15s',
-                  flexShrink: 0,
-                  position: 'relative',
-                  opacity: isGreyedOut ? 0.35 : 1,
-                  pointerEvents: isGreyedOut ? 'none' as const : undefined,
-                }}
+                className={cn(
+                  'relative flex shrink-0 items-center border-none text-label transition-colors',
+                  compact ? 'flex-row gap-1.5 rounded-control px-2.5 py-0.5' : 'min-w-20 flex-col gap-1 rounded-card px-3.5 py-1.5',
+                  isGreyedOut && 'pointer-events-none opacity-35',
+                )}
+                style={{ background: isActive && !isGreyedOut ? roleColor + '12' : 'transparent' }}
               >
-                <div style={{
-                  width: compact ? 18 : 26,
-                  height: compact ? 18 : 26,
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 11,
-                  fontWeight: 700,
-                  background: isGreyedOut ? 'rgba(0,0,0,0.06)' : isActive ? roleColor : isEmpty ? 'rgba(0,0,0,0.06)' : roleColor + '18',
-                  color: isGreyedOut ? '#aaa' : isActive ? '#fff' : isEmpty ? 'var(--text-muted)' : roleColor,
-                  transition: 'all 0.15s',
-                  flexShrink: 0,
-                }}>
+                <span
+                  className={cn('flex shrink-0 items-center justify-center rounded-full text-label font-bold transition-colors', compact ? 'size-[18px]' : 'size-[26px]',
+                    muted ? 'bg-disabled text-fg-muted' : isActive && 'text-white')}
+                  style={muted ? undefined : { background: isActive ? roleColor : roleColor + '18', color: isActive ? undefined : roleColor }}
+                >
                   {step.stepNumber}
-                </div>
-                <span style={{
-                  fontSize: 11,
-                  fontWeight: isActive && !isGreyedOut ? 700 : 600,
-                  color: isGreyedOut ? '#aaa' : isActive ? roleColor : isEmpty ? 'var(--text-muted)' : 'var(--text-secondary)',
-                  whiteSpace: 'nowrap',
-                  transition: 'color 0.15s',
-                }}>
+                </span>
+                <span
+                  className={cn('whitespace-nowrap text-label transition-colors', isActive && !isGreyedOut ? 'font-bold' : 'font-semibold',
+                    muted ? 'text-fg-muted' : !isActive && 'text-fg-label')}
+                  style={!muted && isActive ? { color: roleColor } : undefined}
+                >
                   {step.label}
                 </span>
                 {count > 0 && (
-                  <span style={{
-                    ...(compact ? {} : { position: 'absolute' as const, top: 2, right: 6 }),
-                    minWidth: compact ? 16 : 18,
-                    height: compact ? 16 : 18,
-                    borderRadius: compact ? 8 : 9,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 11,
-                    fontWeight: 700,
-                    background: isActive ? roleColor : '#ef4444',
-                    color: '#fff',
-                    padding: '0 3px',
-                    lineHeight: 1,
-                    marginLeft: compact ? 'auto' : undefined,
-                  }}>
+                  <span
+                    className={cn(
+                      'flex items-center justify-center rounded-full px-[3px] text-label leading-none font-bold text-white',
+                      compact ? 'ml-auto h-4 min-w-4' : 'absolute top-0.5 right-1.5 h-[18px] min-w-[18px]',
+                      !isActive && 'bg-danger',
+                    )}
+                    style={isActive ? { background: roleColor } : undefined}
+                  >
                     {count}
                   </span>
                 )}
@@ -1854,15 +1799,9 @@ export default function Workspace({
           return chunks.map((chunk, idx) => {
             if (Array.isArray(chunk)) {
               return (
-                <div key={`grp-${idx}`} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                  <div style={{
-                    width: 3,
-                    alignSelf: 'stretch',
-                    background: `${roleColor}30`,
-                    borderRadius: 2,
-                    margin: '2px 0',
-                  }} />
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <div key={`grp-${idx}`} className="flex shrink-0 items-center">
+                  <div className="my-0.5 w-[3px] self-stretch rounded-full" style={{ background: `${roleColor}30` }} />
+                  <div className="flex flex-col gap-px">
                     {chunk.map(s => renderStepBtn(s, true))}
                   </div>
                 </div>
@@ -1872,9 +1811,9 @@ export default function Workspace({
           })
         })()}
       </div>}
-      </div>
+      </nav>
 
-      {/* Action Modal — extracted to ModalStepForms */}
+      {/* Action Modal - extracted to ModalStepForms */}
       <ModalStepForms
         actionModal={actionModal}
         setActionModal={setActionModal}
