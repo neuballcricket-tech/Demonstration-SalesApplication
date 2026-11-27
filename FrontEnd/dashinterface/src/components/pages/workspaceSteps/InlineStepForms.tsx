@@ -2827,49 +2827,39 @@ export default function InlineStepForms({
 })() : selectedItem.actionKind === 'create-bl' && actionModal ? (() => {
   // Helper: input field
   const cbInput = (form: 'mbl' | 'hbl', label: string, key: string, opts?: { placeholder?: string; readOnly?: boolean; span2?: boolean; type?: string }) => (
-    <div style={opts?.span2 ? { gridColumn: '1 / -1' } : {}}>
-      <label className="lt-label">{label}</label>
-      <input className="lt-input" style={{ width: '100%', ...(opts?.readOnly ? { background: 'rgba(0,0,0,0.03)' } : {}) }}
-        type={opts?.type || 'text'}
-        value={form === 'mbl' ? mblField(key) : hblField(key)}
-        onChange={e => form === 'mbl' ? setMblField(key, e.target.value) : setHblField(key, e.target.value)}
-        placeholder={opts?.placeholder || ''} readOnly={opts?.readOnly} />
-    </div>
+    <Field label={label} className={cn(opts?.span2 && 'col-span-full')}>
+      {ids => opts?.type === 'date'
+        ? <DatePicker {...ids} value={form === 'mbl' ? mblField(key) : hblField(key)}
+          onChange={v => form === 'mbl' ? setMblField(key, v) : setHblField(key, v)} />
+        : <Input {...ids} type={opts?.type || 'text'}
+          value={form === 'mbl' ? mblField(key) : hblField(key)}
+          onChange={e => form === 'mbl' ? setMblField(key, e.target.value) : setHblField(key, e.target.value)}
+          placeholder={opts?.placeholder || ''} readOnly={opts?.readOnly} className={cn(opts?.readOnly && 'bg-canvas')} />}
+    </Field>
   )
   // Helper: textarea field
   const cbTextarea = (form: 'mbl' | 'hbl', label: string, key: string, rows: number, placeholder?: string) => (
-    <div style={{ gridColumn: '1 / -1' }}>
-      <label className="lt-label">{label}</label>
-      <textarea className="lt-input" rows={rows} style={{ width: '100%', resize: 'vertical' as const, fontSize: 12 }}
+    <Field label={label} className="col-span-full">
+      {ids => <Textarea {...ids} rows={rows} className="resize-y"
         value={form === 'mbl' ? mblField(key) : hblField(key)}
         onChange={e => form === 'mbl' ? setMblField(key, e.target.value) : setHblField(key, e.target.value)}
-        placeholder={placeholder || ''} />
-    </div>
+        placeholder={placeholder || ''} />}
+    </Field>
   )
   // Helper: select field
   const cbSelect = (form: 'mbl' | 'hbl', label: string, key: string, options: string[]) => (
-    <div>
-      <label className="lt-label">{label}</label>
-      <select className="lt-input" style={{ width: '100%' }}
-        value={form === 'mbl' ? mblField(key) : hblField(key)}
-        onChange={e => form === 'mbl' ? setMblField(key, e.target.value) : setHblField(key, e.target.value)}>
-        {options.map(o => <option key={o} value={o}>{o || '—'}</option>)}
-      </select>
-    </div>
+    <Field label={label}>
+      {ids => <Select {...ids} value={form === 'mbl' ? mblField(key) : hblField(key)}
+        onChange={v => form === 'mbl' ? setMblField(key, v) : setHblField(key, v)}
+        options={options.map(o => ({ value: o, label: o || '—' }))} />}
+    </Field>
   )
-  // Helper: accordion section header
-  const cbSection = (sectionId: string, title: string, hint?: string) => (
-    <div onClick={() => toggleHblSection(sectionId)} style={{
-      padding: '8px 12px', background: 'rgba(8,145,178,0.08)',
-      borderLeft: '3px solid #0891b2', borderRadius: '0 6px 6px 0',
-      fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const,
-      letterSpacing: '0.05em', color: '#0891b2', marginTop: 4,
-      cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    }}>
-      <span>{title}{hint ? <span style={{ fontWeight: 400, textTransform: 'none' as const, marginLeft: 8, fontSize: 11, color: '#64748b' }}>{hint}</span> : null}</span>
-      <span style={{ fontSize: 14, lineHeight: 1 }}>{hblCollapsed[sectionId] ? '+' : '−'}</span>
-    </div>
+  // Helper: accordion section heading
+  const cbHead = (sectionId: string, title: string, hint?: string) => (
+    <CollapsibleHead title={title} hint={hint} collapsed={!!hblCollapsed[sectionId]} onToggle={() => toggleHblSection(sectionId)} />
   )
+  const cbCell = 'truncate rounded-control border border-line-soft bg-canvas px-1 py-0.5'
+  const cbTableGrid = 'grid min-w-[700px] grid-cols-[100px_120px_90px_80px_70px_70px_70px_60px_1fr] gap-1'
 
   // Gather all bookings with HBLs that don't yet have an MBL
   const availableHblBookings = bookings.filter(b =>
@@ -2914,71 +2904,60 @@ export default function InlineStepForms({
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {/* Header banner */}
-      <div style={{ padding: '8px 14px', background: '#0d9488', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>MASTER BILL OF LADING</span>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>{mblSelectedHblIds.length} HBL(s) selected</span>
-      </div>
+    <div className="flex flex-col gap-4">
+      <StepHeader title="MASTER BILL OF LADING" subtitle={`${mblSelectedHblIds.length} HBL(s) selected`} />
 
       {/* HBL Search & Select Panel */}
-      <div style={{ border: '1px solid rgba(13,148,136,0.25)', borderRadius: 8, overflow: 'hidden' }}>
-        <div style={{ padding: '8px 12px', background: 'rgba(13,148,136,0.06)', borderBottom: '1px solid rgba(13,148,136,0.15)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Search size={14} style={{ color: '#0d9488', flexShrink: 0 }} />
-          <input className="lt-input" style={{ width: '100%', border: 'none', background: 'transparent', fontSize: 12, padding: '4px 0' }}
+      <div className="overflow-hidden rounded-card border border-line-soft">
+        <div className="flex items-center gap-2 border-b border-line-soft bg-canvas px-3 py-2">
+          <Search size={14} className="shrink-0 text-fg-muted" aria-hidden="true" />
+          <Input aria-label="Search HBLs" className="flex-1"
             value={mblHblSearch} onChange={e => setMblHblSearch(e.target.value)}
             placeholder="Search HBLs by customer, BL number, booking ID, origin, destination..." />
           {mblHblSearch && (
-            <button type="button" onClick={() => setMblHblSearch('')}
-              style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 14, padding: 0, lineHeight: 1 }}>×</button>
+            <Tooltip content="Clear search">
+              <Button variant="ghost" className="w-8 px-0" aria-label="Clear search"
+                icon={<X size={14} aria-hidden="true" />} onClick={() => setMblHblSearch('')} />
+            </Tooltip>
           )}
         </div>
-        <div style={{ maxHeight: 200, overflowY: 'auto' as const }}>
+        <div className="max-h-[200px] overflow-y-auto">
           {filteredHblBookings.length === 0 ? (
-            <div style={{ padding: '16px 12px', fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' as const }}>
+            <div className="px-3 py-4 text-center text-label text-fg-muted">
               {mblHblSearch ? 'No HBLs match your search.' : 'No HBLs available for MBL assignment.'}
             </div>
           ) : filteredHblBookings.map(hb => {
             const isSelected = mblSelectedHblIds.includes(hb.id)
             return (
-              <div key={hb.id} onClick={() => toggleHblSelection(hb.id)} style={{
-                padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
-                borderBottom: '1px solid var(--border)',
-                background: isSelected ? 'rgba(13,148,136,0.08)' : 'transparent',
-              }}>
-                <div style={{
-                  width: 16, height: 16, borderRadius: 3, border: isSelected ? '2px solid #0d9488' : '2px solid #cbd5e1',
-                  background: isSelected ? '#0d9488' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0,
-                }}>
-                  {isSelected && <Check size={10} style={{ color: '#fff' }} />}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: isSelected ? '#0d9488' : 'var(--text)' }}>
-                    {hb.house_bl_number || hb.id} — {hb.customer_name}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-                    {hb.origin} → {hb.destination} · {hb.quantity}x {hb.container_type} · {hb.shipping_line || 'No liner'}
-                  </div>
-                </div>
+              <div key={hb.id} className={cn('border-b border-line-soft last:border-b-0', isSelected && 'bg-primary-subtle')}>
+                <Checkbox checked={isSelected} onChange={() => toggleHblSelection(hb.id)} className="flex w-full gap-2.5 px-3 py-2">
+                  <span className="flex min-w-0 flex-1 flex-col gap-px">
+                    <span className={cn('font-semibold', isSelected ? 'text-primary' : 'text-fg')}>
+                      {hb.house_bl_number || hb.id} — {hb.customer_name}
+                    </span>
+                    <span className="text-label text-fg-muted">
+                      {hb.origin} → {hb.destination} · {hb.quantity}x {hb.container_type} · {hb.shipping_line || 'No liner'}
+                    </span>
+                  </span>
+                </Checkbox>
               </div>
             )
           })}
         </div>
         {selectedHblBookings.length > 0 && (
-          <div style={{ padding: '6px 12px', background: 'rgba(13,148,136,0.04)', borderTop: '1px solid rgba(13,148,136,0.15)', fontSize: 11, color: '#0d9488', fontWeight: 600 }}>
+          <div className="border-t border-line-soft bg-primary-subtle px-3 py-1.5 text-label font-semibold text-primary">
             Selected: {selectedHblBookings.map(b => b.house_bl_number || b.id).join(', ')}
           </div>
         )}
       </div>
 
       {/* ===== MBL FORM — 3 Sections ===== */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
 
-          {/* Section 1: Job Header & Routing Information */}
-          {cbSection('mbl-jobheader', 'Job Header & Routing', 'Job, vessel & routing details')}
-          {!hblCollapsed['mbl-jobheader'] && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '8px 0' }}>
+      {/* Section 1: Job Header & Routing Information */}
+      <section className="flex flex-col gap-3">
+        {cbHead('mbl-jobheader', 'Job Header & Routing', 'Job, vessel & routing details')}
+        {!hblCollapsed['mbl-jobheader'] && (
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
               {cbInput('mbl', 'Job #', 'jobNumber', { placeholder: 'Job reference number' })}
               {cbInput('mbl', 'Vessel / Voy', 'vesselVoyage', { placeholder: 'e.g. EVER GIVEN / 1234N' })}
               {cbInput('mbl', 'ETA LKCMB (POL)', 'etaPol', { type: 'date' })}
@@ -2996,48 +2975,46 @@ export default function InlineStepForms({
               {cbInput('mbl', 'Exchange Rate', 'exchangeRate', { type: 'number', placeholder: '0.00' })}
               {cbSelect('mbl', 'Type', 'mblType', ['', 'FCL', 'LCL', 'BREAK BULK', 'RORO'])}
               {cbInput('mbl', 'ETD Date', 'etdDate', { type: 'date' })}
-            </div>
-          )}
+          </div>
+        )}
+      </section>
 
-          {/* Section 2: B/L Table (auto-populated from selected HBLs) */}
-          {cbSection('mbl-bltable', 'B/L Table', `${selectedHblBookings.length} HBL(s)`)}
-          {!hblCollapsed['mbl-bltable'] && (
-            <div style={{ padding: '8px 0' }}>
-              {selectedHblBookings.length === 0 ? (
-                <div style={{ padding: '16px 12px', fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' as const, background: 'rgba(0,0,0,0.02)', borderRadius: 6, border: '1px dashed var(--border)' }}>
-                  Select one or more HBLs above to populate this table.
-                </div>
-              ) : (
-                <div style={{ overflowX: 'auto' as const }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '100px 120px 90px 80px 70px 70px 70px 60px 1fr', gap: 4, fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, paddingLeft: 2, minWidth: 700 }}>
-                    <span>BL No.</span><span>Shipper</span><span>Final Dest</span><span>Cargo Type</span><span>No. of Pkgs</span><span>Pkg Type</span><span>GW (kg)</span><span>CBM</span><span>Container / Seal</span>
-                  </div>
-                  {selectedHblBookings.map((hb) => (
-                    <div key={hb.id} style={{ display: 'grid', gridTemplateColumns: '100px 120px 90px 80px 70px 70px 70px 60px 1fr', gap: 4, marginBottom: 3, minWidth: 700, fontSize: 11 }}>
-                      <div className="lt-input" style={{ width: '100%', padding: '3px 4px', background: 'rgba(0,0,0,0.03)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }} title={hb.house_bl_number || hb.id}>
-                        {hb.house_bl_number || hb.id}
-                      </div>
-                      <div className="lt-input" style={{ width: '100%', padding: '3px 4px', background: 'rgba(0,0,0,0.03)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }} title={hb.house_bl_shipper || hb.customer_name}>
-                        {hb.house_bl_shipper || hb.customer_name}
-                      </div>
-                      <div className="lt-input" style={{ width: '100%', padding: '3px 4px', background: 'rgba(0,0,0,0.03)' }}>{hb.destination}</div>
-                      <div className="lt-input" style={{ width: '100%', padding: '3px 4px', background: 'rgba(0,0,0,0.03)' }}>General</div>
-                      <div className="lt-input" style={{ width: '100%', padding: '3px 4px', background: 'rgba(0,0,0,0.03)' }}>{hb.quantity || 1}</div>
-                      <div className="lt-input" style={{ width: '100%', padding: '3px 4px', background: 'rgba(0,0,0,0.03)' }}>{hb.container_type}</div>
-                      <div className="lt-input" style={{ width: '100%', padding: '3px 4px', background: 'rgba(0,0,0,0.03)' }}>—</div>
-                      <div className="lt-input" style={{ width: '100%', padding: '3px 4px', background: 'rgba(0,0,0,0.03)' }}>—</div>
-                      <div className="lt-input" style={{ width: '100%', padding: '3px 4px', background: 'rgba(0,0,0,0.03)' }}>—</div>
-                    </div>
-                  ))}
-                </div>
-              )}
+      {/* Section 2: B/L Table (auto-populated from selected HBLs) */}
+      <section className="flex flex-col gap-3">
+        {cbHead('mbl-bltable', 'B/L Table', `${selectedHblBookings.length} HBL(s)`)}
+        {!hblCollapsed['mbl-bltable'] && (
+          selectedHblBookings.length === 0 ? (
+            <div className="rounded-card border border-dashed border-line bg-canvas px-3 py-4 text-center text-label text-fg-muted">
+              Select one or more HBLs above to populate this table.
             </div>
-          )}
+          ) : (
+            <div className="overflow-x-auto text-label">
+              <div className={cn(cbTableGrid, 'mb-1 pl-0.5 font-semibold text-fg-muted')}>
+                <span>BL No.</span><span>Shipper</span><span>Final Dest</span><span>Cargo Type</span><span>No. of Pkgs</span><span>Pkg Type</span><span>GW (kg)</span><span>CBM</span><span>Container / Seal</span>
+              </div>
+              {selectedHblBookings.map((hb) => (
+                <div key={hb.id} className={cn(cbTableGrid, 'mb-1 text-fg')}>
+                  <div className={cbCell} title={hb.house_bl_number || hb.id}>{hb.house_bl_number || hb.id}</div>
+                  <div className={cbCell} title={hb.house_bl_shipper || hb.customer_name}>{hb.house_bl_shipper || hb.customer_name}</div>
+                  <div className={cbCell}>{hb.destination}</div>
+                  <div className={cbCell}>General</div>
+                  <div className={cbCell}>{hb.quantity || 1}</div>
+                  <div className={cbCell}>{hb.container_type}</div>
+                  <div className={cbCell}>—</div>
+                  <div className={cbCell}>—</div>
+                  <div className={cbCell}>—</div>
+                </div>
+              ))}
+            </div>
+          )
+        )}
+      </section>
 
-          {/* Section 3: Carrier B/L Instructions */}
-          {cbSection('mbl-carrierins', 'Carrier B/L Instructions', 'Carrier draft details')}
-          {!hblCollapsed['mbl-carrierins'] && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '8px 0' }}>
+      {/* Section 3: Carrier B/L Instructions */}
+      <section className="flex flex-col gap-3">
+        {cbHead('mbl-carrierins', 'Carrier B/L Instructions', 'Carrier draft details')}
+        {!hblCollapsed['mbl-carrierins'] && (
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
               {cbInput('mbl', 'Carrier BL Ins. Reference', 'carrierBlInsRef')}
               {cbSelect('mbl', 'Category', 'category', ['', 'CUSTOMER', 'FORWARDER'])}
               {cbSelect('mbl', 'Master B/L Type', 'masterBlType', ['', 'ORIGINAL', 'SEAWAY BILL', 'EXPRESS RELEASE', 'TELEX RELEASE'])}
@@ -3048,38 +3025,35 @@ export default function InlineStepForms({
               {cbInput('mbl', 'Notify Party', 'notifyParty')}
               {cbTextarea('mbl', 'Notify Address (incl. Tel & Fax)', 'notifyAddress', 3, 'Full address with telephone and fax')}
               {cbInput('mbl', 'Detention Days', 'detentionDays')}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, gridColumn: '1 / -1' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={mblField('displayOnCarrierDraft') === 'true'}
-                    onChange={e => setMblField('displayOnCarrierDraft', e.target.checked ? 'true' : '')} />
-                  Display on Carrier Draft
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, cursor: 'pointer', marginLeft: 16 }}>
-                  <input type="checkbox" checked={mblField('displayContainerNumbers') === 'true'}
-                    onChange={e => setMblField('displayContainerNumbers', e.target.checked ? 'true' : '')} />
-                  Display Container Numbers
-                </label>
-              </div>
+            <div className="col-span-full flex items-center gap-6">
+              <Checkbox checked={mblField('displayOnCarrierDraft') === 'true'}
+                onChange={checked => setMblField('displayOnCarrierDraft', checked ? 'true' : '')}>
+                Display on Carrier Draft
+              </Checkbox>
+              <Checkbox checked={mblField('displayContainerNumbers') === 'true'}
+                onChange={checked => setMblField('displayContainerNumbers', checked ? 'true' : '')}>
+                Display Container Numbers
+              </Checkbox>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+      </section>
 
       {/* Notes */}
-      <div>
-        <label className="lt-label">Notes (optional)</label>
-        <input className="lt-input" style={{ width: '100%' }} value={formNote}
-          onChange={e => setFormNote(e.target.value)} placeholder="Internal notes..." />
-      </div>
+      <Field label="Notes (optional)">
+        {ids => <Input {...ids} value={formNote}
+          onChange={e => setFormNote(e.target.value)} placeholder="Internal notes..." />}
+      </Field>
 
       {/* Submit (this step renders inline only, so it needs its own button) */}
       {(() => {
         const blDisabled = !mblField('shipperName').trim() || !mblField('consigneeName').trim()
         return (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            <button className="db-btn primary" onClick={handleModalSubmit} disabled={blDisabled}
-              style={blDisabled ? { opacity: 0.4, cursor: 'not-allowed' } : { background: '#0d9488', borderColor: '#0d9488' }}>
-              <FileText size={12} /> Record Master BL
-            </button>
+          <div className="flex justify-end">
+            <Button variant="primary" onClick={handleModalSubmit} disabled={blDisabled}
+              icon={<FileText size={14} aria-hidden="true" />}>
+              Record Master BL
+            </Button>
           </div>
         )
       })()}

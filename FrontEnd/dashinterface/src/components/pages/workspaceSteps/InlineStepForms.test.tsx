@@ -799,3 +799,52 @@ describe('InlineStepForms create-hbl', () => {
     expect(setHblContainers).toHaveBeenLastCalledWith([{ ...containerRow, containerNo: 'C2' }])
   })
 })
+
+describe('InlineStepForms create-bl', () => {
+  const hb = (id: string, no: string) => booking({ id, house_bl_number: no, house_bl_created: true, master_bl_recorded: false, status: 'Released' })
+  const blProps = (over: Partial<InlineStepFormsProps> = {}): Partial<InlineStepFormsProps> => ({
+    mblField: rec({}), setMblField: () => {}, hblField: rec({}), setHblField: () => {}, setMblContainers: () => {},
+    mblSelectedHblIds: [], setMblSelectedHblIds: () => {}, mblHblSearch: '', setMblHblSearch: () => {},
+    hblCollapsed: {}, toggleHblSection: () => {}, bookings: [hb('B1', 'HBL-1'), hb('B2', 'HBL-2')],
+    ...over,
+  })
+
+  it('ticking an HBL adds it to the selection and rebuilds the B/L table', async () => {
+    const user = userEvent.setup()
+    const setMblSelectedHblIds = vi.fn(), setMblContainers = vi.fn()
+    renderStep('create-bl', booking(), blProps({ setMblSelectedHblIds, setMblContainers }))
+    const row = screen.getByRole('checkbox', { name: /HBL-2/ })
+    expect(row).not.toBeChecked()
+    await user.click(row)
+    const updater = setMblSelectedHblIds.mock.calls[0][0] as (prev: string[]) => string[]
+    expect(updater(['B1'])).toEqual(['B1', 'B2'])
+    expect(setMblContainers).toHaveBeenCalledWith([
+      expect.objectContaining({ containerNo: 'HBL-1' }), expect.objectContaining({ containerNo: 'HBL-2' }),
+    ])
+  })
+
+  it('submit needs shipper and consignee; the carrier draft checkboxes store "true"/""', async () => {
+    const user = userEvent.setup()
+    const setMblField = vi.fn()
+    const { unmount } = renderStep('create-bl', booking(), blProps({ setMblField, mblField: rec({ shipperName: 'S', displayOnCarrierDraft: 'true' }) }))
+    expect(screen.getByRole('button', { name: 'Record Master BL' })).toBeDisabled()
+    await user.click(screen.getByRole('checkbox', { name: 'Display on Carrier Draft' }))
+    expect(setMblField).toHaveBeenCalledWith('displayOnCarrierDraft', '')
+    await user.click(screen.getByRole('checkbox', { name: 'Display Container Numbers' }))
+    expect(setMblField).toHaveBeenCalledWith('displayContainerNumbers', 'true')
+    unmount()
+    renderStep('create-bl', booking(), blProps({ mblField: rec({ shipperName: 'S', consigneeName: 'C' }), mblSelectedHblIds: ['B1'] }))
+    expect(screen.getByRole('button', { name: 'Record Master BL' })).toBeEnabled()
+    expect(screen.getByRole('checkbox', { name: /HBL-1/ })).toBeChecked()
+    expect(screen.getByText('Selected: HBL-1')).toBeInTheDocument()
+  })
+
+  it('search filters the list and the clear button empties it', async () => {
+    const user = userEvent.setup()
+    const setMblHblSearch = vi.fn()
+    renderStep('create-bl', booking(), blProps({ setMblHblSearch, mblHblSearch: 'zzz' }))
+    expect(screen.getByText('No HBLs match your search.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Clear search' }))
+    expect(setMblHblSearch).toHaveBeenCalledWith('')
+  })
+})
