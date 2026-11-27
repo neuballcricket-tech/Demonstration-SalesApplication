@@ -64,7 +64,7 @@ export function Radio({ value, children, isDisabled, className }: RadioProps) {
     <AriaRadio
       value={value}
       isDisabled={isDisabled}
-      className={cn('group/radio inline-flex items-center gap-2 text-control text-fg data-disabled:opacity-60', className)}
+      className={cn('group/radio relative inline-flex items-center gap-2 text-control text-fg data-disabled:opacity-60', className)}
     >
       {({ isSelected, isInvalid }) => (
         <>

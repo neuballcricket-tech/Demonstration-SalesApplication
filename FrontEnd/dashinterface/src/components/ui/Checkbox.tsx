@@ -42,7 +42,7 @@ export function Checkbox({
       isDisabled={isDisabled}
       isIndeterminate={isIndeterminate}
       isInvalid={isInvalid || ariaInvalid === true || ariaInvalid === 'true'}
-      className={cn('group inline-flex items-center gap-2 text-control text-fg data-disabled:opacity-60', className)}
+      className={cn('group relative inline-flex items-center gap-2 text-control text-fg data-disabled:opacity-60', className)}
       style={style}
       {...rest}
     >

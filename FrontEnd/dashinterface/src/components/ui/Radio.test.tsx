@@ -112,4 +112,23 @@ describe('RadioGroup', () => {
     )
     expect(screen.getByRole('radiogroup', { name: 'Mode' })).toHaveAttribute('aria-orientation', 'horizontal')
   })
+
+  it('keeps the visually hidden input positioned inside the radio in a scroll container', () => {
+    render(
+      <div className="overflow-x-auto">
+        <RadioGroup aria-label="Mode" value="air" onChange={() => {}}>
+          <Radio value="air">Air</Radio>
+        </RadioGroup>
+      </div>,
+    )
+    const input = screen.getByRole('radio', { name: 'Air' })
+    const hidden = input.parentElement as HTMLElement
+    expect(hidden.style.position).toBe('absolute')
+    const positioned = (el: HTMLElement | null): HTMLElement | null => {
+      for (let n = el; n; n = n.parentElement) if (n.classList.contains('relative') || (n.style.position && n.style.position !== 'static')) return n
+      return null
+    }
+    expect(positioned(hidden.parentElement)).toBe(input.closest('label'))
+  })
 })
+

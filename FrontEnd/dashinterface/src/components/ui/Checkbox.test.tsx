@@ -86,4 +86,29 @@ describe('Checkbox', () => {
     expect(root).toHaveClass('extra')
     expect(root.style.marginTop).toBe('3px')
   })
+
+  it('keeps the visually hidden input positioned inside the control in a scroll container', () => {
+    render(
+      <div className="overflow-x-auto">
+        <Checkbox checked={false} onChange={() => {}} aria-label="Pick" />
+      </div>,
+    )
+    const input = screen.getByRole('checkbox', { name: 'Pick' })
+    // RAC wraps the input in an absolutely positioned span; it must resolve against the checkbox root,
+    // not escape to the scroller (which widened the page in a scrolling table).
+    const hidden = input.parentElement as HTMLElement
+    expect(hidden.style.position).toBe('absolute')
+    const positioned = (el: HTMLElement | null): HTMLElement | null => {
+      for (let n = el; n; n = n.parentElement) if (n.classList.contains('relative') || (n.style.position && n.style.position !== 'static')) return n
+      return null
+    }
+    expect(positioned(hidden.parentElement)).toBe(input.closest('label'))
+  })
+
+  it('lets a consumer position class replace the default relative root', () => {
+    const { container } = render(<Checkbox checked={false} onChange={() => {}} aria-label="Pick" className="absolute" />)
+    const root = container.firstElementChild as HTMLElement
+    expect(root).toHaveClass('absolute')
+    expect(root).not.toHaveClass('relative')
+  })
 })
