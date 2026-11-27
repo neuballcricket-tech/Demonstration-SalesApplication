@@ -16,7 +16,7 @@ import type { CompletedRateRequest } from "../../../types"
 import type { WorkspaceItem, BlContainerRow, MblContainerRow, QuotationOptionOverride } from "./types"
 import { empName, openMailto, buildRateSection, generateQuotationPdf } from "./utils"
 import { lookupQuotationId } from "./useWorkspaceActions"
-import { Badge, Button, Checkbox, ComboBox, DatePicker, Field, FileButton, Input, NumberInput, Select, Textarea, Tooltip, type ComboBoxItem, type Option } from "../../ui"
+import { Badge, Button, Checkbox, ComboBox, DatePicker, Field, FileButton, Input, Modal, NumberInput, Select, Textarea, TimeField, Tooltip, type ComboBoxItem, type Option } from "../../ui"
 import { labelClass } from "../../ui/controlStyles"
 import { cn } from "../../../lib/cn"
 
@@ -412,7 +412,6 @@ export default function InlineStepForms({
   vesselRemarks, setVesselRemarks, vesselAgent, setVesselAgent,
   selectedReleaseOrderId, setSelectedReleaseOrderId,
   showVesselSuggestions, setShowVesselSuggestions,
-  vesselDropOpen, setVesselDropOpen, voyageDropOpen, setVoyageDropOpen,
   unknownVoyageWarning, setUnknownVoyageWarning,
   vesselPickedRef, voyagePickedRef, bkgField, setBkgField,
   hblField, setHblField, hblContainers, setHblContainers,
@@ -2302,184 +2301,136 @@ export default function InlineStepForms({
   )
 })() : selectedItem.actionKind === 'create-vessel-booking' && actionModal ? (() => {
   const blBkg = actionModal.sourceData.booking as Booking
-  const sectionHeader = (title: string) => (
-    <div style={{ padding: '6px 12px', background: 'rgba(8,145,178,0.08)', borderLeft: '3px solid #0891b2', borderRadius: '0 6px 6px 0', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '0.05em', color: '#0891b2', marginTop: 4 }}>{title}</div>
-  )
   const formInput = (label: string, key: string, opts?: { type?: string; placeholder?: string; span2?: boolean; readOnly?: boolean }) => (
-    <div style={opts?.span2 ? { gridColumn: '1 / -1' } : {}}>
-      <label className="lt-label">{label}</label>
-      <input className="lt-input" style={{ width: '100%', ...(opts?.readOnly ? { background: 'rgba(0,0,0,0.03)' } : {}) }}
-        type={opts?.type || 'text'} value={bkgField(key)} onChange={e => setBkgField(key, e.target.value)}
-        placeholder={opts?.placeholder || ''} readOnly={opts?.readOnly} />
-    </div>
+    <Field label={label} className={cn(opts?.span2 && 'col-span-full')}>
+      {ids => opts?.type === 'date'
+        ? <DatePicker {...ids} value={bkgField(key)} onChange={v => setBkgField(key, v)} />
+        : opts?.type === 'time'
+          ? <TimeField {...ids} value={bkgField(key)} onChange={v => setBkgField(key, v)} />
+          : <Input {...ids} type={opts?.type || 'text'} value={bkgField(key)} onChange={e => setBkgField(key, e.target.value)}
+            placeholder={opts?.placeholder || ''} readOnly={opts?.readOnly} className={cn(opts?.readOnly && 'bg-canvas')} />}
+    </Field>
   )
   const formSelect = (label: string, key: string, options: string[]) => (
-    <div>
-      <label className="lt-label">{label}</label>
-      <select className="lt-input" style={{ width: '100%' }} value={bkgField(key)} onChange={e => setBkgField(key, e.target.value)}>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-    </div>
+    <Field label={label}>
+      {ids => <Select {...ids} value={bkgField(key)} onChange={v => setBkgField(key, v)}
+        options={options.map(o => ({ value: o, label: o || '—' }))} />}
+    </Field>
   )
   const formTextarea = (label: string, key: string, placeholder?: string) => (
-    <div style={{ gridColumn: '1 / -1' }}>
-      <label className="lt-label">{label}</label>
-      <textarea className="lt-input" rows={2} style={{ width: '100%', resize: 'vertical' as const, fontSize: 12 }}
-        value={bkgField(key)} onChange={e => setBkgField(key, e.target.value)} placeholder={placeholder || ''} />
-    </div>
+    <Field label={label} className="col-span-full">
+      {ids => <Textarea {...ids} rows={2} className="resize-y"
+        value={bkgField(key)} onChange={e => setBkgField(key, e.target.value)} placeholder={placeholder || ''} />}
+    </Field>
   )
+  const readOnlyInput = (label: string, value: string) => (
+    <Field label={label}>
+      {ids => <Input {...ids} value={value} readOnly className="bg-canvas" />}
+    </Field>
+  )
+  // Same lists as the old hand-made dropdowns: unique vessel names, and voyages narrowed by the typed vessel.
+  const cvbVesselQ = formVessel.toLowerCase()
+  const cvbVesselItems: ComboBoxItem[] = MOCK_OPEN_VOYAGES
+    .filter(v => v.vesselName.toLowerCase().includes(cvbVesselQ))
+    .filter((v, i, arr) => arr.findIndex(x => x.vesselName === v.vesselName) === i)
+    .map(v => ({ value: v.vesselName, description: v.shippingLine }))
+  const cvbVoyageQ = formVoyage.toLowerCase()
+  const cvbVesselFilter = formVessel.trim().toLowerCase()
+  const cvbVoyageItems: ComboBoxItem[] = MOCK_OPEN_VOYAGES
+    .filter(v =>
+      (v.voyageNumber.toLowerCase().includes(cvbVoyageQ) || v.vesselName.toLowerCase().includes(cvbVoyageQ)) &&
+      (!cvbVesselFilter || v.vesselName.toLowerCase().includes(cvbVesselFilter))
+    )
+    .map(v => ({ value: v.voyageNumber, label: `${v.voyageNumber} · ${v.vesselName} · ${v.shippingLine}`, description: `${v.pol} → ${v.fpod} · ETD ${v.etdPol} · ETA ${v.etaFpod}` }))
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div className="flex flex-col gap-4">
 
-      {/* ── Unknown vessel / voyage warning modal ── */}
-      {unknownVoyageWarning && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.45)' }}
-          onClick={() => setUnknownVoyageWarning(null)}>
-          <div style={{ background: 'var(--bg-card)', borderRadius: 12, padding: '24px 28px', maxWidth: 420, width: '90%', boxShadow: '0 8px 32px rgba(0,0,0,0.22)', border: '1px solid var(--border)' }}
-            onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
-              <div style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 8, background: 'rgba(217,119,6,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <AlertTriangle size={18} style={{ color: '#d97706' }} />
-              </div>
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>
-                  {unknownVoyageWarning.field === 'vessel' ? 'Vessel Not Found' : 'Voyage Not Found'}
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.55 }}>
-                  <strong style={{ color: 'var(--text)' }}>"{unknownVoyageWarning.value}"</strong> does not match any open {unknownVoyageWarning.field} record.
-                  <br /><br />
-                  Please verify that you typed it correctly, or go to the <strong>Vessel step (Step 11)</strong> to add this {unknownVoyageWarning.field} as a new open voyage first.
-                </div>
-              </div>
+      {/* ── Unknown vessel / voyage warning ── */}
+      <Modal isOpen={!!unknownVoyageWarning} onClose={() => setUnknownVoyageWarning(null)} size="sm"
+        title={unknownVoyageWarning?.field === 'vessel' ? 'Vessel Not Found' : 'Voyage Not Found'}
+        footer={<>
+          <Button onClick={() => setUnknownVoyageWarning(null)}>
+            Keep Editing
+          </Button>
+          <Button variant="primary"
+            onClick={() => { setUnknownVoyageWarning(null); setActionModal(null); setActiveStep('cs-bl-vessel') }}>
+            Go to Vessel Step
+          </Button>
+        </>}>
+        {unknownVoyageWarning && (
+          <div className="flex items-start gap-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-card bg-warning-bg">
+              <AlertTriangle size={18} className="text-warning" aria-hidden="true" />
             </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 6 }}>
-              <button className="db-btn"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-                onClick={() => setUnknownVoyageWarning(null)}>
-                Keep Editing
-              </button>
-              <button className="db-btn"
-                style={{ background: '#d97706', borderColor: '#d97706', color: '#fff' }}
-                onClick={() => { setUnknownVoyageWarning(null); setActionModal(null); setActiveStep('cs-bl-vessel') }}>
-                Go to Vessel Step
-              </button>
+            <div className="text-control leading-relaxed text-fg-label">
+              <strong className="text-fg">"{unknownVoyageWarning.value}"</strong> does not match any open {unknownVoyageWarning.field} record.
+              <br /><br />
+              Please verify that you typed it correctly, or go to the <strong>Vessel step (Step 11)</strong> to add this {unknownVoyageWarning.field} as a new open voyage first.
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
-      <div style={{ padding: '8px 14px', background: '#0891b2', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>BOOKING</span>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>{blBkg.customer_name} · {blBkg.origin} → {blBkg.destination}</span>
-      </div>
+      <StepHeader title="BOOKING" subtitle={`${blBkg.customer_name} · ${blBkg.origin} → ${blBkg.destination}`} />
 
       {(formVessel || formVoyage) && (
-        <div style={{ padding: '8px 12px', background: 'rgba(8,145,178,0.06)', border: '1px solid rgba(8,145,178,0.15)', borderRadius: 8, fontSize: 12, display: 'flex', flexWrap: 'wrap', gap: '4px 16px' }}>
-          {formVessel && <span><span style={{ color: 'var(--text-muted)' }}>Vessel:</span> <strong>{formVessel}</strong></span>}
-          {formVoyage && <span><span style={{ color: 'var(--text-muted)' }}>Voyage:</span> <strong>{formVoyage}</strong></span>}
-          {vesselPol && <span><span style={{ color: 'var(--text-muted)' }}>POL:</span> {vesselPol}</span>}
-          {vesselFinalPod && <span><span style={{ color: 'var(--text-muted)' }}>FPOD:</span> {vesselFinalPod}</span>}
-          {vesselEtdPol && <span><span style={{ color: 'var(--text-muted)' }}>ETD:</span> {vesselEtdPol}</span>}
-          {vesselEtaFpod && <span><span style={{ color: 'var(--text-muted)' }}>ETA:</span> {vesselEtaFpod}</span>}
+        <div className="flex flex-wrap gap-x-4 gap-y-1 rounded-card border border-line-soft bg-primary-subtle px-3 py-2 text-control text-fg">
+          {formVessel && <span><span className="text-fg-muted">Vessel:</span> <strong>{formVessel}</strong></span>}
+          {formVoyage && <span><span className="text-fg-muted">Voyage:</span> <strong>{formVoyage}</strong></span>}
+          {vesselPol && <span><span className="text-fg-muted">POL:</span> {vesselPol}</span>}
+          {vesselFinalPod && <span><span className="text-fg-muted">FPOD:</span> {vesselFinalPod}</span>}
+          {vesselEtdPol && <span><span className="text-fg-muted">ETD:</span> {vesselEtdPol}</span>}
+          {vesselEtaFpod && <span><span className="text-fg-muted">ETA:</span> {vesselEtaFpod}</span>}
         </div>
       )}
 
-      {sectionHeader('Vessel Details')}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        {/* Vessel combobox */}
-        <div style={{ position: 'relative' }}>
-          <label className="lt-label">Vessel</label>
-          <input className="lt-input" style={{ width: '100%' }}
-            value={formVessel}
-            onChange={e => { setFormVessel(e.target.value); setVesselDropOpen(true) }}
-            onFocus={() => setVesselDropOpen(true)}
+      <FormSection title="Vessel Details">
+        {/* Vessel combobox; a typed name that matches no open voyage raises the warning on blur */}
+        <Field label="Vessel">
+          {ids => <ComboBox {...ids} value={formVessel} items={cvbVesselItems} filter={() => true} menuTrigger="focus"
+            onChange={v => { vesselPickedRef.current = false; setFormVessel(v) }}
+            onPick={() => { vesselPickedRef.current = true }}
             onBlur={() => setTimeout(() => {
-              setVesselDropOpen(false)
               if (vesselPickedRef.current) { vesselPickedRef.current = false; return }
               const v = formVessel.trim()
               if (v && !MOCK_OPEN_VOYAGES.some(o => o.vesselName.toLowerCase() === v.toLowerCase()))
                 setUnknownVoyageWarning({ field: 'vessel', value: v })
             }, 150)}
-            placeholder="Search vessel name…" />
-          {vesselDropOpen && (() => {
-            const q = formVessel.toLowerCase()
-            const uniqueVessels = MOCK_OPEN_VOYAGES
-              .filter(v => v.vesselName.toLowerCase().includes(q))
-              .filter((v, i, arr) => arr.findIndex(x => x.vesselName === v.vesselName) === i)
-            return uniqueVessels.length > 0 ? (
-              <div style={{ position: 'absolute', zIndex: 200, top: 'calc(100% + 2px)', left: 0, right: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.14)', maxHeight: 180, overflowY: 'auto' as const }}>
-                {uniqueVessels.map(v => (
-                  <div key={v.vesselName}
-                    onMouseDown={() => { vesselPickedRef.current = true; setFormVessel(v.vesselName); setVesselDropOpen(false) }}
-                    style={{ padding: '7px 10px', cursor: 'pointer', fontSize: 12, borderBottom: '1px solid var(--border)' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(8,145,178,0.08)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                    <strong>{v.vesselName}</strong>
-                    <span style={{ color: 'var(--text-muted)', marginLeft: 8, fontSize: 11 }}>{v.shippingLine}</span>
-                  </div>
-                ))}
-              </div>
-            ) : null
-          })()}
-        </div>
+            placeholder="Search vessel name…" />}
+        </Field>
 
         {/* Voyage combobox — selecting a voyage auto-fills all vessel fields */}
-        <div style={{ position: 'relative' }}>
-          <label className="lt-label">Voyage</label>
-          <input className="lt-input" style={{ width: '100%' }}
-            value={formVoyage}
-            onChange={e => { setFormVoyage(e.target.value); setVoyageDropOpen(true) }}
-            onFocus={() => setVoyageDropOpen(true)}
+        <Field label="Voyage">
+          {ids => <ComboBox {...ids} value={formVoyage} items={cvbVoyageItems} filter={() => true} menuTrigger="focus"
+            onChange={v => { voyagePickedRef.current = false; setFormVoyage(v) }}
+            onPick={voyageNumber => {
+              const v = MOCK_OPEN_VOYAGES.find(o => o.voyageNumber === voyageNumber)
+              if (!v) return
+              voyagePickedRef.current = true
+              setFormVessel(v.vesselName)
+              setFormVoyage(v.voyageNumber)
+              setVesselPol(v.pol)
+              setVesselFinalPod(v.fpod)
+              setVesselEtdPol(v.etdPol)
+              setVesselEtaFpod(v.etaFpod)
+            }}
             onBlur={() => setTimeout(() => {
-              setVoyageDropOpen(false)
               if (voyagePickedRef.current) { voyagePickedRef.current = false; return }
               const v = formVoyage.trim()
               if (v && !MOCK_OPEN_VOYAGES.some(o => o.voyageNumber.toLowerCase() === v.toLowerCase()))
                 setUnknownVoyageWarning({ field: 'voyage', value: v })
             }, 150)}
-            placeholder="Search voyage number…" />
-          {voyageDropOpen && (() => {
-            const q = formVoyage.toLowerCase()
-            const vesselQ = formVessel.trim().toLowerCase()
-            const matches = MOCK_OPEN_VOYAGES.filter(v =>
-              (v.voyageNumber.toLowerCase().includes(q) || v.vesselName.toLowerCase().includes(q)) &&
-              (!vesselQ || v.vesselName.toLowerCase().includes(vesselQ))
-            )
-            return matches.length > 0 ? (
-              <div style={{ position: 'absolute', zIndex: 200, top: 'calc(100% + 2px)', left: 0, right: 0, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.14)', maxHeight: 220, overflowY: 'auto' as const }}>
-                {matches.map(v => (
-                  <div key={v.id}
-                    onMouseDown={() => {
-                      voyagePickedRef.current = true
-                      setFormVessel(v.vesselName)
-                      setFormVoyage(v.voyageNumber)
-                      setVesselPol(v.pol)
-                      setVesselFinalPod(v.fpod)
-                      setVesselEtdPol(v.etdPol)
-                      setVesselEtaFpod(v.etaFpod)
-                      setVoyageDropOpen(false)
-                    }}
-                    style={{ padding: '7px 10px', cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(8,145,178,0.08)')}
-                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
-                    <div style={{ fontSize: 12 }}><strong>{v.voyageNumber}</strong> <span style={{ color: 'var(--text-muted)', marginLeft: 6, fontSize: 11 }}>{v.vesselName} · {v.shippingLine}</span></div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{v.pol} → {v.fpod} &nbsp;·&nbsp; ETD {v.etdPol} &nbsp;·&nbsp; ETA {v.etaFpod}</div>
-                  </div>
-                ))}
-              </div>
-            ) : null
-          })()}
-        </div>
-        <div><label className="lt-label">Port of Loading</label><input className="lt-input" style={{ width: '100%', background: 'rgba(0,0,0,0.03)' }} value={vesselPol} readOnly /></div>
-        <div><label className="lt-label">Port of Discharge</label><input className="lt-input" style={{ width: '100%', background: 'rgba(0,0,0,0.03)' }} value={vesselFinalPod} readOnly /></div>
-        <div><label className="lt-label">ETD POL</label><input className="lt-input" style={{ width: '100%', background: 'rgba(0,0,0,0.03)' }} value={vesselEtdPol} readOnly /></div>
-        <div><label className="lt-label">ETA FPOD</label><input className="lt-input" style={{ width: '100%', background: 'rgba(0,0,0,0.03)' }} value={vesselEtaFpod} readOnly /></div>
+            placeholder="Search voyage number…" />}
+        </Field>
+        {readOnlyInput('Port of Loading', vesselPol)}
+        {readOnlyInput('Port of Discharge', vesselFinalPod)}
+        {readOnlyInput('ETD POL', vesselEtdPol)}
+        {readOnlyInput('ETA FPOD', vesselEtaFpod)}
         {formInput('SOB Date', 'sob_date', { type: 'date' })}
-        <div><label className="lt-label">Routing Type</label><input className="lt-input" style={{ width: '100%', background: 'rgba(0,0,0,0.03)' }} value={vesselRoutingType} readOnly /></div>
-      </div>
+        {readOnlyInput('Routing Type', vesselRoutingType)}
+      </FormSection>
 
-      {sectionHeader('Business Details')}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <FormSection title="Business Details">
         {formInput('Inquiry Ref No', 'inquiry_ref')}
         {formInput('Quotation Ref No', 'quotation_ref')}
         {formSelect('Customer Category', 'customer_category', ['CUSTOMER', 'FORWARDER'])}
@@ -2492,10 +2443,9 @@ export default function InlineStepForms({
         {formInput('Documentation By', 'documentation_by')}
         {formInput('FCL Cutoff Date', 'fcl_cutoff_date', { type: 'date' })}
         {formInput('LCL Cutoff Date', 'lcl_cutoff_date', { type: 'date' })}
-      </div>
+      </FormSection>
 
-      {sectionHeader('Shipping Details')}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <FormSection title="Shipping Details">
         {formInput('Shipper Name (Booking Party)', 'shipper_name', { span2: true })}
         {formTextarea('Shipper Address', 'shipper_address')}
         {formInput('Actual Shipper', 'actual_shipper', { span2: true })}
@@ -2506,10 +2456,9 @@ export default function InlineStepForms({
         {formTextarea('Consignee Address', 'consignee_address')}
         {formInput('Notify', 'notify', { span2: true })}
         {formTextarea('Notify Address', 'notify_address')}
-      </div>
+      </FormSection>
 
-      {sectionHeader('Cargo & Container')}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <FormSection title="Cargo & Container">
         {formInput('Commodity', 'commodity', { span2: true })}
         {formInput('Receiving Terminal', 'receiving_terminal')}
         {formInput('Final Destination', 'final_destination')}
@@ -2531,21 +2480,20 @@ export default function InlineStepForms({
         {formInput('Net Weight (KG)', 'net_weight', { type: 'number' })}
         {formInput('Volume (CBM)', 'volume_cbm', { type: 'number' })}
         {formInput('Weight/Measurement Ratio', 'weight_measurement_ratio')}
-      </div>
+      </FormSection>
 
-      <div style={{ padding: '8px 12px', background: 'rgba(217,119,6,0.06)', border: '1px solid rgba(217,119,6,0.15)', borderRadius: 8, fontSize: 12 }}>
+      <div className="rounded-card border border-warning-line bg-warning-bg px-3 py-2 text-control text-fg">
         <strong>Container:</strong> {bkgField('container_count')}x {bkgField('container_size')}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
         {formSelect('Delivery Type', 'delivery_type_bkg', ['CFS/DOOR', 'DOOR/CFS', 'DOOR/DOOR', 'DOOR/CY', 'CY/DOOR', 'CY/CY', 'CY/CFS', 'CY/RR', 'CFS/CY', 'CFS/CFS', 'DOOR/PORT', 'PORT/DOOR', 'PORT/PORT', 'TILLING TITE', 'CHECK'])}
         {formInput('Incoterm', 'incoterm', { placeholder: 'e.g. FOB, CIF, EXW, DDP' })}
         {formInput('Pickup Type', 'pickup_type')}
         {formInput('Inland Haulage Type', 'inland_haulage_type')}
       </div>
 
-      {sectionHeader('B/L Details')}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+      <FormSection title="B/L Details">
         {formSelect('B/L Issue Type', 'bl_issue_type', ['OWN', 'THROUGH', 'CARRIER BL', 'RMAT', 'SWITCH BL', 'AGENT BL'])}
         {formSelect('HB/L Issue Term', 'hbl_issue_term', ['', 'COPY', 'DRAFT', 'NON-NEGO', 'ORIGINAL', 'SEAWAY', 'SURRENDER', 'AS PER B/L INSTRUCTIONS'])}
         {formSelect('MB/L Issue Term', 'mbl_issue_term', ['', 'COPY', 'DRAFT', 'NON-NEGO', 'ORIGINAL', 'SEAWAY', 'SURRENDER', 'AS PER B/L INSTRUCTIONS'])}
@@ -2558,20 +2506,20 @@ export default function InlineStepForms({
         {formInput('VGM Cutoff Time', 'vgm_cutoff_time', { type: 'time' })}
         {formSelect('Destination Charges', 'destination_charges', ['COLLECT', 'PREPAID'])}
         {formInput('Permit No', 'permit_no')}
-      </div>
+      </FormSection>
 
-      {sectionHeader('Remarks')}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10 }}>
+      {/* One column */}
+      <section className="flex flex-col gap-3">
+        <SectionHead>Remarks</SectionHead>
         {formTextarea('Marks and Numbers', 'marks_and_numbers', 'Marks, numbers, container numbers...')}
         {formTextarea('Description of Goods', 'description_of_goods', 'Goods description for B/L...')}
         {formTextarea('B/L Instructions', 'bl_instructions', 'Special B/L instructions...')}
         {formTextarea('Remarks (Customer)', 'remarks_customer', 'Customer-facing remarks...')}
         {formTextarea('Remarks (Internal)', 'remarks_internal', 'Internal notes...')}
-      </div>
+      </section>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
-        <button className="db-btn primary"
-          style={{ background: '#0891b2', borderColor: '#0891b2' }}
+      <div className="flex justify-end">
+        <Button variant="primary"
           onClick={() => {
             onMarkBlBookingCreated(blBkg.id)
             onLogActivity({
@@ -2584,7 +2532,7 @@ export default function InlineStepForms({
             setActionModal(null)
           }}>
           Save Booking →
-        </button>
+        </Button>
       </div>
     </div>
   )

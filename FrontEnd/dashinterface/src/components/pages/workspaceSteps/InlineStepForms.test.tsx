@@ -667,3 +667,80 @@ describe('InlineStepForms save-vessel-schedule', () => {
     expect(setActionModal).toHaveBeenCalledWith(null)
   })
 })
+
+describe('InlineStepForms create-vessel-booking', () => {
+  const cvbProps = (over: Partial<InlineStepFormsProps> = {}): Partial<InlineStepFormsProps> => ({
+    formVessel: '', setFormVessel: () => {}, formVoyage: '', setFormVoyage: () => {},
+    vesselPol: '', setVesselPol: () => {}, vesselFinalPod: '', setVesselFinalPod: () => {},
+    vesselEtdPol: '', setVesselEtdPol: () => {}, vesselEtaFpod: '', setVesselEtaFpod: () => {}, vesselRoutingType: 'DIRECT',
+    unknownVoyageWarning: null, setUnknownVoyageWarning: () => {},
+    vesselPickedRef: { current: false }, voyagePickedRef: { current: false },
+    bkgField: rec({ hbl_issue_term: '' }), setBkgField: () => {},
+    activeRole: 'cs', onMarkBlBookingCreated: () => {}, onLogActivity: () => {}, onFlash: () => {}, setActionModal: () => {}, setActiveStep: () => {},
+    ...over,
+  })
+
+  it('picking a voyage fills the vessel, ports and dates', async () => {
+    const user = userEvent.setup()
+    const setFormVessel = vi.fn(), setFormVoyage = vi.fn(), setVesselPol = vi.fn(), setVesselFinalPod = vi.fn()
+    const voyagePickedRef = { current: false }
+    renderStep('create-vessel-booking', booking(), cvbProps({ formVoyage: 'CE-5', setFormVessel, setFormVoyage, setVesselPol, setVesselFinalPod, voyagePickedRef }))
+    await user.click(screen.getByRole('combobox', { name: 'Voyage' }))
+    expect(screen.getAllByRole('option').map(o => o.textContent)).toEqual([
+      expect.stringMatching(/^CE-509E · Colombo Express · Hapag-Lloyd/), expect.stringMatching(/^CE-510W · Colombo Express/),
+    ])
+    await user.click(screen.getByRole('option', { name: /CE-510W/ }))
+    expect(setFormVoyage).toHaveBeenLastCalledWith('CE-510W')
+    expect(setFormVessel).toHaveBeenCalledWith('Colombo Express')
+    expect(setVesselPol).toHaveBeenCalledWith('Colombo')
+    expect(setVesselFinalPod).toHaveBeenCalledWith('Rotterdam')
+    expect(voyagePickedRef.current).toBe(true)
+  })
+
+  it('leaving the vessel field with an unknown name raises the warning; a picked name does not', async () => {
+    const user = userEvent.setup()
+    const setUnknownVoyageWarning = vi.fn()
+    const { unmount } = renderStep('create-vessel-booking', booking(), cvbProps({ formVessel: 'MSC Imaginary', setUnknownVoyageWarning }))
+    await user.click(screen.getByRole('combobox', { name: 'Vessel' }))
+    await user.tab()
+    await waitFor(() => expect(setUnknownVoyageWarning).toHaveBeenCalledWith({ field: 'vessel', value: 'MSC Imaginary' }))
+    unmount()
+    setUnknownVoyageWarning.mockClear()
+    const vesselPickedRef = { current: false }
+    renderStep('create-vessel-booking', booking(), cvbProps({ formVessel: 'Ever', setUnknownVoyageWarning, vesselPickedRef }))
+    await user.click(screen.getByRole('combobox', { name: 'Vessel' }))
+    await user.click(screen.getByRole('option', { name: /Ever Apex/ }))
+    expect(vesselPickedRef.current).toBe(true)
+    await user.tab()
+    await new Promise(r => setTimeout(r, 200))
+    expect(setUnknownVoyageWarning).not.toHaveBeenCalled()
+    expect(vesselPickedRef.current).toBe(false)
+  })
+
+  it('the warning dialog keeps editing or goes to the vessel step', async () => {
+    const user = userEvent.setup()
+    const setUnknownVoyageWarning = vi.fn(), setActionModal = vi.fn(), setActiveStep = vi.fn()
+    renderStep('create-vessel-booking', booking(), cvbProps({ unknownVoyageWarning: { field: 'voyage', value: 'ZZ-1' }, setUnknownVoyageWarning, setActionModal, setActiveStep }))
+    const dialog = screen.getByRole('dialog', { name: 'Voyage Not Found' })
+    expect(dialog).toHaveTextContent('"ZZ-1" does not match any open voyage record.')
+    await user.click(within(dialog).getByRole('button', { name: 'Keep Editing' }))
+    expect(setUnknownVoyageWarning).toHaveBeenCalledWith(null)
+    await user.click(within(dialog).getByRole('button', { name: 'Go to Vessel Step' }))
+    expect(setActionModal).toHaveBeenCalledWith(null)
+    expect(setActiveStep).toHaveBeenCalledWith('cs-bl-vessel')
+  })
+
+  it('selects show the empty choice as a dash and update the booking field; Save Booking records it', async () => {
+    const user = userEvent.setup()
+    const setBkgField = vi.fn(), onMarkBlBookingCreated = vi.fn()
+    renderStep('create-vessel-booking', booking(), cvbProps({ setBkgField, onMarkBlBookingCreated }))
+    const term = screen.getByRole('button', { name: /HB\/L Issue Term/ })
+    expect(term).toHaveTextContent('—')
+    await user.click(term)
+    await user.click(screen.getByRole('option', { name: 'SEAWAY' }))
+    expect(setBkgField).toHaveBeenCalledWith('hbl_issue_term', 'SEAWAY')
+    expect(screen.getByRole('textbox', { name: 'Port of Loading' })).toHaveAttribute('readonly')
+    await user.click(screen.getByRole('button', { name: 'Save Booking →' }))
+    expect(onMarkBlBookingCreated).toHaveBeenCalledWith('BKG-TEST')
+  })
+})

@@ -44,6 +44,8 @@ export interface ComboBoxProps {
   onInputChange?: (text: string) => void
   /** Called with `item.value` when an item is picked (after `onChange`), never on typing. */
   onPick?: (value: string) => void
+  /** Called when the input loses focus (e.g. to validate free text). */
+  onBlur?: () => void
   /** Replaces the default filter (text contained in value, label or description, ignoring case). */
   filter?: (item: ComboBoxItem, text: string) => boolean
   menuTrigger?: 'focus' | 'input'
@@ -74,6 +76,7 @@ export function ComboBox({
   style,
   onInputChange,
   onPick,
+  onBlur,
   filter,
   menuTrigger = 'input',
 }: ComboBoxProps) {
@@ -143,6 +146,7 @@ export function ComboBox({
           placeholder={placeholder}
           onBlur={() => {
             if (!allowsCustomValue && !items.some((i) => i.value === value)) onChange(lastPicked.current ?? '')
+            onBlur?.()
           }}
           className={cn(
             'ui-control',

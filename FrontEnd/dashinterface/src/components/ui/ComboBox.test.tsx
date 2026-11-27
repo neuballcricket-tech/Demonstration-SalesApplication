@@ -178,6 +178,17 @@ describe('ComboBox', () => {
     expect(onPick).toHaveBeenCalledWith('LKCMB')
   })
 
+  it('calls onBlur when the input loses focus, not on a mouse pick', async () => {
+    const onBlur = vi.fn()
+    const user = userEvent.setup()
+    render(<Harness onBlur={onBlur} />)
+    await user.type(screen.getByRole('combobox'), 'col')
+    await user.click(screen.getByRole('option', { name: /Colombo/ }))
+    expect(onBlur).not.toHaveBeenCalled()
+    await user.tab()
+    expect(onBlur).toHaveBeenCalledTimes(1)
+  })
+
   it('filter replaces the default matching', async () => {
     const user = userEvent.setup()
     render(<Harness filter={(item, text) => item.value.startsWith(text.toUpperCase())} />)
