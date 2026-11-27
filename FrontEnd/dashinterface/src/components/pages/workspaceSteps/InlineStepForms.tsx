@@ -305,6 +305,33 @@ function FileAttach({ accept, label, fileName, onFile, onRemove, describedBy }: 
   )
 }
 
+/** Headed two-column group of fields (Pre-Advice, Pre-Alert). */
+function FormSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="flex flex-col gap-3">
+      <SectionHead>{title}</SectionHead>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3">{children}</div>
+    </section>
+  )
+}
+
+/** Collapsible generated message. `action` (e.g. Copy) sits beside the toggle, shown while expanded. */
+function DraftPanel({ title, collapsed, onToggle, action, children }: { title: string; collapsed: boolean; onToggle: () => void; action?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="overflow-hidden rounded-card border border-line-soft">
+      <div className="flex items-center gap-2 bg-canvas pr-2">
+        <button type="button" aria-expanded={!collapsed} onClick={onToggle}
+          className="flex flex-1 items-center justify-between border-none bg-transparent px-3 py-2 text-label hover:bg-surface-hover">
+          <span className="font-bold uppercase tracking-label text-primary">{title}</span>
+          <ChevronDown size={14} aria-hidden="true" className={cn('text-fg-muted transition-transform', collapsed && '-rotate-90')} />
+        </button>
+        {!collapsed && action}
+      </div>
+      {!collapsed && <div className="border-t border-line-soft p-3">{children}</div>}
+    </div>
+  )
+}
+
 /** Who handed the item over, and what they did. */
 function ContextCard({ ctx }: { ctx: ActivityEntry }) {
   return (
@@ -1083,112 +1110,89 @@ export default function InlineStepForms({
   const paBkg = actionModal.sourceData.booking as Booking
   const blCutoff = paBkg.bl_cutoff_date || paBkg.si_cutoff_date
 
-  const paSectionHeader = (title: string) => (
-    <div style={{ fontSize: 11, fontWeight: 700, color: '#0891b2', textTransform: 'uppercase', letterSpacing: 0.5, padding: '12px 0 6px', borderBottom: '2px solid #0891b220' }}>{title}</div>
-  )
   const paInput = (label: string, key: string, opts?: { readOnly?: boolean; span?: boolean }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, gridColumn: opts?.span ? '1 / -1' : undefined }}>
-      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{label}</label>
-      <input value={paField(key)} onChange={e => setPaField(key, e.target.value)} readOnly={opts?.readOnly}
-        style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, background: opts?.readOnly ? 'rgba(0,0,0,0.03)' : 'var(--bg-card)' }} />
-    </div>
+    <Field label={label} className={cn(opts?.span && 'col-span-full')}>
+      {ids => <Input {...ids} value={paField(key)} onChange={e => setPaField(key, e.target.value)} readOnly={opts?.readOnly}
+        className={cn(opts?.readOnly && 'bg-canvas')} />}
+    </Field>
   )
   const paTextarea = (label: string, key: string) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, gridColumn: '1 / -1' }}>
-      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{label}</label>
-      <textarea value={paField(key)} onChange={e => setPaField(key, e.target.value)} rows={3}
-        style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, resize: 'vertical', fontFamily: 'inherit' }} />
-    </div>
+    <Field label={label} className="col-span-full">
+      {ids => <Textarea {...ids} value={paField(key)} onChange={e => setPaField(key, e.target.value)} rows={3} className="resize-y" />}
+    </Field>
   )
 
   return (
-    <div style={{ padding: 20, overflowY: 'auto', maxHeight: '100%' }}>
+    <div className="flex max-h-full flex-col gap-4 overflow-y-auto">
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <FileText size={18} style={{ color: '#0891b2' }} />
-        <span style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>Pre-Advice Notice</span>
+      <div className="flex flex-col gap-1.5">
+        <StepHeader icon={<FileText size={14} aria-hidden="true" />} title="Pre-Advice Notice" />
+        <div className="text-label text-fg-muted">
+          {paBkg.id} &middot; {paBkg.customer_name} &middot; {paBkg.origin} &rarr; {paBkg.destination}
+        </div>
+        {blCutoff && (
+          <Badge tone="warning" className="gap-1 self-start">
+            <Clock size={12} aria-hidden="true" /> BL Cutoff: {blCutoff}
+          </Badge>
+        )}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
-        {paBkg.id} &middot; {paBkg.customer_name} &middot; {paBkg.origin} &rarr; {paBkg.destination}
-      </div>
-      {blCutoff && (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 6, background: '#fef3c7', color: '#92400e', fontSize: 11, fontWeight: 600, marginBottom: 14 }}>
-          <Clock size={12} /> BL Cutoff: {blCutoff}
-        </div>
-      )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
-        {/* Door Agent */}
-        {paSectionHeader('Door Agent')}
-        <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
-          {paInput('Agent Name', 'door_agent')}
-          {paInput('Contact Person', 'door_agent_contact')}
-          {paInput('Address', 'door_agent_address', { span: true })}
-          {paInput('Email', 'door_agent_email')}
-        </div>
+      <FormSection title="Door Agent">
+        {paInput('Agent Name', 'door_agent')}
+        {paInput('Contact Person', 'door_agent_contact')}
+        {paInput('Address', 'door_agent_address', { span: true })}
+        {paInput('Email', 'door_agent_email')}
+      </FormSection>
 
-        {/* Shipment Reference */}
-        {paSectionHeader('Shipment Reference')}
-        <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
-          {paInput('B/L Number', 'bl_number')}
-          {paInput('Booking Ref', 'booking_ref', { readOnly: true })}
-        </div>
+      <FormSection title="Shipment Reference">
+        {paInput('B/L Number', 'bl_number')}
+        {paInput('Booking Ref', 'booking_ref', { readOnly: true })}
+      </FormSection>
 
-        {/* Parties */}
-        {paSectionHeader('Parties')}
-        <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
-          {paInput('Shipper', 'shipper')}
-          {paInput('Shipper Address', 'shipper_address')}
-          {paInput('Consignee', 'consignee')}
-          {paInput('Consignee Address', 'consignee_address')}
-          {paInput('Notify Party', 'notify_party')}
-          {paInput('Notify Address', 'notify_address')}
-        </div>
+      <FormSection title="Parties">
+        {paInput('Shipper', 'shipper')}
+        {paInput('Shipper Address', 'shipper_address')}
+        {paInput('Consignee', 'consignee')}
+        {paInput('Consignee Address', 'consignee_address')}
+        {paInput('Notify Party', 'notify_party')}
+        {paInput('Notify Address', 'notify_address')}
+      </FormSection>
 
-        {/* Vessel & Route */}
-        {paSectionHeader('Vessel & Route')}
-        <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
-          {paInput('Vessel', 'vessel', { readOnly: true })}
-          {paInput('Voyage', 'voyage', { readOnly: true })}
-          {paInput('Carrier', 'carrier', { readOnly: true })}
-          {paInput('Port of Loading', 'pol', { readOnly: true })}
-          {paInput('Port of Discharge', 'pod', { readOnly: true })}
-          {paInput('Final Destination', 'final_destination')}
-          {paInput('ETA Destination', 'eta_destination')}
-        </div>
+      <FormSection title="Vessel & Route">
+        {paInput('Vessel', 'vessel', { readOnly: true })}
+        {paInput('Voyage', 'voyage', { readOnly: true })}
+        {paInput('Carrier', 'carrier', { readOnly: true })}
+        {paInput('Port of Loading', 'pol', { readOnly: true })}
+        {paInput('Port of Discharge', 'pod', { readOnly: true })}
+        {paInput('Final Destination', 'final_destination')}
+        {paInput('ETA Destination', 'eta_destination')}
+      </FormSection>
 
-        {/* Container Details */}
-        {paSectionHeader('Container Details')}
-        <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
-          {paInput('Container No.', 'container_no')}
-          {paInput('Size / Type', 'container_size', { readOnly: true })}
-          {paInput('Qty', 'container_count', { readOnly: true })}
-          {paInput('Seal No.', 'seal_no')}
-        </div>
+      <FormSection title="Container Details">
+        {paInput('Container No.', 'container_no')}
+        {paInput('Size / Type', 'container_size', { readOnly: true })}
+        {paInput('Qty', 'container_count', { readOnly: true })}
+        {paInput('Seal No.', 'seal_no')}
+      </FormSection>
 
-        {/* Cargo Details */}
-        {paSectionHeader('Cargo Details')}
-        <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
-          {paTextarea('Description of Goods', 'cargo_description')}
-          {paInput('HS Code', 'hs_code')}
-          {paInput('No. of Packages', 'no_of_packages')}
-          {paInput('Package Type', 'package_type')}
-          {paInput('Gross Weight (kg)', 'gross_weight')}
-          {paInput('Net Weight (kg)', 'net_weight')}
-          {paInput('Volume (CBM)', 'volume_cbm')}
-          {paInput('Freight Terms', 'freight_terms')}
-        </div>
+      <FormSection title="Cargo Details">
+        {paTextarea('Description of Goods', 'cargo_description')}
+        {paInput('HS Code', 'hs_code')}
+        {paInput('No. of Packages', 'no_of_packages')}
+        {paInput('Package Type', 'package_type')}
+        {paInput('Gross Weight (kg)', 'gross_weight')}
+        {paInput('Net Weight (kg)', 'net_weight')}
+        {paInput('Volume (CBM)', 'volume_cbm')}
+        {paInput('Freight Terms', 'freight_terms')}
+      </FormSection>
 
-        {/* Door Delivery */}
-        {paSectionHeader('Door Delivery')}
-        <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
-          {paTextarea('Delivery Address', 'delivery_address')}
-          {paInput('Contact at Delivery', 'delivery_contact')}
-          {paInput('Phone', 'delivery_phone')}
-          {paTextarea('Special Instructions', 'special_instructions')}
-          {paTextarea('Remarks', 'remarks')}
-        </div>
-      </div>
+      <FormSection title="Door Delivery">
+        {paTextarea('Delivery Address', 'delivery_address')}
+        {paInput('Contact at Delivery', 'delivery_contact')}
+        {paInput('Phone', 'delivery_phone')}
+        {paTextarea('Special Instructions', 'special_instructions')}
+        {paTextarea('Remarks', 'remarks')}
+      </FormSection>
 
       {/* Generated Email Body */}
       {(() => {
@@ -1263,103 +1267,67 @@ export default function InlineStepForms({
 
         const paEmailSubject = `PRE-ADVICE — ${paField('bl_number') || paBkg.id} — ${paField('vessel')} ${paField('voyage')} — ${paField('pol')} → ${paField('final_destination')}`
         const paEmailBodyOnly = emailBody.split('\n').slice(2).join('\n')
+        const paDisabled =
+          !paField('door_agent').trim() ||
+          (sendMethod === 'email' && (!paField('door_agent_email').includes('@') || !emailConfirmed)) ||
+          (sendMethod === 'whatsapp' && !waConfirmed)
         return (
           <>
             {/* Generated Email — collapsible */}
-            <div style={{ marginTop: 18, border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-              <button type="button" onClick={() => setDraftCollapsed(c => !c)}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-card)', border: 'none', cursor: 'pointer' }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#0891b2', textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>Generated Email</span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {!draftCollapsed && (
-                    <button type="button"
-                      style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, background: paCopied ? '#dcfce7' : 'none', border: paCopied ? '1px solid #86efac' : 'none', cursor: 'pointer', color: paCopied ? '#16a34a' : 'var(--text-muted)', padding: '3px 8px', borderRadius: 5 }}
-                      onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(emailBody); setPaCopied(true); setTimeout(() => setPaCopied(false), 2000) }}>
-                      {paCopied ? <><ClipboardCheck size={11} /> Copied!</> : <><Copy size={11} /> Copy</>}
-                    </button>
-                  )}
-                  <ChevronDown size={13} style={{ color: 'var(--text-muted)', transform: draftCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }} />
-                </span>
-              </button>
-              {!draftCollapsed && (
-                <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
-                  <textarea
-                    readOnly
-                    rows={18}
-                    value={emailBody}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 11, fontFamily: 'ui-monospace, monospace', lineHeight: 1.6, resize: 'vertical', background: 'rgba(0,0,0,0.02)', color: 'var(--text)', boxSizing: 'border-box' }}
-                  />
-                </div>
-              )}
-            </div>
+            <DraftPanel title="Generated Email" collapsed={draftCollapsed} onToggle={() => setDraftCollapsed(c => !c)}
+              action={
+                <Button variant="ghost" size="sm" className={cn(paCopied && 'border-success-line bg-success-bg text-success')}
+                  icon={paCopied ? <ClipboardCheck size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
+                  onClick={() => { navigator.clipboard.writeText(emailBody); setPaCopied(true); setTimeout(() => setPaCopied(false), 2000) }}>
+                  {paCopied ? 'Copied!' : 'Copy'}
+                </Button>
+              }>
+              <Textarea readOnly rows={18} aria-label="Generated Email" value={emailBody}
+                className="resize-y bg-canvas font-mono text-label leading-relaxed" />
+            </DraftPanel>
 
             {/* Send Method */}
-            <div style={{ marginTop: 14, padding: '14px 16px', borderRadius: 10, background: 'rgba(8,145,178,0.04)', border: '1px solid rgba(8,145,178,0.12)' }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#0891b2', marginBottom: 8 }}>SEND TO DOOR AGENT</div>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-                <button onClick={() => { setSendMethod('email'); setEmailConfirmed(false) }}
-                  style={{ padding: '5px 14px', borderRadius: 6, border: sendMethod === 'email' ? '1.5px solid #0891b2' : '1px solid var(--border)', background: sendMethod === 'email' ? '#0891b210' : 'var(--bg-card)', fontSize: 11, fontWeight: 600, color: sendMethod === 'email' ? '#0891b2' : 'var(--text-secondary)', cursor: 'pointer' }}>
-                  <Mail size={11} style={{ marginRight: 4 }} /> Email
-                </button>
-                <button onClick={() => { setSendMethod('whatsapp'); setWaConfirmed(false); setEmailConfirmed(false) }}
-                  style={{ padding: '5px 14px', borderRadius: 6, border: sendMethod === 'whatsapp' ? '1.5px solid #25d366' : '1px solid var(--border)', background: sendMethod === 'whatsapp' ? '#25d36610' : 'var(--bg-card)', fontSize: 11, fontWeight: 600, color: sendMethod === 'whatsapp' ? '#25d366' : 'var(--text-secondary)', cursor: 'pointer' }}>
-                  <MessageCircle size={11} style={{ marginRight: 4 }} /> WhatsApp
-                </button>
-              </div>
+            <div className="flex flex-col gap-2.5 rounded-card border border-line-soft bg-canvas px-4 py-3.5">
+              <SendMethodToggle id="ws-pa-method-label" label="Send to Door Agent" value={sendMethod}
+                onSelect={m => { setSendMethod(m); if (m === 'whatsapp') setWaConfirmed(false); setEmailConfirmed(false) }} />
               {sendMethod === 'email' ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <input placeholder="Door agent email" value={paField('door_agent_email')} onChange={e => setPaField('door_agent_email', e.target.value)}
-                    style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, boxSizing: 'border-box' }} />
+                <>
+                  <Input aria-label="Door agent email" placeholder="Door agent email" value={paField('door_agent_email')}
+                    onChange={e => setPaField('door_agent_email', e.target.value)} />
                   {paField('door_agent_email').includes('@') && (
                     <>
-                      <button className="db-btn" type="button"
-                        onClick={() => openMailto(paField('door_agent_email'), paEmailSubject, paEmailBodyOnly)}
-                        style={{ background: '#0078d4', borderColor: '#0078d4', color: '#fff', width: '100%' }}>
-                        <Mail size={13} style={{ marginRight: 6 }} /> Open in Outlook
-                      </button>
-                      <div style={{ padding: '10px 14px', background: 'rgba(0,120,212,0.06)', border: '1px solid rgba(0,120,212,0.2)', borderRadius: 8 }}>
-                        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 11, color: 'var(--text-secondary)' }}>
-                          <input type="checkbox" checked={emailConfirmed} onChange={e => setEmailConfirmed(e.target.checked)} style={{ marginTop: 2 }} />
-                          <span>
-                            I confirm that I have sent this pre-advice to the door agent via email.
-                            <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Click "Open in Outlook" above, send the email, then check this box.</span>
-                          </span>
-                        </label>
-                      </div>
+                      <Button variant="primary" className="w-full justify-start" icon={<Mail size={14} aria-hidden="true" />}
+                        onClick={() => openMailto(paField('door_agent_email'), paEmailSubject, paEmailBodyOnly)}>
+                        Open in Outlook
+                      </Button>
+                      <ConfirmCheck tone="info" checked={emailConfirmed} onChange={setEmailConfirmed}
+                        hint='Click "Open in Outlook" above, send the email, then check this box.'>
+                        I confirm that I have sent this pre-advice to the door agent via email.
+                      </ConfirmCheck>
                     </>
                   )}
-                </div>
+                </>
               ) : (
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: waConfirmed ? '#16a34a' : 'var(--text-secondary)', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={waConfirmed} onChange={e => setWaConfirmed(e.target.checked)} />
-                  I have sent the pre-advice via WhatsApp (copy message above first)
-                </label>
+                <Checkbox checked={waConfirmed} onChange={setWaConfirmed}>
+                  <span className={cn(waConfirmed ? 'text-success' : 'text-fg-label')}>
+                    I have sent the pre-advice via WhatsApp (copy message above first)
+                  </span>
+                </Checkbox>
               )}
             </div>
 
             {/* Notes */}
-            <div style={{ marginTop: 12 }}>
-              <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>Internal Notes</label>
-              <textarea value={formNote} onChange={e => setFormNote(e.target.value)} rows={2} placeholder="Optional notes..."
-                style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, resize: 'vertical', fontFamily: 'inherit', marginTop: 4, boxSizing: 'border-box' }} />
-            </div>
+            <Field label="Internal Notes">
+              {ids => <Textarea {...ids} value={formNote} onChange={e => setFormNote(e.target.value)} rows={2}
+                placeholder="Optional notes..." className="resize-y" />}
+            </Field>
 
             {/* Submit */}
-            <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
-              <button
-                disabled={
-                  !paField('door_agent').trim() ||
-                  (sendMethod === 'email' && (!paField('door_agent_email').includes('@') || !emailConfirmed)) ||
-                  (sendMethod === 'whatsapp' && !waConfirmed)
-                }
-                onClick={() => handleModalSubmit()}
-                style={{
-                  padding: '8px 22px', borderRadius: 8, border: 'none', fontWeight: 700, fontSize: 12,
-                  background: '#0891b2', color: '#fff', cursor: 'pointer',
-                  opacity: (!paField('door_agent').trim() || (sendMethod === 'email' && (!paField('door_agent_email').includes('@') || !emailConfirmed)) || (sendMethod === 'whatsapp' && !waConfirmed)) ? 0.4 : 1,
-                }}>
-                <FileText size={12} style={{ marginRight: 4 }} /> Send Pre-Advice
-              </button>
+            <div className="flex justify-end">
+              <Button variant="primary" disabled={paDisabled} icon={<FileText size={14} aria-hidden="true" />}
+                onClick={() => handleModalSubmit()}>
+                Send Pre-Advice
+              </Button>
             </div>
           </>
         )
@@ -1369,24 +1337,17 @@ export default function InlineStepForms({
 })() : selectedItem.actionKind === 'send-pre-alert' && actionModal ? (() => {
   const paBkg = actionModal.sourceData.booking as Booking
 
-  const praSectionHeader = (title: string) => (
-    <div style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: 0.5, padding: '12px 0 6px', borderBottom: '2px solid #7c3aed20' }}>{title}</div>
-  )
   const praInput = (label: string, key: string, opts?: { readOnly?: boolean; span?: boolean }) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, gridColumn: opts?.span ? '1 / -1' : undefined }}>
-      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{label}</label>
-      <input value={paField(key)} onChange={e => setPaField(key, e.target.value)} readOnly={opts?.readOnly}
-        style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, background: opts?.readOnly ? 'rgba(0,0,0,0.03)' : 'var(--bg-card)' }} />
-    </div>
+    <Field label={label} className={cn(opts?.span && 'col-span-full')}>
+      {ids => <Input {...ids} value={paField(key)} onChange={e => setPaField(key, e.target.value)} readOnly={opts?.readOnly}
+        className={cn(opts?.readOnly && 'bg-canvas')} />}
+    </Field>
   )
   const praSelect = (label: string, key: string, options: string[]) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>{label}</label>
-      <select value={paField(key)} onChange={e => setPaField(key, e.target.value)}
-        style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, background: 'var(--bg-card)' }}>
-        {options.map(o => <option key={o} value={o}>{o || '—'}</option>)}
-      </select>
-    </div>
+    <Field label={label}>
+      {ids => <Select {...ids} value={paField(key)} onChange={v => setPaField(key, v)}
+        options={options.map(o => ({ value: o, label: o || '—' }))} />}
+    </Field>
   )
 
   const praEmailBody = [
@@ -1424,107 +1385,73 @@ export default function InlineStepForms({
   const FREIGHT_TERMS = ['', 'PREPAID', 'COLLECT']
   const DELIVERY_TYPES = ['', 'CY/CY', 'CY/DOOR', 'DOOR/DOOR']
 
+  const praDisabled = !paField('dest_agent').trim() || !paField('dest_agent_email').includes('@')
+
   return (
-    <div style={{ padding: 20, overflowY: 'auto', maxHeight: '100%' }}>
+    <div className="flex max-h-full flex-col gap-4 overflow-y-auto">
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <Send size={18} style={{ color: '#7c3aed' }} />
-        <span style={{ fontSize: 15, fontWeight: 700, color: '#0f172a' }}>Pre-Alert to Destination Agent</span>
-      </div>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 14 }}>
-        {paBkg.id} &middot; {paBkg.customer_name} &middot; {paBkg.origin} &rarr; {paBkg.destination}
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
-        {/* Destination Agent */}
-        {praSectionHeader('Destination Agent')}
-        <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
-          {praInput('Agent Name', 'dest_agent')}
-          {praInput('Agent Email', 'dest_agent_email')}
-        </div>
-
-        {/* Shipment Details */}
-        {praSectionHeader('Shipment Details')}
-        <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
-          {praSelect('HBL Issue Term', 'hbl_issue_term', ISSUE_TERMS)}
-          {praSelect('MBL Issue Term', 'mbl_issue_term', ISSUE_TERMS)}
-          {praSelect('HBL Freight Term', 'hbl_freight_term', FREIGHT_TERMS)}
-          {praSelect('MBL Freight Term', 'mbl_freight_term', FREIGHT_TERMS)}
-          {praSelect('HBL Delivery Type', 'hbl_delivery_type', DELIVERY_TYPES)}
-          {praSelect('MBL Delivery Type', 'mbl_delivery_type', DELIVERY_TYPES)}
-        </div>
-
-        {/* Vessel & Route */}
-        {praSectionHeader('Vessel & Route')}
-        <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
-          {praInput('Vessel', 'vessel', { readOnly: true })}
-          {praInput('Voyage', 'voyage', { readOnly: true })}
-          {praInput('ATD ' + (paField('origin') || 'Origin'), 'atd_origin')}
-          {praInput('Container No.', 'container_no')}
-          {praInput('ETA ' + (paField('destination') || 'Destination'), 'eta_destination')}
-          {praInput('Carrier', 'carrier', { readOnly: true })}
-        </div>
-
-        {/* BL References */}
-        {praSectionHeader('BL References')}
-        <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
-          {praInput('H B/L No.', 'hbl_number')}
-          {praInput('M B/L No.', 'mbl_number')}
-          {praInput('Shipper', 'shipper', { readOnly: true })}
-          {praInput('Consignee', 'consignee', { readOnly: true })}
+      <div className="flex flex-col gap-1.5">
+        <StepHeader icon={<Send size={14} aria-hidden="true" />} title="Pre-Alert to Destination Agent" />
+        <div className="text-label text-fg-muted">
+          {paBkg.id} &middot; {paBkg.customer_name} &middot; {paBkg.origin} &rarr; {paBkg.destination}
         </div>
       </div>
+
+      <FormSection title="Destination Agent">
+        {praInput('Agent Name', 'dest_agent')}
+        {praInput('Agent Email', 'dest_agent_email')}
+      </FormSection>
+
+      <FormSection title="Shipment Details">
+        {praSelect('HBL Issue Term', 'hbl_issue_term', ISSUE_TERMS)}
+        {praSelect('MBL Issue Term', 'mbl_issue_term', ISSUE_TERMS)}
+        {praSelect('HBL Freight Term', 'hbl_freight_term', FREIGHT_TERMS)}
+        {praSelect('MBL Freight Term', 'mbl_freight_term', FREIGHT_TERMS)}
+        {praSelect('HBL Delivery Type', 'hbl_delivery_type', DELIVERY_TYPES)}
+        {praSelect('MBL Delivery Type', 'mbl_delivery_type', DELIVERY_TYPES)}
+      </FormSection>
+
+      <FormSection title="Vessel & Route">
+        {praInput('Vessel', 'vessel', { readOnly: true })}
+        {praInput('Voyage', 'voyage', { readOnly: true })}
+        {praInput('ATD ' + (paField('origin') || 'Origin'), 'atd_origin')}
+        {praInput('Container No.', 'container_no')}
+        {praInput('ETA ' + (paField('destination') || 'Destination'), 'eta_destination')}
+        {praInput('Carrier', 'carrier', { readOnly: true })}
+      </FormSection>
+
+      <FormSection title="BL References">
+        {praInput('H B/L No.', 'hbl_number')}
+        {praInput('M B/L No.', 'mbl_number')}
+        {praInput('Shipper', 'shipper', { readOnly: true })}
+        {praInput('Consignee', 'consignee', { readOnly: true })}
+      </FormSection>
 
       {/* Generated Email — collapsible */}
-      <div style={{ marginTop: 18, border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-        <button type="button" onClick={() => setDraftCollapsed(c => !c)}
-          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-card)', border: 'none', cursor: 'pointer' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase' as const, letterSpacing: 0.5 }}>Generated Email</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            {!draftCollapsed && (
-              <button type="button"
-                style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, background: paCopied ? '#dcfce7' : 'none', border: paCopied ? '1px solid #86efac' : 'none', cursor: 'pointer', color: paCopied ? '#16a34a' : 'var(--text-muted)', padding: '3px 8px', borderRadius: 5 }}
-                onClick={e => { e.stopPropagation(); navigator.clipboard.writeText(praEmailBody); setPaCopied(true); setTimeout(() => setPaCopied(false), 2000) }}>
-                {paCopied ? <><ClipboardCheck size={11} /> Copied!</> : <><Copy size={11} /> Copy</>}
-              </button>
-            )}
-            <ChevronDown size={13} style={{ color: 'var(--text-muted)', transform: draftCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }} />
-          </span>
-        </button>
-        {!draftCollapsed && (
-          <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
-            <textarea
-              readOnly
-              rows={18}
-              value={praEmailBody}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 11, fontFamily: 'ui-monospace, monospace', lineHeight: 1.6, resize: 'vertical', background: 'rgba(0,0,0,0.02)', color: 'var(--text)', boxSizing: 'border-box' }}
-            />
-          </div>
-        )}
-      </div>
+      <DraftPanel title="Generated Email" collapsed={draftCollapsed} onToggle={() => setDraftCollapsed(c => !c)}
+        action={
+          <Button variant="ghost" size="sm" className={cn(paCopied && 'border-success-line bg-success-bg text-success')}
+            icon={paCopied ? <ClipboardCheck size={12} aria-hidden="true" /> : <Copy size={12} aria-hidden="true" />}
+            onClick={() => { navigator.clipboard.writeText(praEmailBody); setPaCopied(true); setTimeout(() => setPaCopied(false), 2000) }}>
+            {paCopied ? 'Copied!' : 'Copy'}
+          </Button>
+        }>
+        <Textarea readOnly rows={18} aria-label="Generated Email" value={praEmailBody}
+          className="resize-y bg-canvas font-mono text-label leading-relaxed" />
+      </DraftPanel>
 
       {/* Notes */}
-      <div style={{ marginTop: 14 }}>
-        <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>Internal Notes</label>
-        <textarea value={formNote} onChange={e => setFormNote(e.target.value)} rows={2} placeholder="Optional notes..."
-          style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12, resize: 'vertical', fontFamily: 'inherit', marginTop: 4, boxSizing: 'border-box' }} />
-      </div>
+      <Field label="Internal Notes">
+        {ids => <Textarea {...ids} value={formNote} onChange={e => setFormNote(e.target.value)} rows={2}
+          placeholder="Optional notes..." className="resize-y" />}
+      </Field>
 
       {/* Submit — auto-opens Outlook Web with pre-alert email */}
-      <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
-        <button
-          disabled={
-            !paField('dest_agent').trim() ||
-            !paField('dest_agent_email').includes('@')
-          }
-          onClick={() => handleModalSubmit()}
-          style={{
-            padding: '8px 22px', borderRadius: 8, border: 'none', fontWeight: 700, fontSize: 12,
-            background: '#7c3aed', color: '#fff', cursor: 'pointer',
-            opacity: (!paField('dest_agent').trim() || !paField('dest_agent_email').includes('@')) ? 0.4 : 1,
-          }}>
-          <Mail size={12} style={{ marginRight: 4 }} /> Send Pre-Alert
-        </button>
+      <div className="flex justify-end">
+        <Button variant="primary" disabled={praDisabled} icon={<Mail size={14} aria-hidden="true" />}
+          onClick={() => handleModalSubmit()}>
+          Send Pre-Alert
+        </Button>
       </div>
     </div>
   )

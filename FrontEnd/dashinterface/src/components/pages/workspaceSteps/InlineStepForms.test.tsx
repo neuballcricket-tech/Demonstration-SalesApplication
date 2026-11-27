@@ -250,3 +250,91 @@ describe('InlineStepForms request-si', () => {
     await waitFor(() => expect(setVgmCertContent).toHaveBeenCalledWith(expect.stringMatching(/^data:application\/pdf;base64,/)))
   })
 })
+
+const paFieldProps = (fields: Record<string, string>, over: Partial<InlineStepFormsProps> = {}): Partial<InlineStepFormsProps> => ({
+  paField: (k: string) => fields[k] ?? '',
+  setPaField: () => {},
+  paCopied: false, setPaCopied: () => {},
+  draftCollapsed: false, setDraftCollapsed: () => {},
+  ...over,
+})
+
+describe('InlineStepForms send-pre-advice', () => {
+  const paBooking = booking({ status: 'Liner Confirmed', delivery_type: 'door-to-door', bl_cutoff_date: '2026-12-05' } as Partial<Booking>)
+
+  it('renders labelled fields; read-only ones stay read-only; typing updates the field', async () => {
+    const user = userEvent.setup()
+    const setPaField = vi.fn()
+    renderStep('send-pre-advice', paBooking, paFieldProps({ booking_ref: 'BKG-TEST' }, { setPaField }))
+    expect(screen.getByText('BL Cutoff: 2026-12-05')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Booking Ref' })).toHaveAttribute('readonly')
+    expect(screen.getByRole('textbox', { name: 'Description of Goods' }).tagName).toBe('TEXTAREA')
+    await user.type(screen.getByRole('textbox', { name: 'Agent Name' }), 'A')
+    expect(setPaField).toHaveBeenCalledWith('door_agent', 'A')
+  })
+
+  it('the generated email copies to the clipboard and collapses; Copy sits outside the toggle', async () => {
+    const user = userEvent.setup()
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText')
+    const setPaCopied = vi.fn()
+    const setDraftCollapsed = vi.fn()
+    renderStep('send-pre-advice', paBooking, paFieldProps({ door_agent: 'Door Co' }, { setPaCopied, setDraftCollapsed }))
+    const toggle = screen.getByRole('button', { name: 'Generated Email' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    const copy = screen.getByRole('button', { name: 'Copy' })
+    expect(toggle).not.toContainElement(copy)
+    await user.click(copy)
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('Dear Door Co,'))
+    expect(setPaCopied).toHaveBeenCalledWith(true)
+    expect(setDraftCollapsed).not.toHaveBeenCalled()
+    await user.click(toggle)
+    expect(setDraftCollapsed).toHaveBeenCalledTimes(1)
+  })
+
+  it('a collapsed email hides the body and the Copy button', () => {
+    renderStep('send-pre-advice', paBooking, paFieldProps({}, { draftCollapsed: true }))
+    expect(screen.getByRole('button', { name: 'Generated Email' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('button', { name: 'Copy' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Generated Email' })).not.toBeInTheDocument()
+  })
+
+  it('switching to WhatsApp resets both confirmations; submit needs the agent and the confirmation', async () => {
+    const user = userEvent.setup()
+    const setSendMethod = vi.fn(); const setWaConfirmed = vi.fn(); const setEmailConfirmed = vi.fn()
+    const { unmount } = renderStep('send-pre-advice', paBooking, paFieldProps({ door_agent: 'Door Co' }, { setSendMethod, setWaConfirmed, setEmailConfirmed }))
+    const group = screen.getByRole('group', { name: 'Send to Door Agent' })
+    await user.click(within(group).getByRole('button', { name: 'WhatsApp' }))
+    expect(setSendMethod).toHaveBeenCalledWith('whatsapp')
+    expect(setWaConfirmed).toHaveBeenCalledWith(false)
+    expect(setEmailConfirmed).toHaveBeenCalledWith(false)
+    expect(screen.getByRole('button', { name: /Send Pre-Advice/ })).toBeDisabled()
+    unmount()
+    renderStep('send-pre-advice', paBooking, paFieldProps({ door_agent: 'Door Co' }, { sendMethod: 'whatsapp', waConfirmed: true }))
+    expect(screen.getByRole('checkbox', { name: /I have sent the pre-advice via WhatsApp/ })).toBeChecked()
+    expect(screen.getByRole('button', { name: /Send Pre-Advice/ })).toBeEnabled()
+  })
+})
+
+describe('InlineStepForms send-pre-alert', () => {
+  const praBooking = booking({ pre_advice_sent: true })
+
+  it('issue-term selects show the empty choice as a dash and update the field', async () => {
+    const user = userEvent.setup()
+    const setPaField = vi.fn()
+    renderStep('send-pre-alert', praBooking, paFieldProps({}, { setPaField }))
+    const hblIssue = screen.getByRole('button', { name: /HBL Issue Term/ })
+    expect(hblIssue).toHaveTextContent('—')
+    await user.click(hblIssue)
+    await user.click(screen.getByRole('option', { name: 'SURRENDER' }))
+    expect(setPaField).toHaveBeenCalledWith('hbl_issue_term', 'SURRENDER')
+  })
+
+  it('submit needs the agent name and an email address', () => {
+    const { unmount } = renderStep('send-pre-alert', praBooking, paFieldProps({ dest_agent: 'Dest Co', dest_agent_email: 'no-at' }))
+    expect(screen.getByRole('button', { name: /Send Pre-Alert/ })).toBeDisabled()
+    unmount()
+    renderStep('send-pre-alert', praBooking, paFieldProps({ dest_agent: 'Dest Co', dest_agent_email: 'agent@dest.co' }))
+    expect(screen.getByRole('button', { name: /Send Pre-Alert/ })).toBeEnabled()
+    expect((screen.getByRole('textbox', { name: 'Generated Email' }) as HTMLTextAreaElement).value).toContain('Subject: Pre-Alert')
+  })
+})
