@@ -587,3 +587,83 @@ describe('InlineStepForms generate-si', () => {
     expect(setSiEmailShow).toHaveBeenCalledWith(false)
   })
 })
+
+describe('InlineStepForms save-vessel-schedule', () => {
+  const now = new Date().toISOString()
+  const schedule = (id: string, voyage: string, type: 'FCL' | 'CONSOL') => ({
+    id, vessel_name: 'MSC Aurora', voyage_number: voyage, schedule_type: type, pol: 'Colombo', eta_pol: '', etd_pol: '2026-12-03',
+    routing_type: 'DIRECT' as const, final_pod: 'Durban', eta_fpod: '2026-12-20', remarks: 'R', agent: 'A', created_at: now, created_by: 1,
+  })
+  const svsProps = (over: Partial<InlineStepFormsProps> = {}): Partial<InlineStepFormsProps> => ({
+    bookings: [], vesselSchedules: [], vesselScheduleType: 'FCL', setVesselScheduleType: () => {},
+    formVessel: '', setFormVessel: () => {}, formVoyage: '', setFormVoyage: () => {},
+    vesselPol: '', setVesselPol: () => {}, vesselEtaPol: '', setVesselEtaPol: () => {}, vesselEtdPol: '', setVesselEtdPol: () => {},
+    vesselRoutingType: 'DIRECT', setVesselRoutingType: () => {}, vesselFinalPod: '', setVesselFinalPod: () => {},
+    vesselEtaFpod: '', setVesselEtaFpod: () => {}, vesselRemarks: '', setVesselRemarks: () => {}, vesselAgent: '', setVesselAgent: () => {},
+    selectedReleaseOrderId: '', setSelectedReleaseOrderId: () => {}, showVesselSuggestions: false, setShowVesselSuggestions: () => {},
+    activeRole: 'cs', onAddVesselSchedule: () => {}, onMarkBlVesselConfirmed: () => {}, onLogActivity: () => {}, onFlash: () => {},
+    setVesselCreatedPrompt: () => {}, setActionModal: () => {},
+    ...over,
+  })
+
+  it('the schedule type toggle is a pressed group; Routing Type round-trips', async () => {
+    const user = userEvent.setup()
+    const setVesselScheduleType = vi.fn(), setVesselRoutingType = vi.fn()
+    renderStep('save-vessel-schedule', booking(), svsProps({ setVesselScheduleType, setVesselRoutingType, vesselRoutingType: 'TRANSSHIPMENT' }))
+    const group = screen.getByRole('group', { name: 'Vessel Schedule Type' })
+    expect(within(group).getByRole('button', { name: 'FCL' })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(within(group).getByRole('button', { name: 'BOTH' }))
+    expect(setVesselScheduleType).toHaveBeenCalledWith('BOTH')
+    const routing = screen.getByRole('button', { name: /Routing Type/ })
+    expect(routing).toHaveTextContent('Transshipment')
+    await user.click(routing)
+    await user.click(screen.getByRole('option', { name: 'Direct' }))
+    expect(setVesselRoutingType).toHaveBeenCalledWith('DIRECT')
+  })
+
+  it('picking a release order pre-fills the vessel fields', async () => {
+    const user = userEvent.setup()
+    const setSelectedReleaseOrderId = vi.fn(), setFormVessel = vi.fn(), setFormVoyage = vi.fn(), setVesselEtdPol = vi.fn()
+    const roBkg = booking({ id: 'BKG-RO', release_order_fields: ro })
+    renderStep('save-vessel-schedule', booking(), svsProps({ bookings: [roBkg], setSelectedReleaseOrderId, setFormVessel, setFormVoyage, setVesselEtdPol }))
+    await user.click(screen.getByRole('button', { name: /Pre-fill from Release Order/ }))
+    await user.click(screen.getByRole('option', { name: /TEST VESSEL \/ V001/ }))
+    expect(setSelectedReleaseOrderId).toHaveBeenCalledWith('BKG-RO')
+    expect(setFormVessel).toHaveBeenCalledWith('TEST VESSEL')
+    expect(setFormVoyage).toHaveBeenCalledWith('V001')
+    expect(setVesselEtdPol).toHaveBeenCalledWith('2026-12-06')
+  })
+
+  it('typing shows suggestions; picking one fills the whole schedule and hides them', async () => {
+    const user = userEvent.setup()
+    const setFormVessel = vi.fn(), setFormVoyage = vi.fn(), setVesselScheduleType = vi.fn(), setShowVesselSuggestions = vi.fn()
+    renderStep('save-vessel-schedule', booking(), svsProps({
+      formVessel: 'MSC', showVesselSuggestions: true, vesselSchedules: [schedule('VS-1', 'AU-112E', 'FCL'), schedule('VS-2', 'AU-113W', 'CONSOL')],
+      setFormVessel, setFormVoyage, setVesselScheduleType, setShowVesselSuggestions,
+    }))
+    const vessel = screen.getByRole('combobox', { name: 'Vessel' })
+    await user.type(vessel, 'X')
+    expect(setFormVessel).toHaveBeenCalledWith('MSCX')
+    expect(setShowVesselSuggestions).toHaveBeenCalledWith(true)
+    await user.click(screen.getByRole('option', { name: /AU-113W/ }))
+    expect(setFormVessel).toHaveBeenLastCalledWith('MSC Aurora')
+    expect(setFormVoyage).toHaveBeenCalledWith('AU-113W')
+    expect(setVesselScheduleType).toHaveBeenCalledWith('CONSOL')
+    expect(setShowVesselSuggestions).toHaveBeenLastCalledWith(false)
+  })
+
+  it('dates have a clear button; submit needs vessel and voyage and saves the schedule', async () => {
+    const user = userEvent.setup()
+    const setVesselEtdPol = vi.fn(), onAddVesselSchedule = vi.fn(), setActionModal = vi.fn()
+    const { unmount } = renderStep('save-vessel-schedule', booking(), svsProps({ formVessel: 'V' }))
+    expect(screen.getByRole('button', { name: 'Confirm Vessel Schedule →' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Clear ETD POL' })).not.toBeInTheDocument()
+    unmount()
+    renderStep('save-vessel-schedule', booking(), svsProps({ formVessel: ' V ', formVoyage: 'Y', vesselEtdPol: '2026-12-03', setVesselEtdPol, onAddVesselSchedule, setActionModal }))
+    await user.click(screen.getByRole('button', { name: 'Clear ETD POL' }))
+    expect(setVesselEtdPol).toHaveBeenCalledWith('')
+    await user.click(screen.getByRole('button', { name: 'Confirm Vessel Schedule →' }))
+    expect(onAddVesselSchedule).toHaveBeenCalledWith(expect.objectContaining({ vessel_name: 'V', voyage_number: 'Y', etd_pol: '2026-12-03', schedule_type: 'FCL' }))
+    expect(setActionModal).toHaveBeenCalledWith(null)
+  })
+})

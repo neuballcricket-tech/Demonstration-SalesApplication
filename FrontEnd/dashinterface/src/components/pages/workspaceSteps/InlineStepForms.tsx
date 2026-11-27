@@ -2195,115 +2195,81 @@ export default function InlineStepForms({
     setVesselEtaFpod(vs.eta_fpod); setVesselRemarks(vs.remarks)
     setVesselAgent(vs.agent); setShowVesselSuggestions(false)
   }
-  const tabBtn = (label: string, val: typeof vesselScheduleType) => (
-    <button key={val} onClick={() => setVesselScheduleType(val)} style={{ flex: 1, padding: '7px 0', fontSize: 12, fontWeight: 700, border: '1px solid var(--border)', cursor: 'pointer', borderRadius: 0, background: vesselScheduleType === val ? '#0891b2' : 'var(--bg-card)', color: vesselScheduleType === val ? '#fff' : 'var(--text-secondary)' }}>
-      {label}
-    </button>
-  )
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ padding: '8px 14px', background: '#0891b2', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>VESSEL SCHEDULE</span>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.75)' }}>{blBkg.customer_name} · {blBkg.origin} → {blBkg.destination}</span>
-      </div>
-
-      {roBookings.length > 0 && (
-        <div>
-          <label className="lt-label">Pre-fill from Release Order (optional)</label>
-          <select className="lt-input" style={{ width: '100%' }} value={selectedReleaseOrderId} onChange={e => applyReleaseOrder(e.target.value)}>
-            <option value="">— Select a release order —</option>
-            {roBookings.map(b => (
-              <option key={b.id} value={b.id}>{b.customer_name} · {b.vessel_name} / {b.voyage_number} ({b.origin} → {b.destination})</option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>Vessel Schedule Type</div>
-        <div style={{ display: 'flex', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }}>
-          {tabBtn('FCL', 'FCL')}{tabBtn('CONSOL', 'CONSOL')}{tabBtn('BOTH', 'BOTH')}
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-        <div style={{ position: 'relative' }}>
-          <label className="lt-label">Vessel</label>
-          <input className="lt-input" style={{ width: '100%' }} value={formVessel}
-            onChange={e => { setFormVessel(e.target.value); setShowVesselSuggestions(true) }}
-            onFocus={() => setShowVesselSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowVesselSuggestions(false), 200)}
-            placeholder="e.g. MSC America" autoComplete="off" />
-          {showVesselSuggestions && vesselMatches.length > 0 && (
-            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', maxHeight: 220, overflowY: 'auto', marginTop: 2 }}>
-              <div style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border)' }}>Recent vessels (last 2 weeks)</div>
-              {vesselMatches.map(vs => (
-                <button key={vs.id} onMouseDown={e => { e.preventDefault(); applyVesselSchedule(vs) }}
-                  style={{ display: 'block', width: '100%', padding: '8px 10px', border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 12, borderBottom: '1px solid var(--border)' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(8,145,178,0.06)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
-                  <div style={{ fontWeight: 600, color: 'var(--text)' }}>{vs.vessel_name} / {vs.voyage_number}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{vs.pol}{vs.final_pod ? ` → ${vs.final_pod}` : ''}{vs.etd_pol ? ` · ETD ${vs.etd_pol}` : ''} · {vs.schedule_type}</div>
-                </button>
-              ))}
-            </div>
+  // Picking a suggestion fills the whole schedule; items are keyed by schedule id because one vessel can have several voyages.
+  // The pick replaces the text with the vessel name, so the list is emptied (showVesselSuggestions = false) to keep it closed.
+  const vesselItems: ComboBoxItem[] = (showVesselSuggestions ? vesselMatches : []).map(vs => ({
+    value: vs.id,
+    label: `${vs.vessel_name} / ${vs.voyage_number}`,
+    description: `${vs.pol}${vs.final_pod ? ` → ${vs.final_pod}` : ''}${vs.etd_pol ? ` · ETD ${vs.etd_pol}` : ''} · ${vs.schedule_type}`,
+  }))
+  const svsDate = (label: string, value: string, onChange: (v: string) => void) => (
+    <Field label={label}>
+      {ids => (
+        <div className="flex gap-1">
+          <DatePicker {...ids} className="flex-1" value={value} onChange={onChange} />
+          {value && (
+            <Tooltip content={`Clear ${label}`}>
+              <Button variant="ghost" className="w-8 px-0" aria-label={`Clear ${label}`}
+                icon={<X size={14} aria-hidden="true" />} onClick={() => onChange('')} />
+            </Tooltip>
           )}
         </div>
-        <div>
-          <label className="lt-label">Voyage</label>
-          <input className="lt-input" style={{ width: '100%' }} value={formVoyage} onChange={e => setFormVoyage(e.target.value)} placeholder="e.g. QB614W" />
-        </div>
-        <div>
-          <label className="lt-label">Port of Loading</label>
-          <input className="lt-input" style={{ width: '100%' }} value={vesselPol} onChange={e => setVesselPol(e.target.value)} placeholder="e.g. Colombo" />
-        </div>
-        <div>
-          <label className="lt-label">ETD POL</label>
-          <div style={{ display: 'flex', gap: 4 }}>
-            <input type="date" className="lt-input" style={{ flex: 1 }} value={vesselEtdPol} onChange={e => setVesselEtdPol(e.target.value)} />
-            {vesselEtdPol && <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0 4px' }} onClick={() => setVesselEtdPol('')}><X size={13} /></button>}
-          </div>
-        </div>
-        <div>
-          <label className="lt-label">ETA POL</label>
-          <div style={{ display: 'flex', gap: 4 }}>
-            <input type="date" className="lt-input" style={{ flex: 1 }} value={vesselEtaPol} onChange={e => setVesselEtaPol(e.target.value)} />
-            {vesselEtaPol && <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0 4px' }} onClick={() => setVesselEtaPol('')}><X size={13} /></button>}
-          </div>
-        </div>
-        <div>
-          <label className="lt-label">Routing Type</label>
-          <select className="lt-input" style={{ width: '100%' }} value={vesselRoutingType} onChange={e => setVesselRoutingType(e.target.value as 'DIRECT' | 'TRANSSHIPMENT')}>
-            <option value="DIRECT">Direct</option>
-            <option value="TRANSSHIPMENT">Transshipment</option>
-          </select>
-        </div>
-        <div>
-          <label className="lt-label">Final Port of Discharge</label>
-          <input className="lt-input" style={{ width: '100%' }} value={vesselFinalPod} onChange={e => setVesselFinalPod(e.target.value)} placeholder="e.g. Felixstowe" />
-        </div>
-        <div>
-          <label className="lt-label">ETA FPOD</label>
-          <div style={{ display: 'flex', gap: 4 }}>
-            <input type="date" className="lt-input" style={{ flex: 1 }} value={vesselEtaFpod} onChange={e => setVesselEtaFpod(e.target.value)} />
-            {vesselEtaFpod && <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', padding: '0 4px' }} onClick={() => setVesselEtaFpod('')}><X size={13} /></button>}
-          </div>
-        </div>
+      )}
+    </Field>
+  )
+  return (
+    <div className="flex flex-col gap-4">
+      <StepHeader title="VESSEL SCHEDULE" subtitle={`${blBkg.customer_name} · ${blBkg.origin} → ${blBkg.destination}`} />
+
+      {roBookings.length > 0 && (
+        <Field label="Pre-fill from Release Order (optional)">
+          {ids => <Select {...ids} value={selectedReleaseOrderId} onChange={applyReleaseOrder}
+            options={[
+              { value: '', label: '— Select a release order —' },
+              ...roBookings.map(b => ({ value: b.id, label: `${b.customer_name} · ${b.vessel_name} / ${b.voyage_number} (${b.origin} → ${b.destination})` })),
+            ]} />}
+        </Field>
+      )}
+
+      <ToggleGroup label="Vessel Schedule Type" options={['FCL', 'CONSOL', 'BOTH'] as const} value={vesselScheduleType}
+        onSelect={setVesselScheduleType} stretch />
+
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+        {/* Suggestions are recent vessels (last 2 weeks) */}
+        <Field label="Vessel">
+          {ids => <ComboBox {...ids} value={formVessel} onChange={v => { setFormVessel(v); setShowVesselSuggestions(true) }} items={vesselItems}
+            filter={() => true} menuTrigger="focus"
+            onPick={id => { const vs = vesselMatches.find(v => v.id === id); if (vs) applyVesselSchedule(vs) }}
+            placeholder="e.g. MSC America" />}
+        </Field>
+        <Field label="Voyage">
+          {ids => <Input {...ids} value={formVoyage} onChange={e => setFormVoyage(e.target.value)} placeholder="e.g. QB614W" />}
+        </Field>
+        <Field label="Port of Loading">
+          {ids => <Input {...ids} value={vesselPol} onChange={e => setVesselPol(e.target.value)} placeholder="e.g. Colombo" />}
+        </Field>
+        {svsDate('ETD POL', vesselEtdPol, setVesselEtdPol)}
+        {svsDate('ETA POL', vesselEtaPol, setVesselEtaPol)}
+        <Field label="Routing Type">
+          {ids => <Select {...ids} value={vesselRoutingType} onChange={v => setVesselRoutingType(v as 'DIRECT' | 'TRANSSHIPMENT')}
+            options={[{ value: 'DIRECT', label: 'Direct' }, { value: 'TRANSSHIPMENT', label: 'Transshipment' }]} />}
+        </Field>
+        <Field label="Final Port of Discharge">
+          {ids => <Input {...ids} value={vesselFinalPod} onChange={e => setVesselFinalPod(e.target.value)} placeholder="e.g. Felixstowe" />}
+        </Field>
+        {svsDate('ETA FPOD', vesselEtaFpod, setVesselEtaFpod)}
       </div>
 
-      <div>
-        <label className="lt-label">Remarks</label>
-        <textarea className="lt-input" rows={2} style={{ width: '100%', resize: 'vertical' as const, fontSize: 13 }} value={vesselRemarks} onChange={e => setVesselRemarks(e.target.value)} placeholder="Any remarks about the vessel schedule..." />
-      </div>
-      <div>
-        <label className="lt-label">Agent</label>
-        <textarea className="lt-input" rows={2} style={{ width: '100%', resize: 'vertical' as const, fontSize: 13 }} value={vesselAgent} onChange={e => setVesselAgent(e.target.value)} placeholder="Agent details..." />
-      </div>
+      <Field label="Remarks">
+        {ids => <Textarea {...ids} rows={2} className="resize-y" value={vesselRemarks} onChange={e => setVesselRemarks(e.target.value)} placeholder="Any remarks about the vessel schedule..." />}
+      </Field>
+      <Field label="Agent">
+        {ids => <Textarea {...ids} rows={2} className="resize-y" value={vesselAgent} onChange={e => setVesselAgent(e.target.value)} placeholder="Agent details..." />}
+      </Field>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <button className="db-btn primary"
+      <div className="flex justify-end">
+        <Button variant="primary"
           disabled={!formVessel.trim() || !formVoyage.trim()}
-          style={!formVessel.trim() || !formVoyage.trim() ? { opacity: 0.4, cursor: 'not-allowed' } : { background: '#0891b2', borderColor: '#0891b2' }}
           onClick={() => {
             onAddVesselSchedule({
               vessel_name: formVessel.trim(), voyage_number: formVoyage.trim(),
@@ -2330,10 +2296,8 @@ export default function InlineStepForms({
             setActionModal(null)
           }}>
           Confirm Vessel Schedule →
-        </button>
+        </Button>
       </div>
-
-
     </div>
   )
 })() : selectedItem.actionKind === 'create-vessel-booking' && actionModal ? (() => {
