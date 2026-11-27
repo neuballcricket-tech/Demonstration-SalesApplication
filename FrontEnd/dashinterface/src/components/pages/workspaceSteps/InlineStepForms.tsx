@@ -162,9 +162,9 @@ const KYC_CURRENCY_OPTIONS: Option[] = ['USD', 'LKR', 'EUR', 'GBP'].map(v => ({ 
 /** Selected state of a toggle button in a group (Send Method). */
 const SELECTED_TOGGLE = 'border-primary bg-primary text-white hover:bg-primary-hover'
 /** Success state: the selected "Accepted" decision and "Download Quotation PDF" after the file was fetched. */
-const SELECTED_SUCCESS = 'border-success bg-success text-white hover:bg-success'
+export const SELECTED_SUCCESS = 'border-success bg-success text-white hover:bg-success'
 /** Danger state: the selected "Rejected" decision. */
-const SELECTED_DANGER = 'border-danger bg-danger text-white hover:bg-danger hover:opacity-90'
+export const SELECTED_DANGER = 'border-danger bg-danger text-white hover:bg-danger hover:opacity-90'
 /** Column layout of the Prepare Quotation rate-option table (header and rows). */
 const PQ_GRID = 'grid grid-cols-[48px_1fr_110px_80px_104px_80px_1fr]'
 
@@ -249,7 +249,7 @@ function ReleaseOrderReference({ ro, bkg, collapsed, onToggle }: { ro: ReleaseOr
 }
 
 /** Email / WhatsApp toggle group. */
-function SendMethodToggle({ id, label, value, onSelect }: { id: string; label: string; value: 'email' | 'whatsapp'; onSelect: (m: 'email' | 'whatsapp') => void }) {
+export function SendMethodToggle({ id, label, value, onSelect }: { id: string; label: string; value: 'email' | 'whatsapp'; onSelect: (m: 'email' | 'whatsapp') => void }) {
   return (
     <div className="flex flex-col gap-1">
       <span id={id} className={labelClass}>{label}</span>
@@ -288,7 +288,7 @@ function ToggleGroup<T extends string>({ label, options, value, onSelect, stretc
 }
 
 /** "I confirm that I have sent…" checkbox in a tinted box (info for email, success for WhatsApp). */
-function ConfirmCheck({ tone, checked, onChange, hint, children }: { tone: 'info' | 'success'; checked: boolean; onChange: (v: boolean) => void; hint: string; children: ReactNode }) {
+export function ConfirmCheck({ tone, checked, onChange, hint, children }: { tone: 'info' | 'success'; checked: boolean; onChange: (v: boolean) => void; hint: string; children: ReactNode }) {
   return (
     <div className={cn('rounded-card border px-3.5 py-2.5', tone === 'info' ? 'border-info-line bg-info-bg' : 'border-success-line bg-success-bg')}>
       <Checkbox checked={checked} onChange={onChange} className="items-start">
@@ -350,7 +350,7 @@ function CollapsibleHead({ title, hint, collapsed, onToggle }: { title: string; 
 }
 
 /** Collapsible generated message. `action` (e.g. Copy) sits beside the toggle, shown while expanded. */
-function DraftPanel({ title, collapsed, onToggle, action, children }: { title: string; collapsed: boolean; onToggle: () => void; action?: ReactNode; children: ReactNode }) {
+export function DraftPanel({ title, collapsed, onToggle, action, children }: { title: string; collapsed: boolean; onToggle: () => void; action?: ReactNode; children: ReactNode }) {
   return (
     <div className="overflow-hidden rounded-card border border-line-soft">
       <div className="flex items-center gap-2 bg-canvas pr-2">
@@ -366,8 +366,8 @@ function DraftPanel({ title, collapsed, onToggle, action, children }: { title: s
   )
 }
 
-/** Who handed the item over, and what they did. */
-function ContextCard({ ctx }: { ctx: ActivityEntry }) {
+/** Who handed the item over, and what they did (plus their notes when `showNotes` is set). */
+export function ContextCard({ ctx, showNotes }: { ctx: ActivityEntry; showNotes?: boolean }) {
   return (
     <div className="rounded-card border border-line-soft border-l-[3px] border-l-primary bg-surface px-4 py-3.5">
       <div className="mb-1 flex items-center gap-1.5">
@@ -377,6 +377,7 @@ function ContextCard({ ctx }: { ctx: ActivityEntry }) {
         </span>
       </div>
       <div className="text-control text-fg-label">{ctx.action}</div>
+      {showNotes && ctx.notes && <div className="mt-1 text-label italic text-fg-muted">{ctx.notes}</div>}
     </div>
   )
 }
