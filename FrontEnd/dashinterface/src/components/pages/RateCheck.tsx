@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, Fragment } from 'react'
+import { useState, useEffect, useMemo, useRef, Fragment, type ReactNode } from 'react'
 import { ArrowLeft, ChevronRight, FileDown, FileText, Loader2, PanelRight, Plus, Send, Ship, X, Filter } from 'lucide-react'
 import {
   RATE_SOURCE_COLORS, COMMODITY_TYPES, portOptions, CONTAINER_TYPE_LABELS,
@@ -539,6 +539,22 @@ export function SelectablePivotRateTable({ pivot, selectedIds, selectedScheduleI
         </div>
       </div>
     </>
+  )
+}
+
+// ---- Rate brief document pieces ----
+
+const BRIEF_DIVIDER = 'my-2 border-t border-line'
+const BRIEF_SECTION = 'mb-1 text-label font-bold uppercase tracking-label text-fg-muted'
+const BRIEF_ITEM = 'border-0 border-b border-dashed border-line py-1.5'
+const BRIEF_META = 'mt-px text-label text-fg-muted'
+
+function BriefRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex justify-between py-0.5 text-control">
+      <span className="text-fg-muted">{label}</span>
+      <strong className="font-semibold text-fg">{children}</strong>
+    </div>
   )
 }
 
@@ -1347,25 +1363,25 @@ export default function RateCheck({
   // ── Render a single manual entry card in the rate brief ──
   const renderManualEntryBrief = (e: ManualRateEntry) => {
     const typeLabel = MR_TAB_LABELS[e.tab]
-    const accent = ({ 'vessel-spot': RATE_SOURCE_COLORS['Spot'], fak: RATE_SOURCE_COLORS['FAK'], special: RATE_SOURCE_COLORS['Special'] } as Record<ManualRateTab, string>)[e.tab] || '#d97706'
+    const accent = ({ 'vessel-spot': RATE_SOURCE_COLORS['Spot'], fak: RATE_SOURCE_COLORS['FAK'], special: RATE_SOURCE_COLORS['Special'] } as Record<ManualRateTab, string>)[e.tab] || COLOR.warning
     const surTotal = totalSurcharge(e)
     const surNames = surchargeTypeNames(e)
     return (
-      <div key={e.id} style={{ padding: '6px 0', borderBottom: '1px dashed var(--border)' }}>
-        <div style={{ fontWeight: 700, fontSize: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: `${accent}18`, color: accent, border: `1px solid ${accent}30` }}>{typeLabel}</span>
+      <div key={e.id} className={BRIEF_ITEM}>
+        <div className="flex items-center gap-1.5 text-control font-bold text-fg">
+          <span className="rounded-control border px-1.5 py-px text-label font-semibold" style={{ background: `${accent}18`, color: accent, borderColor: `${accent}30` }}>{typeLabel}</span>
           {e.liner}
-          {e.tab === 'vessel-spot' && e.vesselName && <span style={{ fontWeight: 400, color: 'var(--text-muted)', fontSize: 11 }}>{e.vesselName}{e.voyage ? ` / ${e.voyage}` : ''}</span>}
+          {e.tab === 'vessel-spot' && e.vesselName && <span className="text-label font-normal text-fg-muted">{e.vesselName}{e.voyage ? ` / ${e.voyage}` : ''}</span>}
         </div>
         {e.scheduleId != null && e.scheduleSummary && (
-          <div style={{ fontSize: 11, color: COLOR.primary, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-            <Ship size={9} /> Linked to: {e.scheduleSummary}
+          <div className="mt-0.5 flex items-center gap-1 text-label text-primary">
+            <Ship size={12} aria-hidden="true" /> Linked to: {e.scheduleSummary}
           </div>
         )}
         {e.containers.map((c, ci) => {
           const allIn = Number(c.rate) + surTotal
           return (
-            <div key={ci} style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: ci > 0 ? 1 : 0 }}>
+            <div key={ci} className={cn('text-label text-fg-label', ci > 0 && 'mt-px')}>
               ${allIn.toLocaleString()} {c.currency} / {c.containerType}
               {c.tus ? ` · TUs: ${c.tus}` : ''}
               {c.maxWeight ? ` · Wt: ${c.maxWeight}` : ''}
@@ -1373,44 +1389,44 @@ export default function RateCheck({
           )
         })}
         {surNames.length > 0 && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, fontStyle: 'italic' }}>
+          <div className="mt-0.5 text-label italic text-fg-muted">
             Inclusive of {surNames.join(', ')}
           </div>
         )}
-        <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 1 }}>
+        <div className="mt-px text-label text-fg-label">
           {e.origin || '?'} → {e.destination || '?'}
           {e.tradeLane ? ` · ${e.tradeLane}` : ''}
           {e.serviceLane ? ` · SL: ${e.serviceLane}` : ''}
         </div>
         {(e.validFrom || e.validTo) && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+          <div className="mt-0.5 text-label text-fg-muted">
             Valid: {e.validFrom || '?'} → {e.validTo || '?'}
           </div>
         )}
-        {e.freeTime && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>Free Days: {e.freeTime}</div>}
+        {e.freeTime && <div className={BRIEF_META}>Free Days: {e.freeTime}</div>}
         {e.tab === 'vessel-spot' && (e.vesselEta || e.vesselEtd) && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+          <div className={BRIEF_META}>
             {e.vesselEtd ? `ETD: ${e.vesselEtd}` : ''}{e.vesselEta ? `${e.vesselEtd ? ' · ' : ''}ETA: ${e.vesselEta}` : ''}
           </div>
         )}
         {e.tab === 'vessel-spot' && (e.fclOpenDate || e.fclCutDate) && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+          <div className={BRIEF_META}>
             {e.fclOpenDate ? `FCL Open: ${e.fclOpenDate}${e.fclOpenTime ? ` ${e.fclOpenTime}` : ''}` : ''}
             {e.fclCutDate ? `${e.fclOpenDate ? ' · ' : ''}FCL Cut: ${e.fclCutDate}${e.fclCutTime ? ` ${e.fclCutTime}` : ''}` : ''}
           </div>
         )}
         {e.tab === 'special' && (e.commodityType || e.commodityName) && (
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
+          <div className={BRIEF_META}>
             Commodity: {e.commodityType || '?'}{e.commodityName ? ` - ${e.commodityName}` : ''}
           </div>
         )}
-        <div style={{ fontSize: 11, marginTop: 2, display: 'flex', gap: 6 }}>
-          {e.isSold && <span style={{ color: '#059669', fontWeight: 600 }}>SOLD</span>}
-          {e.isCancelled && <span style={{ color: '#dc2626', fontWeight: 600 }}>CANCELLED{e.cancelReason ? `: ${e.cancelReason}` : ''}{e.cancelCharge ? ` · Charge: ${e.cancelCharge} ${e.cancelChargeCurrency}` : ''}</span>}
+        <div className="mt-0.5 flex gap-1.5 text-label">
+          {e.isSold && <span className="font-semibold text-success">SOLD</span>}
+          {e.isCancelled && <span className="font-semibold text-danger">CANCELLED{e.cancelReason ? `: ${e.cancelReason}` : ''}{e.cancelCharge ? ` · Charge: ${e.cancelCharge} ${e.cancelChargeCurrency}` : ''}</span>}
         </div>
-        {e.salesperson && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>Sales Contact: {e.salesperson}</div>}
-        {e.note && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>Note: {e.note}</div>}
-        {e.specialRemark && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>Analysis Note: {e.specialRemark}</div>}
+        {e.salesperson && <div className={BRIEF_META}>Sales Contact: {e.salesperson}</div>}
+        {e.note && <div className={BRIEF_META}>Note: {e.note}</div>}
+        {e.specialRemark && <div className={BRIEF_META}>Analysis Note: {e.specialRemark}</div>}
       </div>
     )
   }
@@ -1445,38 +1461,38 @@ export default function RateCheck({
     }
 
     return (
-      <div className="ws-doc-preview">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-          <FileDown size={14} style={{ color: isProcurement ? '#d97706' : COLOR.primary }} />
-          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>Rate Brief</span>
+      <div className="rounded-card border border-line bg-canvas p-3.5">
+        <div className="mb-2.5 flex items-center gap-1.5">
+          <FileDown size={14} aria-hidden="true" className={isProcurement ? 'text-warning' : 'text-primary'} />
+          <span className="text-control font-bold text-fg">Rate Brief</span>
         </div>
-        <div className="ws-doc-body">
-          <div className="ws-doc-header">RATE BRIEF</div>
-          <div className="ws-doc-sub">ABC Logistics (Pvt) Ltd</div>
-          <div className="ws-doc-divider" />
-          <div className="ws-doc-section">Customer</div>
-          <div className="ws-doc-row"><span>Name:</span><strong>{inquiry.customer_name}</strong></div>
-          <div className="ws-doc-row"><span>Tier:</span><strong>{custData?.tier ?? 'N/A'}</strong></div>
-          <div className="ws-doc-row"><span>Location:</span><strong>{custData?.location ?? 'N/A'}</strong></div>
-          <div className="ws-doc-divider" />
-          <div className="ws-doc-section">Inquiry</div>
-          <div className="ws-doc-row"><span>Ref:</span><strong>{inquiry.id}</strong></div>
-          <div className="ws-doc-row"><span>Route:</span><strong>{inquiry.origin} → {dest}</strong></div>
-          <div className="ws-doc-row"><span>Request:</span><strong>{inquiry.request}</strong></div>
-          <div className="ws-doc-row"><span>Channel:</span><strong>{inquiry.channel}</strong></div>
+        <div className="rounded-card border border-line bg-surface p-4 text-control text-fg-label">
+          <div className="text-body font-extrabold tracking-label text-fg">RATE BRIEF</div>
+          <div className="mb-1 text-label text-fg-muted">ABC Logistics (Pvt) Ltd</div>
+          <div className={BRIEF_DIVIDER} />
+          <div className={BRIEF_SECTION}>Customer</div>
+          <BriefRow label="Name:">{inquiry.customer_name}</BriefRow>
+          <BriefRow label="Tier:">{custData?.tier ?? 'N/A'}</BriefRow>
+          <BriefRow label="Location:">{custData?.location ?? 'N/A'}</BriefRow>
+          <div className={BRIEF_DIVIDER} />
+          <div className={BRIEF_SECTION}>Inquiry</div>
+          <BriefRow label="Ref:">{inquiry.id}</BriefRow>
+          <BriefRow label="Route:">{inquiry.origin} → {dest}</BriefRow>
+          <BriefRow label="Request:">{inquiry.request}</BriefRow>
+          <BriefRow label="Channel:">{inquiry.channel}</BriefRow>
 
           {/* DB Rates section */}
           {selectedDbRates.length > 0 && <>
-            <div className="ws-doc-divider" />
-            <div className="ws-doc-section">{isProcurement ? 'Database Rates' : 'Selected Rates'}</div>
+            <div className={BRIEF_DIVIDER} />
+            <div className={BRIEF_SECTION}>{isProcurement ? 'Database Rates' : 'Selected Rates'}</div>
             {selectedDbRates.map(r => (
-              <div key={r.id} style={{ padding: '6px 0', borderBottom: '1px dashed var(--border)' }}>
-                <div style={{ fontWeight: 700, fontSize: 12 }}>{r.liner_name || 'N/A'} <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({r.source_type})</span></div>
-                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+              <div key={r.id} className={BRIEF_ITEM}>
+                <div className="text-control font-bold text-fg">{r.liner_name || 'N/A'} <span className="font-normal text-fg-muted">({r.source_type})</span></div>
+                <div className="text-label text-fg-label">
                   ${(r.rate ?? 0).toLocaleString()} {r.currency} / {r.container_type || 'N/A'}
                   {r.trade_lane && ` · ${r.trade_lane}`}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                <div className="text-label text-fg-muted">
                   Valid: {r.valid_from || '?'} → {r.valid_to || '?'}
                   {r.vessel_name && ` · ${r.vessel_name}`}
                 </div>
@@ -1486,24 +1502,24 @@ export default function RateCheck({
 
           {/* Manual entries section */}
           {manualEntries.length > 0 && <>
-            <div className="ws-doc-divider" />
-            <div className="ws-doc-section">Manual Rates ({manualEntries.length})</div>
+            <div className={BRIEF_DIVIDER} />
+            <div className={BRIEF_SECTION}>Manual Rates ({manualEntries.length})</div>
             {manualEntries.map(e => renderManualEntryBrief(e))}
           </>}
 
           {/* Schedule-matched rates section */}
           {aggregateBriefItems.length > 0 && <>
-            <div className="ws-doc-divider" />
-            <div className="ws-doc-section">Schedule Rates ({aggregateBriefItems.length})</div>
+            <div className={BRIEF_DIVIDER} />
+            <div className={BRIEF_SECTION}>Schedule Rates ({aggregateBriefItems.length})</div>
             {aggregateBriefItems.map(item => (
-              <div key={`${item.rateType}:${item.rate.rate_id}`} style={{ padding: '6px 0', borderBottom: '1px dashed var(--border)' }}>
-                <div style={{ fontWeight: 700, fontSize: 12 }}>
-                  {item.scheduleName} <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({item.rateType})</span>
+              <div key={`${item.rateType}:${item.rate.rate_id}`} className={BRIEF_ITEM}>
+                <div className="text-control font-bold text-fg">
+                  {item.scheduleName} <span className="font-normal text-fg-muted">({item.rateType})</span>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                <div className="text-label text-fg-label">
                   ${item.rate.rate.toLocaleString()} {item.rate.currency} / {item.rate.container_type}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                <div className="text-label text-fg-muted">
                   Valid: {item.rate.valid_from || '?'} → {item.rate.valid_to || '?'}
                   {item.rate.transit && ` · Transit: ${item.rate.transit}`}
                 </div>
@@ -1511,9 +1527,9 @@ export default function RateCheck({
             ))}
           </>}
 
-          <div className="ws-doc-divider" />
-          <div className="ws-doc-row"><span>Prepared by:</span><strong>{activeEmployee.name} ({activeRole})</strong></div>
-          <div className="ws-doc-row"><span>Date:</span><strong>{new Date().toISOString().slice(0, 10)}</strong></div>
+          <div className={BRIEF_DIVIDER} />
+          <BriefRow label="Prepared by:">{activeEmployee.name} ({activeRole})</BriefRow>
+          <BriefRow label="Date:">{new Date().toISOString().slice(0, 10)}</BriefRow>
         </div>
       </div>
     )
