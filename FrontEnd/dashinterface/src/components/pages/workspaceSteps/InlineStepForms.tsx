@@ -287,7 +287,7 @@ function FileAttach({ accept, label, fileName, onFile, onRemove, describedBy }: 
 }) {
   return (
     <div className="flex items-center gap-2">
-      <FileButton accept={accept} size="sm" aria-describedby={describedBy}
+      <FileButton accept={accept} aria-describedby={describedBy}
         onSelect={files => { const file = files[0]; if (file) onFile(file) }}>
         {fileName ? 'Replace file' : label}
       </FileButton>
@@ -985,7 +985,7 @@ export default function InlineStepForms({
   const isOvd = dLeft < 0
   const urgencyTone = isOvd ? 'danger' : dLeft === 0 ? 'warning' : 'info'
   const urgencyCard = { danger: 'border-danger-line bg-danger-bg', warning: 'border-warning-line bg-warning-bg', info: 'border-info-line bg-info-bg' }[urgencyTone]
-  const urgencyClass = { danger: 'text-danger', warning: 'text-warning', info: 'text-accent' }[urgencyTone]
+  const urgencyClass = { danger: 'text-danger', warning: 'text-warning', info: 'text-info-fg' }[urgencyTone]
   const urgencyLabel = isOvd
     ? `OVERDUE by ${Math.abs(dLeft)} day(s)`
     : dLeft === 0 ? 'Due TODAY' : `${dLeft} day(s) remaining`
@@ -1123,7 +1123,7 @@ export default function InlineStepForms({
   )
 
   return (
-    <div className="flex max-h-full flex-col gap-4 overflow-y-auto">
+    <div className="flex flex-col gap-4">
       {/* Header */}
       <div className="flex flex-col gap-1.5">
         <StepHeader icon={<FileText size={14} aria-hidden="true" />} title="Pre-Advice Notice" />
@@ -1388,7 +1388,7 @@ export default function InlineStepForms({
   const praDisabled = !paField('dest_agent').trim() || !paField('dest_agent_email').includes('@')
 
   return (
-    <div className="flex max-h-full flex-col gap-4 overflow-y-auto">
+    <div className="flex flex-col gap-4">
       {/* Header */}
       <div className="flex flex-col gap-1.5">
         <StepHeader icon={<Send size={14} aria-hidden="true" />} title="Pre-Alert to Destination Agent" />

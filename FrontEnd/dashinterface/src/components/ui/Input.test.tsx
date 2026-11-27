@@ -68,6 +68,13 @@ describe('Textarea', () => {
     expect(ref.current?.tagName).toBe('TEXTAREA')
     expect(ref.current).toHaveClass('ui-control', 'ui-control--sm')
   })
+
+  it('uses the sans font unless className picks another (no preflight, so it would be UA monospace)', () => {
+    render(<><Textarea aria-label="plain" /><Textarea aria-label="mono" className="font-mono" /></>)
+    expect(screen.getByLabelText('plain')).toHaveClass('font-sans')
+    expect(screen.getByLabelText('mono')).toHaveClass('font-mono')
+    expect(screen.getByLabelText('mono')).not.toHaveClass('font-sans')
+  })
 })
 
 describe('Badge', () => {

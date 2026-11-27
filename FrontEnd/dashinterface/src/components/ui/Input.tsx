@@ -51,5 +51,6 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
   { controlSize = 'md', className, ...rest },
   ref,
 ) {
-  return <textarea ref={ref} className={cn('ui-control', modifier(controlSize), textarea({ controlSize }), className)} {...rest} />
+  // Without preflight a textarea keeps the UA monospace font; font-sans matches Input (className can still override).
+  return <textarea ref={ref} className={cn('ui-control', modifier(controlSize), textarea({ controlSize }), 'font-sans', className)} {...rest} />
 })
