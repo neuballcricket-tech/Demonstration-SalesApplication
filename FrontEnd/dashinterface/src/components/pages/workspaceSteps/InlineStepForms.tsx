@@ -9,14 +9,13 @@ import { MOCK_OPEN_VOYAGES } from "../../../mockData"
 import {
   ROLE_LABELS, daysUntil, linerDisplay, type UserRole,
   type Booking, type LinerRecord, type ReleaseOrderFields,
-  type Inquiry,
+  type Inquiry, type ActivityEntry,
 } from "../../../types"
 import { apiGetQuotationFile, type KycPendingClient, type QuotationOptionRow, type UnsentQuotation } from "../../../api"
 import type { CompletedRateRequest } from "../../../types"
 import type { WorkspaceItem, BlContainerRow, MblContainerRow, QuotationOptionOverride } from "./types"
 import { empName, openMailto, buildRateSection, generateQuotationPdf } from "./utils"
 import { lookupQuotationId } from "./useWorkspaceActions"
-import { COLOR } from "../../ui/tokens"
 import { Button, Checkbox, DatePicker, Field, Input, NumberInput, Select, Textarea, Tooltip, type Option } from "../../ui"
 import { labelClass } from "../../ui/controlStyles"
 import { cn } from "../../../lib/cn"
@@ -160,6 +159,10 @@ export interface InlineStepFormsProps {
 const KYC_CLIENT_TYPE_OPTIONS: Option[] = ['Shipper', 'Buyer', 'Agent', 'Trader'].map(v => ({ value: v, label: v }))
 const KYC_CURRENCY_OPTIONS: Option[] = ['USD', 'LKR', 'EUR', 'GBP'].map(v => ({ value: v, label: v }))
 
+/** Selected state of a toggle button in a group (Customer Decision, Send Method). */
+const SELECTED_TOGGLE = 'border-primary bg-primary text-white hover:bg-primary-hover'
+/** "Download Quotation PDF" after the file was fetched. */
+const DOWNLOADED_BUTTON = 'border-success bg-success text-white hover:bg-success'
 /** Column layout of the Prepare Quotation rate-option table (header and rows). */
 const PQ_GRID = 'grid grid-cols-[48px_1fr_110px_80px_104px_80px_1fr]'
 
@@ -199,6 +202,21 @@ function SummaryRow({ label, children }: { label: string; children: ReactNode })
     <div className="grid grid-cols-[140px_1fr] border-b border-line-soft">
       <div className={cn(labelClass, 'flex items-center border-r border-line-soft bg-canvas px-3 py-2')}>{label}</div>
       <div className="px-2.5 py-2 text-control font-semibold text-fg">{children}</div>
+    </div>
+  )
+}
+
+/** Who handed the item over, and what they did. */
+function ContextCard({ ctx }: { ctx: ActivityEntry }) {
+  return (
+    <div className="rounded-card border border-line-soft border-l-[3px] border-l-primary bg-surface px-4 py-3.5">
+      <div className="mb-1 flex items-center gap-1.5">
+        <User size={11} className="text-fg-muted" aria-hidden="true" />
+        <span className="text-label font-semibold text-fg-label">
+          {empName(ctx.actor_id)} ({ROLE_LABELS[ctx.actor_role]})
+        </span>
+      </div>
+      <div className="text-control text-fg-label">{ctx.action}</div>
     </div>
   )
 }
@@ -654,91 +672,67 @@ export default function InlineStepForms({
   const ctx = actionModal.previousContext
   const crDisabled = customerDecision === 'accepted' && quotationOptions.length > 0 && selectedOptionRateId == null
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Header */}
-      <div style={{ padding: '10px 14px', background: '#7c3aed', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <MessageSquare size={14} style={{ color: '#fff' }} />
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>RECORD CUSTOMER RESPONSE</span>
-      </div>
+    <div className="flex flex-col gap-3">
+      <StepHeader icon={<MessageSquare size={14} aria-hidden="true" />} title="RECORD CUSTOMER RESPONSE" />
 
       {/* Previous context */}
-      {ctx && (
-        <div className="ws-context-card" style={{ marginTop: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-            <User size={11} style={{ color: 'var(--text-muted)' }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
-              {empName(ctx.actor_id)} ({ROLE_LABELS[ctx.actor_role]})
-            </span>
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{ctx.action}</div>
-        </div>
-      )}
+      {ctx && <ContextCard ctx={ctx} />}
 
       {/* Customer Decision */}
-      <div>
-        <label className="lt-label">Customer Decision</label>
-        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-          <button
-            className={`db-btn ${customerDecision === 'accepted' ? 'primary' : ''}`}
-            style={customerDecision === 'accepted' ? { background: '#16a34a', borderColor: '#16a34a' } : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-            onClick={() => setCustomerDecision('accepted')}
-          >
-            <Check size={13} style={{ marginRight: 4 }} /> Accepted
-          </button>
-          <button
-            className={`db-btn ${customerDecision === 'rejected' ? 'primary' : ''}`}
-            style={customerDecision === 'rejected' ? { background: '#dc2626', borderColor: '#dc2626' } : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-            onClick={() => setCustomerDecision('rejected')}
-          >
-            <X size={13} style={{ marginRight: 4 }} /> Rejected
-          </button>
+      <div className="flex flex-col gap-1">
+        <span id="ws-cr-decision-label" className={labelClass}>Customer Decision</span>
+        <div role="group" aria-labelledby="ws-cr-decision-label" className="flex gap-2">
+          <Button aria-pressed={customerDecision === 'accepted'} className={cn(customerDecision === 'accepted' && SELECTED_TOGGLE)}
+            icon={<Check size={14} aria-hidden="true" />}
+            onClick={() => setCustomerDecision('accepted')}>
+            Accepted
+          </Button>
+          <Button aria-pressed={customerDecision === 'rejected'} className={cn(customerDecision === 'rejected' && SELECTED_TOGGLE)}
+            icon={<X size={14} aria-hidden="true" />}
+            onClick={() => setCustomerDecision('rejected')}>
+            Rejected
+          </Button>
         </div>
       </div>
 
       {/* Quotation option selection — shown only when accepted */}
       {customerDecision === 'accepted' && (
-        <div>
-          <label className="lt-label">Accepted Option</label>
+        <div className="flex flex-col gap-1">
+          <span id="ws-cr-option-label" className={labelClass}>Accepted Option</span>
           {quotationOptionsLoading ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 0', color: 'var(--text-muted)', fontSize: 12 }}>
-              <Loader2 size={13} className="spin" /> Loading options…
+            <div role="status" className="flex items-center gap-1.5 py-2 text-control text-fg-muted">
+              <Loader2 size={14} className="animate-spin" aria-hidden="true" /> Loading options…
             </div>
           ) : quotationOptions.length === 0 ? (
-            <div style={{ padding: '8px 0', color: 'var(--text-muted)', fontSize: 12 }}>
+            <div className="py-2 text-control text-fg-muted">
               No options found for this quotation.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+            <div role="group" aria-labelledby="ws-cr-option-label" className="flex flex-col gap-1.5">
               {quotationOptions.map(opt => {
                 const isSelected = selectedOptionRateId === opt.rate_id
                 return (
                   <button
                     key={opt.option_id}
                     type="button"
+                    aria-pressed={isSelected}
                     onClick={() => setSelectedOptionRateId(opt.rate_id)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10,
-                      padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                      border: isSelected ? '2px solid #16a34a' : '1px solid var(--border)',
-                      background: isSelected ? 'rgba(22,163,74,0.06)' : 'var(--bg-card)',
-                      textAlign: 'left', width: '100%',
-                    }}
+                    className={cn(
+                      'flex w-full items-center gap-2.5 rounded-card border px-3 py-2.5 text-left text-control',
+                      isSelected ? 'border-primary bg-primary-subtle' : 'border-line bg-surface hover:bg-surface-hover',
+                    )}
                   >
-                    <div style={{
-                      width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
-                      border: isSelected ? '5px solid #16a34a' : '2px solid var(--border)',
-                      background: 'var(--bg)',
-                    }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>
+                    <span aria-hidden="true" className={cn('size-4 shrink-0 rounded-full bg-surface', isSelected ? 'border-4 border-primary' : 'border-2 border-line')} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold text-fg">
                         {opt.vessel ? `${opt.vessel}${opt.voyage ? ` / ${opt.voyage}` : ''}` : `Option ${opt.option_id}`}
-                      </div>
-                      <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
+                      </span>
+                      <span className="mt-0.5 block text-label text-fg-label">
                         {opt.option_currency ?? 'USD'} {opt.final_amt != null ? Number(opt.final_amt).toLocaleString(undefined, { minimumFractionDigits: 2 }) : opt.amt != null ? Number(opt.amt).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '—'}
-                        {opt.rate_id != null && <span style={{ marginLeft: 8, color: 'var(--text-muted)' }}>Rate #{opt.rate_id}</span>}
-                      </div>
-                    </div>
-                    {isSelected && <Check size={14} style={{ color: '#16a34a', flexShrink: 0 }} />}
+                        {opt.rate_id != null && <span className="ml-2 text-fg-muted">Rate #{opt.rate_id}</span>}
+                      </span>
+                    </span>
+                    {isSelected && <Check size={14} className="shrink-0 text-primary" aria-hidden="true" />}
                   </button>
                 )
               })}
@@ -748,27 +742,22 @@ export default function InlineStepForms({
       )}
 
       {/* Notes */}
-      <div>
-        <label className="lt-label">{customerDecision === 'rejected' ? 'Rejection Reason' : 'Notes'} (optional)</label>
-        <input className="lt-input" style={{ width: '100%' }} value={formNote}
+      <Field label={`${customerDecision === 'rejected' ? 'Rejection Reason' : 'Notes'} (optional)`}>
+        {ids => <Input {...ids} value={formNote}
           onChange={e => setFormNote(e.target.value)}
-          placeholder={customerDecision === 'rejected' ? 'Reason for rejection...' : 'Any follow-up notes...'} />
-      </div>
+          placeholder={customerDecision === 'rejected' ? 'Reason for rejection...' : 'Any follow-up notes...'} />}
+      </Field>
 
       {/* Submit button */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 4 }}>
-        <button className="db-btn primary"
+      <div className="flex justify-end pt-1">
+        <Button variant={customerDecision === 'accepted' ? 'primary' : 'danger'}
           disabled={crDisabled}
-          style={
-            crDisabled ? { opacity: 0.4, cursor: 'not-allowed' } :
-            customerDecision === 'accepted' ? { background: '#16a34a', borderColor: '#16a34a' } :
-            { background: '#dc2626', borderColor: '#dc2626' }
-          }
+          icon={customerDecision === 'accepted' ? <Check size={14} aria-hidden="true" /> : <X size={14} aria-hidden="true" />}
           onClick={handleModalSubmit}>
           {customerDecision === 'accepted'
-            ? <><Check size={12} style={{ marginRight: 6 }} /> Customer Accepted — Proceed to Booking</>
-            : <><X size={12} style={{ marginRight: 6 }} /> Customer Rejected — Close Inquiry</>}
-        </button>
+            ? 'Customer Accepted — Proceed to Booking'
+            : 'Customer Rejected — Close Inquiry'}
+        </Button>
       </div>
     </div>
   )
@@ -3863,31 +3852,21 @@ export default function InlineStepForms({
     (sendMethod === 'whatsapp' && !waConfirmed)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      {ctx && (
-        <div className="ws-context-card" style={{ marginTop: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-            <User size={11} style={{ color: 'var(--text-muted)' }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>
-              {empName(ctx.actor_id)} ({ROLE_LABELS[ctx.actor_role]})
-            </span>
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{ctx.action}</div>
-        </div>
-      )}
+    <div className="flex flex-col gap-3">
+      {ctx && <ContextCard ctx={ctx} />}
 
       {/* Quotation preview — collapsible, plain text only */}
       {quotationText && (
-        <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-          <button type="button" onClick={() => setDraftCollapsed(c => !c)}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'var(--bg-card)', border: 'none', cursor: 'pointer' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: COLOR.primary, textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
-              <FileText size={12} /> Quotation Preview
+        <div className="overflow-hidden rounded-card border border-line-soft">
+          <button type="button" aria-expanded={!draftCollapsed} onClick={() => setDraftCollapsed(c => !c)}
+            className="flex w-full items-center justify-between border-none bg-canvas px-3 py-2 text-label hover:bg-surface-hover">
+            <span className="flex items-center gap-1.5 font-bold uppercase tracking-label text-primary">
+              <FileText size={12} aria-hidden="true" /> Quotation Preview
             </span>
-            <ChevronDown size={13} style={{ color: 'var(--text-muted)', transform: draftCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }} />
+            <ChevronDown size={14} aria-hidden="true" className={cn('text-fg-muted transition-transform', draftCollapsed && '-rotate-90')} />
           </button>
           {!draftCollapsed && (
-            <div className="ws-doc-body" style={{ whiteSpace: 'pre-wrap', fontSize: 11, lineHeight: 1.5, maxHeight: 240, overflowY: 'auto', padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
+            <div className="max-h-60 overflow-y-auto whitespace-pre-wrap border-t border-line-soft bg-canvas px-3 py-2.5 text-label leading-normal text-fg-label">
               {quotationText}
             </div>
           )}
@@ -3895,69 +3874,58 @@ export default function InlineStepForms({
       )}
 
       {/* Send method toggle */}
-      <div>
-        <label className="lt-label">Send Method</label>
-        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-          <button
-            className={`db-btn ${sendMethod === 'email' ? 'primary' : ''}`}
-            style={sendMethod !== 'email' ? { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' } : {}}
-            onClick={() => { setSendMethod('email'); setEmailConfirmed(false) }}
-          >
-            <Mail size={13} style={{ marginRight: 4 }} /> Email
-          </button>
-          <button
-            className={`db-btn ${sendMethod === 'whatsapp' ? 'primary' : ''}`}
-            style={sendMethod === 'whatsapp' ? { background: '#25d366', borderColor: '#25d366' } : { background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-secondary)' }}
-            onClick={() => { setSendMethod('whatsapp'); setEmailConfirmed(false) }}
-          >
-            <MessageCircle size={13} style={{ marginRight: 4 }} /> WhatsApp
-          </button>
+      <div className="flex flex-col gap-1">
+        <span id="ws-stc-method-label" className={labelClass}>Send Method</span>
+        <div role="group" aria-labelledby="ws-stc-method-label" className="flex gap-2">
+          <Button aria-pressed={sendMethod === 'email'} className={cn(sendMethod === 'email' && SELECTED_TOGGLE)}
+            icon={<Mail size={14} aria-hidden="true" />}
+            onClick={() => { setSendMethod('email'); setEmailConfirmed(false) }}>
+            Email
+          </Button>
+          <Button aria-pressed={sendMethod === 'whatsapp'} className={cn(sendMethod === 'whatsapp' && SELECTED_TOGGLE)}
+            icon={<MessageCircle size={14} aria-hidden="true" />}
+            onClick={() => { setSendMethod('whatsapp'); setEmailConfirmed(false) }}>
+            WhatsApp
+          </Button>
         </div>
       </div>
 
       {/* Email fields */}
       {sendMethod === 'email' && (
         <>
-          <div>
-            <label className="lt-label">Customer Email <span style={{ color: '#dc2626' }}>*</span></label>
-            <input className="lt-input" style={{ width: '100%' }} type="email"
+          <Field label="Customer Email" required>
+            {ids => <Input {...ids} type="email"
               value={customerContactEmail} onChange={e => setCustomerContactEmail(e.target.value)}
-              placeholder="customer@example.com" autoFocus />
-          </div>
+              placeholder="customer@example.com" autoFocus />}
+          </Field>
           {customerContactEmail.includes('@') && (
             <>
               {/* Download quotation PDF from S3 */}
               {resolvedQuoteId && (
-                <button className="db-btn" type="button" onClick={handleDownloadPdf} disabled={pdfDownloading}
-                  style={{ background: pdfDownloaded ? '#16a34a' : 'var(--bg-card)', border: `1px solid ${pdfDownloaded ? '#16a34a' : 'var(--border)'}`, color: pdfDownloaded ? '#fff' : 'var(--text-secondary)', width: '100%' }}>
-                  {pdfDownloading
-                    ? <><FileText size={13} style={{ marginRight: 6 }} /> Downloading...</>
-                    : pdfDownloaded
-                      ? <><FileText size={13} style={{ marginRight: 6 }} /> Downloaded — attach to email</>
-                      : <><FileText size={13} style={{ marginRight: 6 }} /> Download Quotation PDF</>
-                  }
-                </button>
+                <Button className={cn('w-full justify-start', pdfDownloaded && DOWNLOADED_BUTTON)}
+                  icon={<FileText size={14} aria-hidden="true" />}
+                  isPending={pdfDownloading} onClick={handleDownloadPdf}>
+                  {pdfDownloading ? 'Downloading...' : pdfDownloaded ? 'Downloaded — attach to email' : 'Download Quotation PDF'}
+                </Button>
               )}
               {/* Open Outlook compose with quotation text in body */}
-              <button className="db-btn" type="button" onClick={handleOpenOutlook}
-                style={{ background: '#0078d4', borderColor: '#0078d4', color: '#fff', width: '100%' }}>
-                <Mail size={13} style={{ marginRight: 6 }} /> Open in Outlook
-              </button>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', padding: '0 2px', lineHeight: 1.4 }}>
+              <Button variant="primary" className="w-full justify-start" icon={<Mail size={14} aria-hidden="true" />} onClick={handleOpenOutlook}>
+                Open in Outlook
+              </Button>
+              <p className="m-0 px-0.5 text-label leading-snug text-fg-muted">
                 {resolvedQuoteId
                   ? 'Download the PDF first, then open Outlook and attach it to the email before sending.'
                   : 'Opens Outlook with the quotation text. Attach any files manually if needed.'}
-              </div>
-              <div style={{ padding: '10px 14px', background: 'rgba(0,120,212,0.06)', border: '1px solid rgba(0,120,212,0.2)', borderRadius: 8 }}>
-                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)' }}>
-                  <input type="checkbox" checked={emailConfirmed} onChange={e => setEmailConfirmed(e.target.checked)} style={{ marginTop: 2 }} />
-                  <span>
+              </p>
+              <div className="rounded-card border border-info-line bg-info-bg px-3.5 py-2.5">
+                <Checkbox checked={emailConfirmed} onChange={setEmailConfirmed} className="items-start">
+                  <span className="text-fg-label">
                     I confirm that I have sent this quotation to the customer via email.
-                    <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                    <span className="mt-0.5 block text-label text-fg-muted">
                       Download the PDF, open Outlook, attach the file, verify the content, send it, then check this box.
                     </span>
                   </span>
-                </label>
+                </Checkbox>
               </div>
             </>
           )}
@@ -3967,78 +3935,63 @@ export default function InlineStepForms({
       {/* WhatsApp fields */}
       {sendMethod === 'whatsapp' && (
         <>
-          <div>
-            <label className="lt-label">Customer WhatsApp Number <span style={{ color: '#dc2626' }}>*</span></label>
-            <input className="lt-input" style={{ width: '100%' }}
+          <Field label="Customer WhatsApp Number" required>
+            {ids => <Input {...ids}
               value={customerContactPhone} onChange={e => setCustomerContactPhone(e.target.value)}
-              placeholder="+94 7X XXX XXXX" autoFocus />
-          </div>
+              placeholder="+94 7X XXX XXXX" autoFocus />}
+          </Field>
           {customerContactPhone.replace(/\s/g, '').length >= 8 && (
             <>
               {/* Download quotation PDF for WhatsApp attachment */}
               {resolvedQuoteId && (
-                <button className="db-btn" type="button" onClick={handleDownloadPdf} disabled={pdfDownloading}
-                  style={{ background: pdfDownloaded ? '#16a34a' : 'var(--bg-card)', border: `1px solid ${pdfDownloaded ? '#16a34a' : 'var(--border)'}`, color: pdfDownloaded ? '#fff' : 'var(--text-secondary)', width: '100%' }}>
-                  {pdfDownloading
-                    ? <><FileText size={13} style={{ marginRight: 6 }} /> Downloading...</>
-                    : pdfDownloaded
-                      ? <><FileText size={13} style={{ marginRight: 6 }} /> Downloaded — attach to WhatsApp</>
-                      : <><FileText size={13} style={{ marginRight: 6 }} /> Download Quotation PDF</>
-                  }
-                </button>
+                <Button className={cn('w-full justify-start', pdfDownloaded && DOWNLOADED_BUTTON)}
+                  icon={<FileText size={14} aria-hidden="true" />}
+                  isPending={pdfDownloading} onClick={handleDownloadPdf}>
+                  {pdfDownloading ? 'Downloading...' : pdfDownloaded ? 'Downloaded — attach to WhatsApp' : 'Download Quotation PDF'}
+                </Button>
               )}
               {/* Open WhatsApp with pre-filled message */}
-              <button className="db-btn" type="button"
+              <Button variant="primary" className="w-full justify-start" icon={<MessageCircle size={14} aria-hidden="true" />}
                 onClick={() => {
                   const phone = customerContactPhone.replace(/[\s\-()]/g, '').replace(/^\+/, '')
                   const waUrl = `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(quotationText)}`
                   window.open(waUrl, '_blank')
-                }}
-                style={{ background: '#25d366', borderColor: '#25d366', color: '#fff', width: '100%' }}>
-                <MessageCircle size={13} style={{ marginRight: 6 }} /> Open in WhatsApp
-              </button>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', padding: '0 2px', lineHeight: 1.4 }}>
+                }}>
+                Open in WhatsApp
+              </Button>
+              <p className="m-0 px-0.5 text-label leading-snug text-fg-muted">
                 {resolvedQuoteId
                   ? 'Download the PDF first, then open WhatsApp and attach it to the chat before sending.'
                   : 'Opens WhatsApp Web with the quotation text pre-filled.'}
-              </div>
-              <div style={{ padding: '10px 14px', background: 'rgba(37,211,102,0.06)', border: '1px solid rgba(37,211,102,0.2)', borderRadius: 8 }}>
-                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)' }}>
-                  <input type="checkbox" checked={waConfirmed} onChange={e => setWaConfirmed(e.target.checked)} style={{ marginTop: 2 }} />
-                  <span>
+              </p>
+              <div className="rounded-card border border-success-line bg-success-bg px-3.5 py-2.5">
+                <Checkbox checked={waConfirmed} onChange={setWaConfirmed} className="items-start">
+                  <span className="text-fg-label">
                     I confirm that I have sent this quotation to the customer via WhatsApp.
-                    <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                    <span className="mt-0.5 block text-label text-fg-muted">
                       Download the PDF, open WhatsApp, attach the file, verify the content, send it, then check this box.
                     </span>
                   </span>
-                </label>
+                </Checkbox>
               </div>
             </>
           )}
         </>
       )}
 
-      <div>
-        <label className="lt-label">Notes (optional)</label>
-        <input className="lt-input" style={{ width: '100%' }} value={formNote}
+      <Field label="Notes (optional)">
+        {ids => <Input {...ids} value={formNote}
           onChange={e => setFormNote(e.target.value)}
-          placeholder="Any additional notes..." />
-      </div>
+          placeholder="Any additional notes..." />}
+      </Field>
 
       {/* Submit */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 18, borderTop: '1px solid #eef2f6' }}>
-        <button
-          className="db-btn primary"
-          disabled={stcDisabled}
-          style={
-            sendMethod === 'whatsapp' && waConfirmed ? { background: '#25d366', borderColor: '#25d366' } :
-            sendMethod === 'email' && customerContactEmail.includes('@') && emailConfirmed ? {} :
-            stcDisabled ? { opacity: 0.4, cursor: 'not-allowed' } : {}
-          }
-          onClick={handleModalSubmit}
-        >
-          {sendMethod === 'email' ? <><Mail size={12} /> Send via Email</> : <><MessageCircle size={12} /> Confirm WhatsApp Sent</>}
-        </button>
+      <div className="flex justify-end gap-2.5 border-t border-line-soft pt-4">
+        <Button variant="primary" disabled={stcDisabled}
+          icon={sendMethod === 'email' ? <Mail size={14} aria-hidden="true" /> : <MessageCircle size={14} aria-hidden="true" />}
+          onClick={handleModalSubmit}>
+          {sendMethod === 'email' ? 'Send via Email' : 'Confirm WhatsApp Sent'}
+        </Button>
       </div>
     </div>
   )
@@ -4056,18 +4009,14 @@ export default function InlineStepForms({
     ])
     const isImmediate = IMMEDIATE_KINDS.has(selectedItem.actionKind)
     return (
-      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, padding: 24, boxShadow: '0 1px 2px rgba(15,23,42,0.03)' }}>
-        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 18, color: 'var(--text)' }}>{selectedItem.actionLabel}</div>
-        <div style={{ fontSize: 13, color: '#64748b', marginBottom: 18 }}>{selectedItem.subtitle}</div>
+      <div className="rounded-card border border-line-soft bg-surface p-6">
+        <div className="mb-4 text-title font-bold text-fg">{selectedItem.actionLabel}</div>
+        <div className="mb-4 text-control text-fg-muted">{selectedItem.subtitle}</div>
         {!isImmediate && (
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 18, borderTop: '1px solid #eef2f6' }}>
-            <button
-              className="db-btn primary"
-              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
-              onClick={() => handleAction(selectedItem)}
-            >
-              {selectedItem.actionLabel} <ChevronRight size={13} />
-            </button>
+          <div className="flex justify-end gap-2.5 border-t border-line-soft pt-4">
+            <Button variant="primary" onClick={() => handleAction(selectedItem)}>
+              {selectedItem.actionLabel} <ChevronRight size={14} aria-hidden="true" />
+            </Button>
           </div>
         )}
       </div>
