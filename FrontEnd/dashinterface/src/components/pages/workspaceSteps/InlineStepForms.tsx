@@ -335,6 +335,20 @@ function FormSection({ title, children }: { title: string; children: ReactNode }
   )
 }
 
+/** Section heading that shows or hides the fields below it (House BL, Master BL). */
+function CollapsibleHead({ title, hint, collapsed, onToggle }: { title: string; hint?: string; collapsed: boolean; onToggle: () => void }) {
+  return (
+    <h3 className="m-0 border-b border-line-soft">
+      <button type="button" aria-expanded={!collapsed} onClick={onToggle}
+        className="flex w-full items-center gap-2 border-none bg-transparent px-0 pt-0 pb-2 text-left text-label">
+        <span className="font-bold uppercase tracking-label text-primary">{title}</span>
+        {hint && <span className="text-fg-muted">{hint}</span>}
+        <ChevronDown size={14} aria-hidden="true" className={cn('ml-auto text-fg-muted transition-transform', collapsed && '-rotate-90')} />
+      </button>
+    </h3>
+  )
+}
+
 /** Collapsible generated message. `action` (e.g. Copy) sits beside the toggle, shown while expanded. */
 function DraftPanel({ title, collapsed, onToggle, action, children }: { title: string; collapsed: boolean; onToggle: () => void; action?: ReactNode; children: ReactNode }) {
   return (
@@ -2540,186 +2554,179 @@ export default function InlineStepForms({
   const chblBkg = actionModal.sourceData.booking as Booking
   // Helper: input field
   const hInput = (label: string, key: string, opts?: { placeholder?: string; readOnly?: boolean; span2?: boolean; type?: string }) => (
-    <div style={opts?.span2 ? { gridColumn: '1 / -1' } : {}}>
-      <label className="lt-label">{label}</label>
-      <input className="lt-input" style={{ width: '100%', ...(opts?.readOnly ? { background: 'rgba(0,0,0,0.03)' } : {}) }}
-        type={opts?.type || 'text'}
-        value={hblField(key)}
-        onChange={e => setHblField(key, e.target.value)}
-        placeholder={opts?.placeholder || ''} readOnly={opts?.readOnly} />
-    </div>
+    <Field label={label} className={cn(opts?.span2 && 'col-span-full')}>
+      {ids => opts?.type === 'date'
+        ? <DatePicker {...ids} value={hblField(key)} onChange={v => setHblField(key, v)} />
+        : <Input {...ids} type={opts?.type || 'text'}
+          value={hblField(key)}
+          onChange={e => setHblField(key, e.target.value)}
+          placeholder={opts?.placeholder || ''} readOnly={opts?.readOnly} className={cn(opts?.readOnly && 'bg-canvas')} />}
+    </Field>
   )
   const hTextarea = (label: string, key: string, rows: number, placeholder?: string) => (
-    <div style={{ gridColumn: '1 / -1' }}>
-      <label className="lt-label">{label}</label>
-      <textarea className="lt-input" rows={rows} style={{ width: '100%', resize: 'vertical' as const, fontSize: 12 }}
+    <Field label={label} className="col-span-full">
+      {ids => <Textarea {...ids} rows={rows} className="resize-y"
         value={hblField(key)}
         onChange={e => setHblField(key, e.target.value)}
-        placeholder={placeholder || ''} />
-    </div>
+        placeholder={placeholder || ''} />}
+    </Field>
   )
   const hSelect = (label: string, key: string, options: string[]) => (
-    <div>
-      <label className="lt-label">{label}</label>
-      <select className="lt-input" style={{ width: '100%' }}
-        value={hblField(key)}
-        onChange={e => setHblField(key, e.target.value)}>
-        {options.map(o => <option key={o} value={o}>{o || '—'}</option>)}
-      </select>
-    </div>
+    <Field label={label}>
+      {ids => <Select {...ids} value={hblField(key)} onChange={v => setHblField(key, v)}
+        options={options.map(o => ({ value: o, label: o || '—' }))} />}
+    </Field>
   )
+  // Sits at the bottom of its grid cell, level with the inputs beside it.
   const hCheck = (label: string, key: string) => (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <input type="checkbox" checked={hblField(key) === '1'}
-        onChange={e => setHblField(key, e.target.checked ? '1' : '0')} />
-      <label className="lt-label" style={{ margin: 0 }}>{label}</label>
-    </div>
+    <Checkbox className="h-8 self-end" checked={hblField(key) === '1'}
+      onChange={checked => setHblField(key, checked ? '1' : '0')}>
+      {label}
+    </Checkbox>
   )
-  const hSection = (sectionId: string, title: string, hint?: string) => (
-    <div onClick={() => toggleHblSection(sectionId)} style={{
-      padding: '8px 12px', background: 'rgba(217,119,6,0.08)',
-      borderLeft: '3px solid #d97706', borderRadius: '0 6px 6px 0',
-      fontSize: 11, fontWeight: 700, textTransform: 'uppercase' as const,
-      letterSpacing: '0.05em', color: '#d97706', marginTop: 4,
-      cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    }}>
-      <span>{title}{hint ? <span style={{ fontWeight: 400, textTransform: 'none' as const, marginLeft: 8, fontSize: 11, color: '#64748b' }}>{hint}</span> : null}</span>
-      <span style={{ fontSize: 14, lineHeight: 1 }}>{hblCollapsed[sectionId] ? '+' : '−'}</span>
-    </div>
+  // Collapsible section: heading plus a 3-column (or 2-column) grid of fields.
+  const hSection = (sectionId: string, title: string, hint: string | undefined, cols: string, children: ReactNode) => (
+    <section className="flex flex-col gap-3">
+      <CollapsibleHead title={title} hint={hint} collapsed={!!hblCollapsed[sectionId]} onToggle={() => toggleHblSection(sectionId)} />
+      {!hblCollapsed[sectionId] && <div className={cn('grid gap-x-4 gap-y-3', cols)}>{children}</div>}
+    </section>
   )
+  const updateRow = (idx: number, patch: Partial<BlContainerRow>) => {
+    const u = [...hblContainers]; u[idx] = { ...u[idx], ...patch }; setHblContainers(u)
+  }
+  const hblColumns: { key: keyof BlContainerRow; label: string; width: string; type?: string }[] = [
+    { key: 'containerNo', label: 'Container #', width: 'w-[15%]' },
+    { key: 'size', label: 'Size', width: 'w-[8%]' },
+    { key: 'type', label: 'Type', width: 'w-[8%]' },
+    { key: 'shipmentType', label: 'SHP Type', width: 'w-[12%]' },
+    { key: 'sealNo', label: 'Seal No', width: 'w-[11%]' },
+    { key: 'packages', label: 'Pkgs', width: 'w-[9%]', type: 'number' },
+    { key: 'packageType', label: 'Pkg Type', width: 'w-[11%]' },
+    { key: 'grossWeight', label: 'G/W', width: 'w-[10%]', type: 'number' },
+    { key: 'cbm', label: 'CBM', width: 'w-[9%]', type: 'number' },
+  ]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      {/* Header banner */}
-      <div style={{ padding: '8px 14px', background: '#d97706', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff', letterSpacing: 0.5 }}>HOUSE BILL OF LADING</span>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>{chblBkg.customer_name} · {chblBkg.origin} → {chblBkg.destination}</span>
-      </div>
+    <div className="flex flex-col gap-4">
+      <StepHeader title="HOUSE BILL OF LADING" subtitle={`${chblBkg.customer_name} · ${chblBkg.origin} → ${chblBkg.destination}`} />
 
       {/* Booking summary strip */}
-      <div style={{ padding: '10px 14px', background: 'rgba(217,119,6,0.06)', border: '1px solid rgba(217,119,6,0.15)', borderRadius: 8, fontSize: 12 }}>
+      <div className="rounded-card border border-line-soft bg-primary-subtle px-3.5 py-2.5 text-control text-fg">
         <strong>{chblBkg.customer_name}</strong> — {chblBkg.origin} → {chblBkg.destination}
-        <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
+        <div className="mt-0.5 text-fg-muted">
           {chblBkg.quantity}x {chblBkg.container_type} · {chblBkg.shipping_line || 'No liner'} · Job Ref: {chblBkg.job_reference_number || 'N/A'}
         </div>
       </div>
 
       {/* Section 1: Job & Header Information */}
-      {hSection('hbl-jobheader', 'Job & Header Information', 'Voyage & schedule details')}
-      {!hblCollapsed['hbl-jobheader'] && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '8px 0' }}>
-          {hInput('Job #', 'jobNumber')}
-          {hInput('Vessel / Voyage', 'vesselVoyage', { readOnly: true })}
-          {hInput('ETA Colombo, Sri Lanka', 'etaColombo', { type: 'date' })}
-          {hInput('SOB Date Colombo, Sri Lanka', 'sobDate', { type: 'date' })}
-          {hInput('Warehouse', 'warehouse')}
-          {hInput('Yard / Depot', 'yardDepot')}
-          {hInput('FCL Cut Off', 'fclCutOff', { type: 'date' })}
-          {hInput('No. of CNTR & Type', 'noOfCntrType', { readOnly: true })}
-          {hInput('Remarks', 'hdrRemarks')}
-          {hInput('Destination', 'hdrDestination')}
-          {hInput('ETA Destination', 'etaDestination', { type: 'date' })}
-          {hInput('Destination Agent', 'destinationAgent')}
-          {hInput('Carrier', 'carrier', { readOnly: true })}
-          {hInput('Carrier Ref #', 'carrierRef')}
-          {hInput('Exchange Rate', 'exchangeRate')}
-          {hSelect('Container Type', 'containerTypeDropdown', ["20'GP", "40'GP", "40'HC", "20'RF", "40'RF", "20'OT", "40'OT", "45'HC"])}
-        </div>
-      )}
+      {hSection('hbl-jobheader', 'Job & Header Information', 'Voyage & schedule details', 'grid-cols-3', <>
+        {hInput('Job #', 'jobNumber')}
+        {hInput('Vessel / Voyage', 'vesselVoyage', { readOnly: true })}
+        {hInput('ETA Colombo, Sri Lanka', 'etaColombo', { type: 'date' })}
+        {hInput('SOB Date Colombo, Sri Lanka', 'sobDate', { type: 'date' })}
+        {hInput('Warehouse', 'warehouse')}
+        {hInput('Yard / Depot', 'yardDepot')}
+        {hInput('FCL Cut Off', 'fclCutOff', { type: 'date' })}
+        {hInput('No. of CNTR & Type', 'noOfCntrType', { readOnly: true })}
+        {hInput('Remarks', 'hdrRemarks')}
+        {hInput('Destination', 'hdrDestination')}
+        {hInput('ETA Destination', 'etaDestination', { type: 'date' })}
+        {hInput('Destination Agent', 'destinationAgent')}
+        {hInput('Carrier', 'carrier', { readOnly: true })}
+        {hInput('Carrier Ref #', 'carrierRef')}
+        {hInput('Exchange Rate', 'exchangeRate')}
+        {hSelect('Container Type', 'containerTypeDropdown', ["20'GP", "40'GP", "40'HC", "20'RF", "40'RF", "20'OT", "40'OT", "45'HC"])}
+      </>)}
 
       {/* Section 2: B/L Details */}
-      {hSection('hbl-bl', 'B/L Details', 'Identifiers')}
-      {!hblCollapsed['hbl-bl'] && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '8px 0' }}>
-          {hSelect('Branch', 'branch', ['COLOMBO', 'GALLE', 'HAMBANTOTA'])}
-          {hInput('Booking No.', 'bookingNo', { readOnly: true })}
-          {hSelect('Shipment Category', 'shipmentCategory', ['LOCAL EXPORT', 'RE-EXPORT', 'TRANSHIPMENT', 'CROSS TRADE'])}
-          {hSelect('B/L Type', 'blType', ['OWN', 'THROUGH', 'CARRIER BL', 'RMAT', 'SWITCH BL', 'AGENT BL'])}
-          {hInput('Sub Job / House BL #', 'houseBlNo', { placeholder: 'System-generated' })}
-          {hInput('Custom BL #', 'customBlNo')}
-          {hInput('STT #', 'sttNo', { placeholder: 'Transhipment only' })}
-          {hInput('HS Code', 'hsCode', { placeholder: 'e.g. 2009.89' })}
-        </div>
-      )}
+      {hSection('hbl-bl', 'B/L Details', 'Identifiers', 'grid-cols-3', <>
+        {hSelect('Branch', 'branch', ['COLOMBO', 'GALLE', 'HAMBANTOTA'])}
+        {hInput('Booking No.', 'bookingNo', { readOnly: true })}
+        {hSelect('Shipment Category', 'shipmentCategory', ['LOCAL EXPORT', 'RE-EXPORT', 'TRANSHIPMENT', 'CROSS TRADE'])}
+        {hSelect('B/L Type', 'blType', ['OWN', 'THROUGH', 'CARRIER BL', 'RMAT', 'SWITCH BL', 'AGENT BL'])}
+        {hInput('Sub Job / House BL #', 'houseBlNo', { placeholder: 'System-generated' })}
+        {hInput('Custom BL #', 'customBlNo')}
+        {hInput('STT #', 'sttNo', { placeholder: 'Transhipment only' })}
+        {hInput('HS Code', 'hsCode', { placeholder: 'e.g. 2009.89' })}
+      </>)}
 
       {/* Section 3: Shipper / Consignee / Notify */}
-      {hSection('hbl-parties', 'Shipper, Consignee & Notify', 'Shipper, consignee, notify party')}
-      {!hblCollapsed['hbl-parties'] && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '8px 0' }}>
-          {hInput('Shipper Name *', 'shipperName', { span2: true })}
-          {hTextarea('Shipper Address', 'shipperAddress', 3)}
-          {hInput('Shipper Reference (PO#)', 'shipperRef')}
-          {hCheck('Display on Shipper Invoice', 'displayOnShipperInvoice')}
-          {hInput('Email Reference', 'emailRef', { span2: true })}
-          {hInput('Consignee Name *', 'consigneeName', { span2: true })}
-          {hTextarea('Consignee Address', 'consigneeAddress', 3)}
-          {hSelect('Notify Type', 'notifyType', ['', 'NONE', 'SAME AS CONSIGNEE'])}
-          {hInput('Notify Name', 'notifyName')}
-          {hTextarea('Notify Address', 'notifyAddress', 3)}
-          {hInput('Also Notify', 'alsoNotify', { span2: true })}
-        </div>
-      )}
+      {hSection('hbl-parties', 'Shipper, Consignee & Notify', 'Shipper, consignee, notify party', 'grid-cols-2', <>
+        {hInput('Shipper Name *', 'shipperName', { span2: true })}
+        {hTextarea('Shipper Address', 'shipperAddress', 3)}
+        {hInput('Shipper Reference (PO#)', 'shipperRef')}
+        {hCheck('Display on Shipper Invoice', 'displayOnShipperInvoice')}
+        {hInput('Email Reference', 'emailRef', { span2: true })}
+        {hInput('Consignee Name *', 'consigneeName', { span2: true })}
+        {hTextarea('Consignee Address', 'consigneeAddress', 3)}
+        {hSelect('Notify Type', 'notifyType', ['', 'NONE', 'SAME AS CONSIGNEE'])}
+        {hInput('Notify Name', 'notifyName')}
+        {hTextarea('Notify Address', 'notifyAddress', 3)}
+        {hInput('Also Notify', 'alsoNotify', { span2: true })}
+      </>)}
 
       {/* Section 4: Operational & Customer Metadata */}
-      {hSection('hbl-operational', 'Operational & Customer Metadata')}
-      {!hblCollapsed['hbl-operational'] && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '8px 0' }}>
-          {hSelect('Customer Category', 'customerCategory', ['CUSTOMER', 'FORWARDER'])}
-          {hSelect('Business Type', 'businessType', ['SALES NOMINATION', 'AGENT NOMINATION', 'FREE HAND'])}
-          {hInput('Customer / Shipper', 'customerShipper')}
-          {hInput('Billing Party', 'billingParty')}
-          {hInput('Sales Person', 'salesPerson')}
-          {hInput('CS Executive', 'csExecutive')}
-          {hInput('Documentation By', 'documentationBy')}
-          {hInput('Introduce By', 'introducedBy')}
-          {hSelect('Cargo Type', 'cargoType', ['GENERAL', 'DG'])}
-          {hInput('Commodity', 'commodity')}
-          {hCheck('Show Containers on Attachment', 'showContainersOnAttachment')}
-          {hInput('No. of Containers on BL', 'noOfContainersOnBl', { type: 'number' })}
-        </div>
-      )}
+      {hSection('hbl-operational', 'Operational & Customer Metadata', undefined, 'grid-cols-3', <>
+        {hSelect('Customer Category', 'customerCategory', ['CUSTOMER', 'FORWARDER'])}
+        {hSelect('Business Type', 'businessType', ['SALES NOMINATION', 'AGENT NOMINATION', 'FREE HAND'])}
+        {hInput('Customer / Shipper', 'customerShipper')}
+        {hInput('Billing Party', 'billingParty')}
+        {hInput('Sales Person', 'salesPerson')}
+        {hInput('CS Executive', 'csExecutive')}
+        {hInput('Documentation By', 'documentationBy')}
+        {hInput('Introduce By', 'introducedBy')}
+        {hSelect('Cargo Type', 'cargoType', ['GENERAL', 'DG'])}
+        {hInput('Commodity', 'commodity')}
+        {hCheck('Show Containers on Attachment', 'showContainersOnAttachment')}
+        {hInput('No. of Containers on BL', 'noOfContainersOnBl', { type: 'number' })}
+      </>)}
 
       {/* Section 5: Containers & Package Details */}
-      {hSection('hbl-containers', 'Containers & Package Details', `${hblContainers.length} row(s)`)}
-      {!hblCollapsed['hbl-containers'] && (
-        <div style={{ padding: '8px 0' }}>
+      <section className="flex flex-col gap-3">
+        <CollapsibleHead title="Containers & Package Details" hint={`${hblContainers.length} row(s)`}
+          collapsed={!!hblCollapsed['hbl-containers']} onToggle={() => toggleHblSection('hbl-containers')} />
+        {!hblCollapsed['hbl-containers'] && (<>
           {/* Container rows table */}
-          <div style={{ overflowX: 'auto', marginBottom: 12 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+          <div className="flex flex-col items-start gap-2 overflow-x-auto">
+            <table className="w-full table-fixed border-collapse text-label">
               <thead>
-                <tr style={{ background: 'rgba(217,119,6,0.06)' }}>
-                  {['Container #', 'Size', 'Type', 'SHP Type', 'Seal No', 'Pkgs', 'Pkg Type', 'G/W', 'CBM', ''].map(h => (
-                    <th key={h} style={{ padding: '6px 4px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>{h}</th>
+                <tr className="bg-canvas">
+                  {hblColumns.map(c => (
+                    <th key={c.key} className={cn(c.width, 'border-b border-line-soft px-1 py-1.5 text-left font-semibold text-fg-label')}>{c.label}</th>
                   ))}
+                  <th className="w-[7%] border-b border-line-soft"><span className="sr-only">Remove</span></th>
                 </tr>
               </thead>
               <tbody>
                 {hblContainers.map((row, idx) => (
                   <tr key={idx}>
-                    <td style={{ padding: '3px 2px' }}><input className="lt-input" style={{ width: 100 }} value={row.containerNo} onChange={e => { const u = [...hblContainers]; u[idx] = { ...u[idx], containerNo: e.target.value }; setHblContainers(u) }} /></td>
-                    <td style={{ padding: '3px 2px' }}><input className="lt-input" style={{ width: 40 }} value={row.size} onChange={e => { const u = [...hblContainers]; u[idx] = { ...u[idx], size: e.target.value }; setHblContainers(u) }} /></td>
-                    <td style={{ padding: '3px 2px' }}><input className="lt-input" style={{ width: 50 }} value={row.type} onChange={e => { const u = [...hblContainers]; u[idx] = { ...u[idx], type: e.target.value }; setHblContainers(u) }} /></td>
-                    <td style={{ padding: '3px 2px' }}><input className="lt-input" style={{ width: 60 }} value={row.shipmentType} onChange={e => { const u = [...hblContainers]; u[idx] = { ...u[idx], shipmentType: e.target.value }; setHblContainers(u) }} /></td>
-                    <td style={{ padding: '3px 2px' }}><input className="lt-input" style={{ width: 70 }} value={row.sealNo} onChange={e => { const u = [...hblContainers]; u[idx] = { ...u[idx], sealNo: e.target.value }; setHblContainers(u) }} /></td>
-                    <td style={{ padding: '3px 2px' }}><input className="lt-input" style={{ width: 40 }} type="number" value={row.packages} onChange={e => { const u = [...hblContainers]; u[idx] = { ...u[idx], packages: e.target.value }; setHblContainers(u) }} /></td>
-                    <td style={{ padding: '3px 2px' }}><input className="lt-input" style={{ width: 60 }} value={row.packageType} onChange={e => { const u = [...hblContainers]; u[idx] = { ...u[idx], packageType: e.target.value }; setHblContainers(u) }} /></td>
-                    <td style={{ padding: '3px 2px' }}><input className="lt-input" style={{ width: 55 }} type="number" value={row.grossWeight} onChange={e => { const u = [...hblContainers]; u[idx] = { ...u[idx], grossWeight: e.target.value }; setHblContainers(u) }} /></td>
-                    <td style={{ padding: '3px 2px' }}><input className="lt-input" style={{ width: 50 }} type="number" value={row.cbm} onChange={e => { const u = [...hblContainers]; u[idx] = { ...u[idx], cbm: e.target.value }; setHblContainers(u) }} /></td>
-                    <td style={{ padding: '3px 2px' }}>
-                      {hblContainers.length > 1 && <button className="lt-icon-btn" onClick={() => setHblContainers(hblContainers.filter((_, i) => i !== idx))} title="Remove">×</button>}
+                    {hblColumns.map(c => (
+                      <td key={c.key} className="px-0.5 py-1">
+                        <Input aria-label={`${c.label} row ${idx + 1}`} type={c.type} className="px-1.5"
+                          value={row[c.key]} onChange={e => updateRow(idx, { [c.key]: e.target.value })} />
+                      </td>
+                    ))}
+                    <td className="px-0.5 py-1">
+                      {hblContainers.length > 1 && (
+                        <Tooltip content="Remove">
+                          <Button variant="ghost" className="w-8 px-0" aria-label={`Remove container row ${idx + 1}`}
+                            icon={<X size={14} aria-hidden="true" />}
+                            onClick={() => setHblContainers(hblContainers.filter((_, i) => i !== idx))} />
+                        </Tooltip>
+                      )}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <button className="db-btn" style={{ marginTop: 4, fontSize: 11, padding: '4px 10px' }}
+            <Button size="sm"
               onClick={() => setHblContainers([...hblContainers, { containerNo: '', size: '20', type: 'GP', shipmentType: 'FCL/FCL', sealNo: '', packages: '', packageType: '', grossWeight: '', cbm: '' }])}>
               + Add Container
-            </button>
+            </Button>
           </div>
 
           {/* Package summary */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+          <div className="grid grid-cols-3 gap-x-4 gap-y-3">
             {hInput('No. of Packages in Figures', 'totalPackages', { type: 'number' })}
             {hSelect('Package Type', 'packageType', ['', 'PALLETS', 'CARTONS', 'BAGS', 'DRUMS', 'BALES', 'PIECES'])}
             {hSelect('Print Details', 'printDetails', ['PACKAGE DETAILS', 'CONTAINER DETAILS', 'BOTH', 'NONE'])}
@@ -2733,95 +2740,88 @@ export default function InlineStepForms({
             {hInput('Weight / Measurement Ratio', 'wmRatio', { type: 'number' })}
           </div>
           {hTextarea('Marks & Numbers', 'marksNumbers', 4, 'CONTAINER AND SEAL DETAILS AS PER ATTACHED SHEET')}
-        </div>
-      )}
+        </>)}
+      </section>
 
       {/* Section 6: Goods Description & Routing */}
-      {hSection('hbl-goods', 'Goods Description & Routing')}
-      {!hblCollapsed['hbl-goods'] && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '8px 0' }}>
-          {hTextarea('Description Prefix (Top)', 'descriptionPrefixTop', 3)}
-          {hTextarea('Description of Goods *', 'descriptionOfGoods', 5, 'e.g. 06X20GP CONTAINERS FCL/FCL...')}
-          {hTextarea('Description Prefix (Bottom)', 'descriptionPrefixBottom', 3)}
-          {hTextarea('Liner B/L Description', 'linerBlDescription', 4, 'What goes to the carrier for the master bill')}
-          {hCheck("Print to B/L Shipper's Load Count & Seal", 'printToBlShipperSeal')}
-          {hSelect('Attach Sheet', 'attachSheet', ['', 'NONE', 'PAGE 1', 'PAGE 2', 'ALL PAGES'])}
-          {hSelect('Delivery Type', 'deliveryType', ['CFS/DOOR', 'DOOR/CFS', 'DOOR/DOOR', 'DOOR/CY', 'CY/DOOR', 'CY/CY', 'CY/CFS', 'CY/RR', 'CFS/CY', 'CFS/CFS', 'DOOR/PORT', 'PORT/DOOR', 'PORT/PORT'])}
-          {hSelect('Incoterm', 'incoterm', ['', 'EXW', 'FCA', 'FAS', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP'])}
-          {hSelect('Country of Origin', 'countryOfOrigin', ['SRI LANKA', 'INDIA', 'CHINA', 'BANGLADESH', 'VIETNAM', 'THAILAND', 'PAKISTAN'])}
-          {hInput('Port of Loading', 'portOfLoading')}
-          {hInput('Port of Discharge', 'portOfDischarge')}
-          {hInput('Port of Discharge ETA', 'podEta', { type: 'date' })}
-          {hInput('Port of Discharge ATA', 'podAta', { type: 'date' })}
-          {hInput('Final Destination', 'finalDestination')}
-          {hInput('Final Destination ETA', 'fdEta', { type: 'date' })}
-          {hInput('Final Destination ATA', 'fdAta', { type: 'date' })}
-          {hInput('Place of Delivery', 'placeOfDelivery')}
-          {hInput('Place of Delivery ETA', 'podelEta', { type: 'date' })}
-          {hInput('Place of Delivery ATA', 'podelAta', { type: 'date' })}
-          {hInput('Transit Time', 'transitTime', { type: 'number' })}
-          {hTextarea('SAP Description', 'sapDescription', 3)}
-        </div>
-      )}
+      {hSection('hbl-goods', 'Goods Description & Routing', undefined, 'grid-cols-3', <>
+        {hTextarea('Description Prefix (Top)', 'descriptionPrefixTop', 3)}
+        {hTextarea('Description of Goods *', 'descriptionOfGoods', 5, 'e.g. 06X20GP CONTAINERS FCL/FCL...')}
+        {hTextarea('Description Prefix (Bottom)', 'descriptionPrefixBottom', 3)}
+        {hTextarea('Liner B/L Description', 'linerBlDescription', 4, 'What goes to the carrier for the master bill')}
+        {hCheck("Print to B/L Shipper's Load Count & Seal", 'printToBlShipperSeal')}
+        {hSelect('Attach Sheet', 'attachSheet', ['', 'NONE', 'PAGE 1', 'PAGE 2', 'ALL PAGES'])}
+        {hSelect('Delivery Type', 'deliveryType', ['CFS/DOOR', 'DOOR/CFS', 'DOOR/DOOR', 'DOOR/CY', 'CY/DOOR', 'CY/CY', 'CY/CFS', 'CY/RR', 'CFS/CY', 'CFS/CFS', 'DOOR/PORT', 'PORT/DOOR', 'PORT/PORT'])}
+        {hSelect('Incoterm', 'incoterm', ['', 'EXW', 'FCA', 'FAS', 'FOB', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP'])}
+        {hSelect('Country of Origin', 'countryOfOrigin', ['SRI LANKA', 'INDIA', 'CHINA', 'BANGLADESH', 'VIETNAM', 'THAILAND', 'PAKISTAN'])}
+        {hInput('Port of Loading', 'portOfLoading')}
+        {hInput('Port of Discharge', 'portOfDischarge')}
+        {hInput('Port of Discharge ETA', 'podEta', { type: 'date' })}
+        {hInput('Port of Discharge ATA', 'podAta', { type: 'date' })}
+        {hInput('Final Destination', 'finalDestination')}
+        {hInput('Final Destination ETA', 'fdEta', { type: 'date' })}
+        {hInput('Final Destination ATA', 'fdAta', { type: 'date' })}
+        {hInput('Place of Delivery', 'placeOfDelivery')}
+        {hInput('Place of Delivery ETA', 'podelEta', { type: 'date' })}
+        {hInput('Place of Delivery ATA', 'podelAta', { type: 'date' })}
+        {hInput('Transit Time', 'transitTime', { type: 'number' })}
+        {hTextarea('SAP Description', 'sapDescription', 3)}
+      </>)}
 
       {/* Section 7: Freight & Financials */}
-      {hSection('hbl-freight', 'Freight & Financials')}
-      {!hblCollapsed['hbl-freight'] && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '8px 0' }}>
-          {hInput('Delivery No', 'deliveryNo')}
-          {hInput('Place of BL Issued', 'placeOfBlIssued')}
-          {hInput('Date of BL Issued', 'dateOfBlIssued', { type: 'date' })}
-          {hInput('Place of Receipt', 'placeOfReceipt')}
-          {hInput('Shipped on Board Date', 'shippedOnBoardDate', { type: 'date' })}
-          {hSelect('Freight Term', 'freightTerm', ['PREPAID', 'COLLECT'])}
-          {hInput('Freight Amount', 'freightAmount', { type: 'number' })}
-          {hTextarea('Freight Payable At', 'freightPayableAt', 2)}
-          {hTextarea('Freight Term Details', 'freightTermDetails', 2)}
-          {hSelect('Destination Charges', 'destinationCharges', ['COLLECT', 'PREPAID'])}
-          {hSelect('Origin Charges', 'originCharges', ['PREPAID', 'COLLECT'])}
-          {hSelect('Received for Shipment', 'receivedForShipment', ['NO', 'YES'])}
-          {hTextarea('Remarks', 'remarks', 3)}
-          {hInput('POD Agent', 'podAgent')}
-        </div>
-      )}
+      {hSection('hbl-freight', 'Freight & Financials', undefined, 'grid-cols-3', <>
+        {hInput('Delivery No', 'deliveryNo')}
+        {hInput('Place of BL Issued', 'placeOfBlIssued')}
+        {hInput('Date of BL Issued', 'dateOfBlIssued', { type: 'date' })}
+        {hInput('Place of Receipt', 'placeOfReceipt')}
+        {hInput('Shipped on Board Date', 'shippedOnBoardDate', { type: 'date' })}
+        {hSelect('Freight Term', 'freightTerm', ['PREPAID', 'COLLECT'])}
+        {hInput('Freight Amount', 'freightAmount', { type: 'number' })}
+        {hTextarea('Freight Payable At', 'freightPayableAt', 2)}
+        {hTextarea('Freight Term Details', 'freightTermDetails', 2)}
+        {hSelect('Destination Charges', 'destinationCharges', ['COLLECT', 'PREPAID'])}
+        {hSelect('Origin Charges', 'originCharges', ['PREPAID', 'COLLECT'])}
+        {hSelect('Received for Shipment', 'receivedForShipment', ['NO', 'YES'])}
+        {hTextarea('Remarks', 'remarks', 3)}
+        {hInput('POD Agent', 'podAgent')}
+      </>)}
 
       {/* Section 8: POD Agent, B/L Terms & Manifest */}
-      {hSection('hbl-terms', 'POD Agent, B/L Terms & Manifest')}
-      {!hblCollapsed['hbl-terms'] && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, padding: '8px 0' }}>
-          {hTextarea('POD Agent Address', 'podAgentAddress', 3)}
-          {hInput('Contact Person', 'contactPerson')}
-          {hInput('B/L Term', 'blTerm')}
-          {hSelect('No. of Original BLs', 'noOfOriginalBls', ['ZERO (0)', 'ONE (1)', 'TWO (2)', 'THREE (3)'])}
-          {hSelect('BL Status', 'blStatus', ['', 'ORIGINAL', 'SURRENDERED', 'SEAWAY', 'EXPRESS'])}
-          {hCheck('Hold Cargo', 'holdCargo')}
-          {hCheck('Email Surrender Letter', 'emailSurrenderLetter')}
-          {hInput('Permit No', 'permitNo')}
-          {hInput('Agent for Carrier', 'agentForCarrier')}
-          {hCheck('Print Agent for Carrier', 'printAgentForCarrier')}
-          {hInput('Detention Days', 'detentionDays', { placeholder: 'e.g. 14 DAYS FREE DETENTION & DEMURRAGE AT DESTINATION' })}
-          {hCheck('Display on Carrier Draft', 'displayOnCarrierDraft')}
-          {hCheck('Display Tariff Charges', 'displayTariffCharges')}
-          {hCheck('Display Additional Text', 'displayAdditionalText')}
-          {hSelect('B/L Format', 'blFormat', ['SELECT HBL FORMAT', 'CLS', 'CLS BDT', 'CLS NONE-NEGO', 'CLS LIGENTIA', 'CLS LOGFRET', 'CLS_FMC', 'CLS_BDT(SW)', 'TRANSMODAL', 'TRANSMODAL(SW)'])}
-          {hCheck('Draft Confirmed', 'draftConfirmed')}
-        </div>
-      )}
+      {hSection('hbl-terms', 'POD Agent, B/L Terms & Manifest', undefined, 'grid-cols-3', <>
+        {hTextarea('POD Agent Address', 'podAgentAddress', 3)}
+        {hInput('Contact Person', 'contactPerson')}
+        {hInput('B/L Term', 'blTerm')}
+        {hSelect('No. of Original BLs', 'noOfOriginalBls', ['ZERO (0)', 'ONE (1)', 'TWO (2)', 'THREE (3)'])}
+        {hSelect('BL Status', 'blStatus', ['', 'ORIGINAL', 'SURRENDERED', 'SEAWAY', 'EXPRESS'])}
+        {hCheck('Hold Cargo', 'holdCargo')}
+        {hCheck('Email Surrender Letter', 'emailSurrenderLetter')}
+        {hInput('Permit No', 'permitNo')}
+        {hInput('Agent for Carrier', 'agentForCarrier')}
+        {hCheck('Print Agent for Carrier', 'printAgentForCarrier')}
+        {hInput('Detention Days', 'detentionDays', { placeholder: 'e.g. 14 DAYS FREE DETENTION & DEMURRAGE AT DESTINATION' })}
+        {hCheck('Display on Carrier Draft', 'displayOnCarrierDraft')}
+        {hCheck('Display Tariff Charges', 'displayTariffCharges')}
+        {hCheck('Display Additional Text', 'displayAdditionalText')}
+        {hSelect('B/L Format', 'blFormat', ['SELECT HBL FORMAT', 'CLS', 'CLS BDT', 'CLS NONE-NEGO', 'CLS LIGENTIA', 'CLS LOGFRET', 'CLS_FMC', 'CLS_BDT(SW)', 'TRANSMODAL', 'TRANSMODAL(SW)'])}
+        {hCheck('Draft Confirmed', 'draftConfirmed')}
+      </>)}
 
       {/* Manifest Charges Table */}
-      {hSection('hbl-manifest', 'Manifest Charges', 'Freight charges breakdown')}
-      {!hblCollapsed['hbl-manifest'] && (
-        <div style={{ padding: '8px 0', fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-          Manifest charges will be managed via the Gensoft integration. Enter charges in Gensoft after saving the HBL.
-        </div>
-      )}
+      <section className="flex flex-col gap-3">
+        <CollapsibleHead title="Manifest Charges" hint="Freight charges breakdown"
+          collapsed={!!hblCollapsed['hbl-manifest']} onToggle={() => toggleHblSection('hbl-manifest')} />
+        {!hblCollapsed['hbl-manifest'] && (
+          <p className="m-0 text-label italic text-fg-muted">
+            Manifest charges will be managed via the Gensoft integration. Enter charges in Gensoft after saving the HBL.
+          </p>
+        )}
+      </section>
 
       {/* Notes */}
-      <div>
-        <label className="lt-label">Notes (optional)</label>
-        <input className="lt-input" style={{ width: '100%' }} value={formNote}
-          onChange={e => setFormNote(e.target.value)} placeholder="Internal notes..." />
-      </div>
+      <Field label="Notes (optional)">
+        {ids => <Input {...ids} value={formNote}
+          onChange={e => setFormNote(e.target.value)} placeholder="Internal notes..." />}
+      </Field>
     </div>
   )
 })() : selectedItem.actionKind === 'create-bl' && actionModal ? (() => {

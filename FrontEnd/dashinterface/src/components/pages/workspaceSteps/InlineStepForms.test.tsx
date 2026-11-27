@@ -744,3 +744,58 @@ describe('InlineStepForms create-vessel-booking', () => {
     expect(onMarkBlBookingCreated).toHaveBeenCalledWith('BKG-TEST')
   })
 })
+
+describe('InlineStepForms create-hbl', () => {
+  const containerRow = { containerNo: 'C1', size: '40', type: 'HC', shipmentType: 'FCL/FCL', sealNo: '', packages: '', packageType: '', grossWeight: '', cbm: '' }
+  const hblProps = (over: Partial<InlineStepFormsProps> = {}): Partial<InlineStepFormsProps> => ({
+    hblField: rec({ holdCargo: '1' }), setHblField: () => {}, hblContainers: [containerRow], setHblContainers: () => {},
+    hblCollapsed: {}, toggleHblSection: () => {},
+    ...over,
+  })
+
+  it('section headings are disclosure buttons; a collapsed section hides its fields', async () => {
+    const user = userEvent.setup()
+    const toggleHblSection = vi.fn()
+    const { unmount } = renderStep('create-hbl', booking(), hblProps({ toggleHblSection }))
+    const head = screen.getByRole('button', { name: /^B\/L Details/ })
+    expect(head).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('textbox', { name: 'Custom BL #' })).toBeInTheDocument()
+    await user.click(head)
+    expect(toggleHblSection).toHaveBeenCalledWith('hbl-bl')
+    unmount()
+    renderStep('create-hbl', booking(), hblProps({ hblCollapsed: { 'hbl-bl': true } }))
+    expect(screen.getByRole('button', { name: /^B\/L Details/ })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('textbox', { name: 'Custom BL #' })).not.toBeInTheDocument()
+  })
+
+  it('checkboxes store "1"/"0"; dates and selects update their fields', async () => {
+    const user = userEvent.setup()
+    const setHblField = vi.fn()
+    renderStep('create-hbl', booking(), hblProps({ setHblField }))
+    const hold = screen.getByRole('checkbox', { name: 'Hold Cargo' })
+    expect(hold).toBeChecked()
+    await user.click(hold)
+    expect(setHblField).toHaveBeenCalledWith('holdCargo', '0')
+    await user.click(screen.getByRole('checkbox', { name: 'Draft Confirmed' }))
+    expect(setHblField).toHaveBeenCalledWith('draftConfirmed', '1')
+    await user.click(screen.getByRole('button', { name: /Incoterm$/ }))
+    await user.click(screen.getByRole('option', { name: 'FOB' }))
+    expect(setHblField).toHaveBeenCalledWith('incoterm', 'FOB')
+    expect(screen.getByRole('group', { name: 'ETA Destination' })).toBeInTheDocument()
+  })
+
+  it('container rows edit, add and remove through setHblContainers', async () => {
+    const user = userEvent.setup()
+    const setHblContainers = vi.fn()
+    const { unmount } = renderStep('create-hbl', booking(), hblProps({ setHblContainers }))
+    expect(screen.queryByRole('button', { name: 'Remove container row 1' })).not.toBeInTheDocument()
+    await user.type(screen.getByRole('textbox', { name: 'Seal No row 1' }), 'S')
+    expect(setHblContainers).toHaveBeenLastCalledWith([{ ...containerRow, sealNo: 'S' }])
+    await user.click(screen.getByRole('button', { name: '+ Add Container' }))
+    expect(setHblContainers).toHaveBeenLastCalledWith([containerRow, { containerNo: '', size: '20', type: 'GP', shipmentType: 'FCL/FCL', sealNo: '', packages: '', packageType: '', grossWeight: '', cbm: '' }])
+    unmount()
+    renderStep('create-hbl', booking(), hblProps({ setHblContainers, hblContainers: [containerRow, { ...containerRow, containerNo: 'C2' }] }))
+    await user.click(screen.getByRole('button', { name: 'Remove container row 1' }))
+    expect(setHblContainers).toHaveBeenLastCalledWith([{ ...containerRow, containerNo: 'C2' }])
+  })
+})
